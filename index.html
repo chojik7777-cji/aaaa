@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자기소개 - 홍길동</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .card {
+            background: white; border-radius: 20px;
+            padding: 50px 40px; max-width: 500px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+        }
+        .avatar {
+            width: 100px; height: 100px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 0 auto 24px; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 40px; color: white; font-weight: bold;
+        }
+        .name { font-size: 28px; font-weight: 700; color: #2d3748; margin-bottom: 8px; }
+        .title { font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 24px; }
+        .divider {
+            width: 60px; height: 3px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 0 auto 24px; border-radius: 2px;
+        }
+        .bio { font-size: 16px; line-height: 1.8; color: #4a5568; margin-bottom: 32px; }
+        .contact { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+        .contact a {
+            display: inline-block; padding: 10px 20px; background: #f7fafc;
+            color: #4a5568; text-decoration: none; border-radius: 10px;
+            font-size: 14px; transition: all 0.3s; border: 1px solid #e2e8f0;
+        }
+        .contact a:hover { background: #667eea; color: white; border-color: #667eea; }
+        .footer { margin-top: 32px; font-size: 13px; color: #a0aec0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="avatar">길</div>
+        <h1 class="name">홍길동</h1>
+        <p class="title">여행을 좋아하는 직장인</p>
+        <div class="divider"></div>
+        <p class="bio">
+            안녕하세요! 저는 홍길동입니다.<br>
+            여행과 맛집 탐방을 좋아하고,<br>
+            새로운 것을 배우는 걸 즐깁니다.<br><br>
+            만나서 반갑습니다!
+        </p>
+        <div class="contact">
+            <a href="mailto:gildong@email.com">이메일</a>
+            <a href="https://github.com/hong-gildong">GitHub</a>
+        </div>
+        <p class="footer">GPTers 4주차 실습으로 만든 페이지입니다</p>
+    </div>
+</body>
+</html>
