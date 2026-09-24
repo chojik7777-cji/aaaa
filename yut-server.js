@@ -151,16 +151,18 @@ function publicRoom(room) {
   return {
     roomId: room.roomId,
     playersConnected: room.players.map(Boolean),
+    guestCount: room.guests ? room.guests.length : 0,
     game: clone(room.game),
     updatedAt: room.updatedAt,
   };
 }
 function assertTurn(room, pid) {
   const pi = room.players.indexOf(pid);
-  if (pi < 0) throw new Error('이 방의 참가자가 아닙니다.');
+  const guest = room.guests && room.guests.includes(pid);
+  if (pi < 0 && !guest) throw new Error('이 방의 참가자가 아닙니다.');
   if (room.game.winner !== null) throw new Error('이미 종료된 게임입니다.');
-  if (room.game.cur !== pi) throw new Error('현재 내 차례가 아닙니다.');
-  return pi;
+  if (!guest && room.game.cur !== pi) throw new Error('현재 내 차례가 아닙니다.');
+  return guest ? room.game.cur : pi;
 }
 function handleThrow(room, pid) {
   assertTurn(room, pid);
@@ -250,7 +252,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       let id; do { id = roomCode(); } while (rooms.has(id));
       const pid = playerId();
-      const room = { roomId: id, players: [pid], game: createGame(body.count, body.pieces), updatedAt: Date.now() };
+      const room = { roomId: id, players: [pid], guests: [], game: createGame(body.count, body.pieces), updatedAt: Date.now() };
       rooms.set(id, room);
       return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 0 });
     }
@@ -260,11 +262,16 @@ const server = http.createServer(async (req, res) => {
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
       let idx = room.players.findIndex((x) => !x);
       if (idx < 0) idx = room.players.length;
-      if (idx >= room.game.players.length) return json(res, 400, { ok: false, error: '방이 가득 찼습니다.' });
       const pid = playerId();
-      room.players[idx] = pid;
+      if (idx < room.game.players.length) {
+        room.players[idx] = pid;
+        room.updatedAt = Date.now();
+        return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: idx, role: 'player' });
+      }
+      room.guests = room.guests || [];
+      room.guests.push(pid);
       room.updatedAt = Date.now();
-      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: idx });
+      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: null, role: 'guest' });
     }
     if (url.pathname === '/api/room/state') {
       const room = rooms.get(String(url.searchParams.get('roomId') || '').toUpperCase());
@@ -289,7 +296,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const room = rooms.get(String(body.roomId || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
-      if (!room.players.includes(body.playerId)) return json(res, 403, { ok: false, error: '이 방의 참가자가 아닙니다.' });
+      if (!room.players.includes(body.playerId) && !(room.guests || []).includes(body.playerId)) return json(res, 403, { ok: false, error: '이 방의 참가자가 아닙니다.' });
       room.game = createGame(room.game.players.length, room.game.players[0].pieces.length);
       room.updatedAt = Date.now();
       return json(res, 200, { ok: true, room: publicRoom(room) });

@@ -623,7 +623,7 @@
 
         function humanTurn() {
             if (!G || G.winner !== null || G.busy) return false;
-            if (NET.active && NET.playerIndex !== G.cur) return false;
+            if (NET.active && NET.playerIndex !== null && NET.playerIndex !== G.cur) return false;
             return !G.players[G.cur].ai;
         }
 
@@ -811,9 +811,10 @@
             const st = document.getElementById('status');
             st.classList.toggle('win', G.winner !== null);
             const pl = G.players[G.cur];
-            const online = NET.active ? ` · 방 ${NET.roomId} · 나는 ${G.players[NET.playerIndex]?.name || '?'} ` : '';
+            const role = NET.playerIndex === null ? '공동참여자' : (G.players[NET.playerIndex]?.name || '?');
+            const online = NET.active ? ` · 방 ${NET.roomId} · 나는 ${role} ` : '';
             if (G.winner !== null) st.textContent = `🎉 ${who(G.winner)}이(가) 이겼습니다!${online}`;
-            else if (NET.active && NET.playerIndex !== G.cur) st.textContent = `${pl.name} 차례 — 상대를 기다리는 중${online}`;
+            else if (NET.active && NET.playerIndex !== null && NET.playerIndex !== G.cur) st.textContent = `${pl.name} 차례 — 상대를 기다리는 중${online}`;
             else if (pl.ai) st.textContent = `${pl.name}(컴퓨터) 차례 — ${G.phase === 'throw' ? '윷을 던지는 중...' : '말을 고르는 중...'}`;
             else if (G.phase === 'throw') st.textContent = `${pl.name} 차례 — 윷을 던지세요${online}`;
             else st.textContent = `${pl.name} 차례 — 움직일 말과 도착 칸을 고르세요${online}`;
@@ -845,7 +846,8 @@
             if (!document.getElementById('game').hidden) drawBoardBase(document.getElementById('board'));
             document.getElementById('setup').hidden = true;
             document.getElementById('game').hidden = false;
-            document.getElementById('roomInfo').textContent = `방 코드: ${NET.roomId} · 이 주소를 다른 폰에서 열고 방 입장하세요.`;
+            const guests = payload.room.guestCount || 0;
+            document.getElementById('roomInfo').textContent = `방 코드: ${NET.roomId} · 공동참여자 ${guests}명 · 이 주소를 다른 폰에서 열고 방 입장하세요.`;
             render();
         }
         function startPolling() {
@@ -884,12 +886,12 @@
             } catch (e) { alert(e.message); NET.active = false; }
         }
         async function netThrow() {
-            if (!NET.active || !G || G.phase !== 'throw' || NET.playerIndex !== G.cur) return;
+            if (!NET.active || !G || G.phase !== 'throw' || (NET.playerIndex !== null && NET.playerIndex !== G.cur)) return;
             try { applyNet(await api('/api/room/throw', { roomId: NET.roomId, playerId: NET.playerId })); }
             catch (e) { alert(e.message); }
         }
         async function netMove(opt) {
-            if (!NET.active || !G || G.phase !== 'move' || NET.playerIndex !== G.cur) return;
+            if (!NET.active || !G || G.phase !== 'move' || (NET.playerIndex !== null && NET.playerIndex !== G.cur)) return;
             try {
                 const destKey = opt.res.done ? 'exit' : String(opt.res.node);
                 applyNet(await api('/api/room/move', { roomId: NET.roomId, playerId: NET.playerId, srcKey: opt.src.key, r: opt.r, destKey }));
