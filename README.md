@@ -5,7 +5,7 @@ Vercel 배포 URL: https://aaaa-phi-lovat.vercel.app/
 ## 페이지
 
 - 자기소개/메뉴: `/index.html`
-- 오목 게임: `/gomoku.html`
+- 오목 게임: `/omok.html`
 - 윷놀이: `/yut.html`
 
 ## 맥미니 온라인 오목 서버
@@ -20,7 +20,7 @@ PORT=8792 HOST=0.0.0.0 node omok-server.js
 같은 와이파이에서는:
 
 ```text
-http://192.168.45.156:8792/gomoku.html
+http://192.168.45.156:8792/omok.html
 ```
 
 사용 순서:
@@ -56,4 +56,4 @@ http://192.168.45.156:8791/yut.html
 4. 방 코드 입력 후 `방 입장`
 5. 각자 자기 색상 차례에 윷 던지기/말 이동
 
-참고: `https://aaaa-phi-lovat.vercel.app/gomoku.html`, `https://aaaa-phi-lovat.vercel.app/yut.html`는 정적 배포 페이지라서 맥미니 로컬 서버 API와 직접 연결되지 않습니다. 온라인 방 대국은 위 맥미니 서버 주소로 접속해야 합니다.
+참고: `https://aaaa-phi-lovat.vercel.app/omok.html`, `https://aaaa-phi-lovat.vercel.app/yut.html`는 정적 배포 페이지라서 맥미니 로컬 서버 API와 직접 연결되지 않습니다. 온라인 방 대국은 위 맥미니 서버 주소로 접속해야 합니다.
