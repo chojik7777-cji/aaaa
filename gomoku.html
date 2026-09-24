@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오목 게임</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex;
+            justify-content: center; align-items: center; padding: 16px;
+        }
+        .card {
+            background: white; border-radius: 20px;
+            padding: 28px 24px; max-width: 620px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+        }
+        h1 { font-size: 28px; color: #2d3748; margin-bottom: 6px; }
+        .status { font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 16px; min-height: 22px; }
+        .status.win { color: #e53e3e; font-size: 18px; }
+        .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .controls button, .controls select {
+            padding: 9px 16px; background: #f7fafc; color: #4a5568;
+            border: 1px solid #e2e8f0; border-radius: 10px;
+            font-size: 14px; font-family: inherit; cursor: pointer; transition: all 0.2s;
+        }
+        .controls button:hover { background: #667eea; color: white; border-color: #667eea; }
+        .controls button:disabled { opacity: 0.4; cursor: default; background: #f7fafc; color: #4a5568; border-color: #e2e8f0; }
+        canvas {
+            width: 100%; max-width: 560px; aspect-ratio: 1;
+            border-radius: 12px; cursor: pointer; touch-action: manipulation;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .score { margin-top: 14px; font-size: 14px; color: #718096; }
+        .footer { margin-top: 12px; font-size: 13px; }
+        .footer a { color: #667eea; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>⚫ 오목 ⚪</h1>
+        <p class="status" id="status"></p>
+        <div class="controls">
+            <select id="mode">
+                <option value="ai">컴퓨터와 대결</option>
+                <option value="pvp">2인 대결</option>
+            </select>
+            <button id="undo">무르기</button>
+            <button id="restart">새 게임</button>
+        </div>
+        <canvas id="board"></canvas>
+        <p class="score" id="score"></p>
+        <p class="footer"><a href="index.html">← 자기소개 페이지로</a></p>
+    </div>
+
+    <script>
+        const SIZE = 15;
+        const EMPTY = 0, BLACK = 1, WHITE = 2;
+        const NAMES = { [BLACK]: '흑', [WHITE]: '백' };
+        const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
+
+        const canvas = document.getElementById('board');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const scoreEl = document.getElementById('score');
+        const modeEl = document.getElementById('mode');
+        const undoBtn = document.getElementById('undo');
+
+        let board, turn, moves, winner, winLine, thinking, aiTimer;
+        const wins = { [BLACK]: 0, [WHITE]: 0 };
+        let px, cell, pad; // 캔버스 픽셀 크기, 칸 간격, 여백
+
+        function resetGame() {
+            clearTimeout(aiTimer);
+            board = Array.from({ length: SIZE }, () => Array(SIZE).fill(EMPTY));
+            turn = BLACK;
+            moves = [];
+            winner = null;
+            winLine = null;
+            thinking = false;
+            update();
+        }
+
+        // ---------- 그리기 ----------
+        function resize() {
+            const dpr = window.devicePixelRatio || 1;
+            const cssSize = canvas.getBoundingClientRect().width;
+            px = Math.round(cssSize * dpr);
+            canvas.width = canvas.height = px;
+            cell = px / (SIZE + 1);
+            pad = cell;
+            draw();
+        }
+
+        function pos(i) { return pad + i * cell; }
+
+        function draw() {
+            if (!px) return;
+            ctx.fillStyle = '#e8c07d';
+            ctx.fillRect(0, 0, px, px);
+
+            ctx.strokeStyle = '#6b4f2a';
+            ctx.lineWidth = Math.max(1, cell / 30);
+            for (let i = 0; i < SIZE; i++) {
+                ctx.beginPath();
+                ctx.moveTo(pos(0), pos(i)); ctx.lineTo(pos(SIZE - 1), pos(i));
+                ctx.moveTo(pos(i), pos(0)); ctx.lineTo(pos(i), pos(SIZE - 1));
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#6b4f2a';
+            for (const [x, y] of [[3, 3], [11, 3], [7, 7], [3, 11], [11, 11]]) {
+                ctx.beginPath();
+                ctx.arc(pos(x), pos(y), cell * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            for (let y = 0; y < SIZE; y++)
+                for (let x = 0; x < SIZE; x++)
+                    if (board[y][x]) drawStone(x, y, board[y][x]);
+
+            const last = moves[moves.length - 1];
+            if (last) {
+                ctx.fillStyle = '#e53e3e';
+                ctx.beginPath();
+                ctx.arc(pos(last.x), pos(last.y), cell * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (winLine) {
+                const [a, b] = winLine;
+                ctx.strokeStyle = 'rgba(229, 62, 62, 0.8)';
+                ctx.lineWidth = cell * 0.15;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(pos(a.x), pos(a.y));
+                ctx.lineTo(pos(b.x), pos(b.y));
+                ctx.stroke();
+                ctx.lineCap = 'butt';
+            }
+        }
+
+        function drawStone(x, y, color) {
+            const r = cell * 0.44;
+            const g = ctx.createRadialGradient(pos(x) - r / 3, pos(y) - r / 3, r / 8, pos(x), pos(y), r);
+            if (color === BLACK) { g.addColorStop(0, '#666'); g.addColorStop(1, '#111'); }
+            else { g.addColorStop(0, '#fff'); g.addColorStop(1, '#ccc'); }
+            ctx.fillStyle = g;
+            ctx.shadowColor = 'rgba(0,0,0,0.35)';
+            ctx.shadowBlur = cell * 0.12;
+            ctx.shadowOffsetY = cell * 0.05;
+            ctx.beginPath();
+            ctx.arc(pos(x), pos(y), r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+        }
+
+        // ---------- 게임 로직 ----------
+        function inBounds(x, y) { return x >= 0 && y >= 0 && x < SIZE && y < SIZE; }
+
+        // (x, y)에 놓인 돌 기준으로 5목 이상이 완성되었는지 확인
+        function findWin(x, y) {
+            const c = board[y][x];
+            for (const [dx, dy] of DIRS) {
+                let a = { x, y }, b = { x, y };
+                while (inBounds(a.x - dx, a.y - dy) && board[a.y - dy][a.x - dx] === c) a = { x: a.x - dx, y: a.y - dy };
+                while (inBounds(b.x + dx, b.y + dy) && board[b.y + dy][b.x + dx] === c) b = { x: b.x + dx, y: b.y + dy };
+                if (Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) + 1 >= 5) return [a, b];
+            }
+            return null;
+        }
+
+        function play(x, y) {
+            if (winner || board[y][x] !== EMPTY) return false;
+            board[y][x] = turn;
+            moves.push({ x, y });
+            winLine = findWin(x, y);
+            if (winLine) {
+                winner = turn;
+                wins[turn]++;
+            } else if (moves.length === SIZE * SIZE) {
+                winner = 'draw';
+            } else {
+                turn = turn === BLACK ? WHITE : BLACK;
+            }
+            update();
+            return true;
+        }
+
+        function undo() {
+            if (thinking || !moves.length) return;
+            if (winner && winner !== 'draw') wins[winner]--;
+            const popOne = () => {
+                const { x, y } = moves.pop();
+                board[y][x] = EMPTY;
+                turn = moves.length % 2 === 0 ? BLACK : WHITE;
+            };
+            popOne();
+            // 컴퓨터 모드에서는 다시 내(흑) 차례가 될 때까지 무른다
+            if (modeEl.value === 'ai' && turn === WHITE) popOne();
+            winner = null;
+            winLine = null;
+            update();
+        }
+
+        // ---------- 컴퓨터 (휴리스틱) ----------
+        // 한 방향으로 이어진 돌 수와 열린 끝의 수로 점수를 매긴다
+        function lineScore(count, open) {
+            if (count >= 5) return 1e7;
+            if (open === 0) return 0;
+            const table = {
+                4: [0, 1e5, 1e6],
+                3: [0, 1e3, 5e4],
+                2: [0, 100, 800],
+                1: [0, 10, 50],
+            };
+            return table[count][open];
+        }
+
+        function evaluatePoint(x, y, color) {
+            let total = 0;
+            for (const [dx, dy] of DIRS) {
+                let count = 1, open = 0;
+                for (const s of [1, -1]) {
+                    let nx = x + dx * s, ny = y + dy * s;
+                    while (inBounds(nx, ny) && board[ny][nx] === color) { count++; nx += dx * s; ny += dy * s; }
+                    if (inBounds(nx, ny) && board[ny][nx] === EMPTY) open++;
+                }
+                total += lineScore(count, open);
+            }
+            return total;
+        }
+
+        function hasNeighbor(x, y) {
+            for (let dy = -2; dy <= 2; dy++)
+                for (let dx = -2; dx <= 2; dx++)
+                    if ((dx || dy) && inBounds(x + dx, y + dy) && board[y + dy][x + dx]) return true;
+            return false;
+        }
+
+        function aiMove() {
+            if (!moves.length) return { x: 7, y: 7 };
+            const me = turn, opp = turn === BLACK ? WHITE : BLACK;
+            let best = null, bestScore = -1;
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    if (board[y][x] || !hasNeighbor(x, y)) continue;
+                    // 공격 점수를 수비보다 살짝 높게 쳐서, 이길 수 있으면 먼저 이긴다
+                    const score = evaluatePoint(x, y, me) * 1.1 + evaluatePoint(x, y, opp)
+                        + Math.random(); // 동점일 때 약간의 무작위성
+                    if (score > bestScore) { bestScore = score; best = { x, y }; }
+                }
+            }
+            return best;
+        }
+
+        function maybeAiTurn() {
+            if (modeEl.value !== 'ai' || turn !== WHITE || winner) return;
+            thinking = true;
+            update();
+            aiTimer = setTimeout(() => {
+                thinking = false;
+                const m = aiMove();
+                if (m) play(m.x, m.y);
+            }, 350);
+        }
+
+        // ---------- UI ----------
+        function update() {
+            statusEl.classList.toggle('win', !!winner);
+            if (winner === 'draw') statusEl.textContent = '무승부입니다!';
+            else if (winner) {
+                const who = modeEl.value === 'ai' ? (winner === BLACK ? '당신이' : '컴퓨터가') : `${NAMES[winner]}이`;
+                statusEl.textContent = `🎉 ${who} 이겼습니다!`;
+            } else if (thinking) statusEl.textContent = '컴퓨터가 생각 중...';
+            else if (modeEl.value === 'ai') statusEl.textContent = '당신(흑) 차례입니다';
+            else statusEl.textContent = `${NAMES[turn]} 차례입니다`;
+
+            scoreEl.textContent = modeEl.value === 'ai'
+                ? `전적 — 나 ${wins[BLACK]} : ${wins[WHITE]} 컴퓨터`
+                : `전적 — 흑 ${wins[BLACK]} : ${wins[WHITE]} 백`;
+            undoBtn.disabled = thinking || !moves.length;
+            draw();
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (thinking || winner) return;
+            if (modeEl.value === 'ai' && turn !== BLACK) return;
+            const rect = canvas.getBoundingClientRect();
+            const scale = px / rect.width;
+            const x = Math.round(((e.clientX - rect.left) * scale - pad) / cell);
+            const y = Math.round(((e.clientY - rect.top) * scale - pad) / cell);
+            if (!inBounds(x, y)) return;
+            if (play(x, y)) maybeAiTurn();
+        });
+
+        document.getElementById('restart').addEventListener('click', resetGame);
+        undoBtn.addEventListener('click', undo);
+        modeEl.addEventListener('change', () => {
+            wins[BLACK] = wins[WHITE] = 0;
+            resetGame();
+        });
+        window.addEventListener('resize', resize);
+
+        resetGame();
+        resize();
+    </script>
+</body>
+</html>
