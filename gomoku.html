@@ -6,6 +6,7 @@
     <title>오목 게임</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        [hidden] { display: none !important; }
         body {
             font-family: 'Segoe UI', '맑은 고딕', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -20,20 +21,23 @@
         h1 { font-size: 28px; color: #2d3748; margin-bottom: 6px; }
         .status { font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 16px; min-height: 22px; }
         .status.win { color: #e53e3e; font-size: 18px; }
-        .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
         .controls button, .controls select {
-            padding: 9px 16px; background: #f7fafc; color: #4a5568;
+            padding: 9px 14px; background: #f7fafc; color: #4a5568;
             border: 1px solid #e2e8f0; border-radius: 10px;
             font-size: 14px; font-family: inherit; cursor: pointer; transition: all 0.2s;
         }
+        .controls button:focus-visible, .controls select:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
         .controls button:hover { background: #667eea; color: white; border-color: #667eea; }
         .controls button:disabled { opacity: 0.4; cursor: default; background: #f7fafc; color: #4a5568; border-color: #e2e8f0; }
+        .level-info { font-size: 13px; color: #718096; margin-bottom: 14px; min-height: 18px; }
+        .level-info b { color: #764ba2; }
         canvas {
             width: 100%; max-width: 560px; aspect-ratio: 1;
             border-radius: 12px; cursor: pointer; touch-action: manipulation;
             box-shadow: 0 6px 20px rgba(0,0,0,0.15);
         }
-        .score { margin-top: 14px; font-size: 14px; color: #718096; }
+        .score { margin-top: 14px; font-size: 14px; color: #718096; font-variant-numeric: tabular-nums; }
         .footer { margin-top: 12px; font-size: 13px; }
         .footer a { color: #667eea; text-decoration: none; }
     </style>
@@ -43,37 +47,519 @@
         <h1>⚫ 오목 ⚪</h1>
         <p class="status" id="status"></p>
         <div class="controls">
-            <select id="mode">
+            <select id="mode" aria-label="대결 방식">
                 <option value="ai">컴퓨터와 대결</option>
                 <option value="pvp">2인 대결</option>
             </select>
+            <select id="level" aria-label="난이도">
+                <option value="1">1단계 · 입문</option>
+                <option value="2">2단계 · 초급</option>
+                <option value="3" selected>3단계 · 중급</option>
+                <option value="4">4단계 · 고급</option>
+                <option value="5">5단계 · 고수</option>
+            </select>
+            <select id="side" aria-label="내 돌">
+                <option value="1">내가 흑 (먼저)</option>
+                <option value="2">내가 백 (나중)</option>
+            </select>
+        </div>
+        <div class="controls">
             <button id="undo">무르기</button>
             <button id="restart">새 게임</button>
         </div>
+        <p class="level-info" id="levelInfo"></p>
         <canvas id="board"></canvas>
         <p class="score" id="score"></p>
         <p class="footer"><a href="index.html">← 자기소개 페이지로</a></p>
     </div>
 
     <script>
+        // =====================================================================
+        // 오목 엔진 (Web Worker 안에서도 돌 수 있도록 외부 변수를 쓰지 않는다)
+        //  - 모든 "5칸 창(window)"에 놓인 흑/백 돌 수를 증분으로 관리해 평가
+        //  - VCF(연속 4 공격) 탐색으로 강제 승리수를 찾고, 상대의 VCF를 막음
+        //  - 반복 심화 알파-베타 탐색 + 치환표 + 강제수(4 막기) 연장
+        // =====================================================================
+        function createEngine() {
+            const N = 15, NN = N * N, CENTER = 7 * N + 7;
+            // 창 하나에 같은 색 돌이 k개(상대 돌 없음)일 때의 가치
+            const W = [0, 1, 15, 250, 6000, 200000];
+            const WIN = 1e9;
+
+            const LEVELS = {
+                1: { greedy: true, pick: 5, missBlock: 0.4 },
+                2: { greedy: true, pick: 1, noise: 0.15 },
+                3: { vcf: 6, vcfNodes: 4000, defend: false, depth: 4, width: 8, rootWidth: 12, time: 700 },
+                4: { vcf: 12, vcfNodes: 20000, defend: true, depth: 8, width: 10, rootWidth: 16, time: 1500 },
+                5: { vcf: 20, vcfNodes: 60000, defend: true, vct: 8, vctNodes: 40000, depth: 14, width: 12, rootWidth: 22, time: 4000 },
+            };
+
+            // ----- 창과 이웃 칸 미리 계산 -----
+            const winCells = [];
+            for (let y = 0; y < N; y++)
+                for (let x = 0; x < N; x++)
+                    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) {
+                        const ex = x + dx * 4, ey = y + dy * 4;
+                        if (ex < 0 || ex >= N || ey < 0 || ey >= N) continue;
+                        for (let k = 0; k < 5; k++) winCells.push((y + dy * k) * N + x + dx * k);
+                    }
+            const WN = winCells.length / 5;
+            const cellWins = Array.from({ length: NN }, () => []);
+            for (let w = 0; w < WN; w++)
+                for (let k = 0; k < 5; k++) cellWins[winCells[w * 5 + k]].push(w);
+            const NEAR = Array.from({ length: NN }, (_, c) => {
+                const x = c % N, y = (c / N) | 0, r = [];
+                for (let dy = -2; dy <= 2; dy++)
+                    for (let dx = -2; dx <= 2; dx++) {
+                        if (!dx && !dy) continue;
+                        const nx = x + dx, ny = y + dy;
+                        if (nx >= 0 && ny >= 0 && nx < N && ny < N) r.push(ny * N + nx);
+                    }
+                return r;
+            });
+            const rnd = () => (Math.random() * 4294967296) | 0;
+            const Z1 = [null, Int32Array.from({ length: NN }, rnd), Int32Array.from({ length: NN }, rnd)];
+            const Z2 = [null, Int32Array.from({ length: NN }, rnd), Int32Array.from({ length: NN }, rnd)];
+
+            let board, cnt, score, near, h1, h2, stones;
+            let deadline, nodes, aborted, tt, vcfBudget, vcfFail;
+            const mark = new Int32Array(NN);
+            let stamp = 0;
+
+            function setup(cells) {
+                board = new Int8Array(NN);
+                cnt = [null, new Int8Array(WN), new Int8Array(WN)];
+                score = [0, 0, 0];
+                near = new Int16Array(NN);
+                h1 = 0; h2 = 0; stones = 0;
+                for (let c = 0; c < NN; c++) if (cells[c]) place(c, cells[c]);
+            }
+
+            function place(c, p) {
+                const o = 3 - p, cp = cnt[p], co = cnt[o], ws = cellWins[c];
+                for (let i = 0; i < ws.length; i++) {
+                    const w = ws[i], a = cp[w], b = co[w];
+                    if (b === 0) score[p] += W[a + 1] - W[a];
+                    else if (a === 0) score[o] -= W[b];
+                    cp[w] = a + 1;
+                }
+                board[c] = p;
+                const nb = NEAR[c];
+                for (let i = 0; i < nb.length; i++) near[nb[i]]++;
+                h1 ^= Z1[p][c]; h2 ^= Z2[p][c]; stones++;
+            }
+
+            function remove(c, p) {
+                const o = 3 - p, cp = cnt[p], co = cnt[o], ws = cellWins[c];
+                for (let i = 0; i < ws.length; i++) {
+                    const w = ws[i], a = cp[w] - 1, b = co[w];
+                    cp[w] = a;
+                    if (b === 0) score[p] -= W[a + 1] - W[a];
+                    else if (a === 0) score[o] += W[b];
+                }
+                board[c] = 0;
+                const nb = NEAR[c];
+                for (let i = 0; i < nb.length; i++) near[nb[i]]--;
+                h1 ^= Z1[p][c]; h2 ^= Z2[p][c]; stones--;
+            }
+
+            // p가 한 수로 5목을 만들 수 있는 빈 칸들
+            function fiveSpots(p) {
+                const cp = cnt[p], co = cnt[3 - p], out = [];
+                for (let w = 0; w < WN; w++) {
+                    if (cp[w] !== 4 || co[w] !== 0) continue;
+                    for (let k = 0; k < 5; k++) {
+                        const c = winCells[w * 5 + k];
+                        if (!board[c] && out.indexOf(c) < 0) out.push(c);
+                    }
+                }
+                return out;
+            }
+
+            // p가 4(다음 수에 5가 되는 모양)를 만들 수 있는 빈 칸들
+            function fourMoves(p) {
+                const cp = cnt[p], co = cnt[3 - p], out = [];
+                stamp++;
+                for (let w = 0; w < WN; w++) {
+                    if (cp[w] !== 3 || co[w] !== 0) continue;
+                    for (let k = 0; k < 5; k++) {
+                        const c = winCells[w * 5 + k];
+                        if (!board[c] && mark[c] !== stamp) { mark[c] = stamp; out.push(c); }
+                    }
+                }
+                return out.sort((a, b) => moveScore(b, p) - moveScore(a, p));
+            }
+
+            // 공격(내 창을 키움) + 수비(상대가 여기 두면 얻을 가치)
+            function moveScore(c, p) {
+                const cp = cnt[p], co = cnt[3 - p], ws = cellWins[c];
+                let att = 0, def = 0;
+                for (let i = 0; i < ws.length; i++) {
+                    const w = ws[i], a = cp[w], b = co[w];
+                    if (b === 0) att += W[a + 1] - W[a];
+                    if (a === 0) def += W[b + 1] - W[b];
+                }
+                return att + def * 0.85;
+            }
+
+            function orderedMoves(p, width) {
+                const list = [];
+                for (let c = 0; c < NN; c++)
+                    if (!board[c] && near[c] > 0) list.push([moveScore(c, p), c]);
+                if (!list.length) return [CENTER];
+                list.sort((a, b) => b[0] - a[0]);
+                const out = [];
+                for (let i = 0; i < list.length && i < width; i++) out.push(list[i][1]);
+                return out;
+            }
+
+            function evaluate(p) {
+                return score[p] * 1.1 - score[3 - p];
+            }
+
+            // ----- VCF: 4를 연속으로 두어 강제로 이기는 수순 찾기 -----
+            function vcf(p, depth) {
+                if (--vcfBudget < 0) return -1;
+                const o = 3 - p;
+                const mine = fiveSpots(p);
+                if (mine.length) return mine[0];
+                if (fiveSpots(o).length) return -1;
+                if (depth <= 0) return -1;
+                const key = (h1 ^ (p << 30)) + ':' + h2;
+                if (vcfFail.has(key)) return -1;
+                const moves = fourMoves(p);
+                for (const c of moves) {
+                    place(c, p);
+                    const spots = fiveSpots(p);
+                    let win = false;
+                    if (spots.length >= 2) win = true;
+                    else if (spots.length === 1) {
+                        const b = spots[0];
+                        place(b, o);
+                        win = vcf(p, depth - 1) >= 0;
+                        remove(b, o);
+                    }
+                    remove(c, p);
+                    if (win) return c;
+                    if (vcfBudget < 0) return -1;
+                }
+                vcfFail.add(key);
+                return -1;
+            }
+
+            function runVcf(p, depth, budget) {
+                vcfBudget = budget;
+                vcfFail = new Set();
+                return vcf(p, depth);
+            }
+
+            // ----- VCT: 3과 4를 섞어 몰아붙여 강제로 이기는 수순 찾기 -----
+            // p가 3을 만들 수 있는 칸 (상대 돌 없는 창에 내 돌 2개)
+            function threeMoves(p, limit) {
+                const cp = cnt[p], co = cnt[3 - p], out = [];
+                stamp++;
+                for (let w = 0; w < WN; w++) {
+                    if (cp[w] !== 2 || co[w] !== 0) continue;
+                    for (let k = 0; k < 5; k++) {
+                        const c = winCells[w * 5 + k];
+                        if (!board[c] && mark[c] !== stamp) { mark[c] = stamp; out.push(c); }
+                    }
+                }
+                out.sort((a, b) => moveScore(b, p) - moveScore(a, p));
+                return out.slice(0, limit);
+            }
+
+            // p가 다음 수에 열린 4(5를 만드는 자리가 둘)를 만들 수 있는가
+            function hasOpenFourMove(p) {
+                for (const c of fourMoves(p)) {
+                    place(c, p);
+                    const n = fiveSpots(p).length;
+                    remove(c, p);
+                    if (n >= 2) return true;
+                }
+                return false;
+            }
+
+            // 열린 3을 막는 후보: p의 4 자리를 차지하거나, 상대(o)가 4로 받아치기
+            function threeDefenses(p) {
+                const o = 3 - p, cp = cnt[p], co = cnt[o], out = [];
+                stamp++;
+                for (let w = 0; w < WN; w++) {
+                    if (cp[w] !== 3 || co[w] !== 0) continue;
+                    for (let k = 0; k < 5; k++) {
+                        const c = winCells[w * 5 + k];
+                        if (!board[c] && mark[c] !== stamp) { mark[c] = stamp; out.push(c); }
+                    }
+                }
+                for (const c of fourMoves(o)) if (out.indexOf(c) < 0) out.push(c);
+                return out;
+            }
+
+            function vct(p, depth) {
+                if (--vcfBudget < 0) return -1;
+                const o = 3 - p;
+                const mine = fiveSpots(p);
+                if (mine.length) return mine[0];
+                if (fiveSpots(o).length) return -1;
+                if (depth <= 0) return -1;
+                const key = 'T' + (h1 ^ (p << 30)) + ':' + h2 + ':' + depth;
+                if (vcfFail.has(key)) return -1;
+                const fours = fourMoves(p);
+                const threes = threeMoves(p, 10).filter(c => fours.indexOf(c) < 0);
+                for (const c of fours.concat(threes)) {
+                    place(c, p);
+                    const spots = fiveSpots(p);
+                    let win = false;
+                    if (spots.length >= 2) win = true;
+                    else if (spots.length === 1) {
+                        const b = spots[0];
+                        place(b, o);
+                        win = vct(p, depth - 1) >= 0;
+                        remove(b, o);
+                    } else if (hasOpenFourMove(p)) {
+                        // 열린 3: 상대의 모든 방어에 대해 계속 이길 수 있어야 한다
+                        win = true;
+                        for (const d of threeDefenses(p)) {
+                            place(d, o);
+                            const ok = vct(p, depth - 1) >= 0;
+                            remove(d, o);
+                            if (!ok) { win = false; break; }
+                        }
+                    }
+                    remove(c, p);
+                    if (win) return c;
+                    if (vcfBudget < 0) return -1;
+                }
+                vcfFail.add(key);
+                return -1;
+            }
+
+            function runVct(p, depth, budget) {
+                vcfBudget = budget;
+                vcfFail = new Set();
+                return vct(p, depth);
+            }
+
+            // ----- 알파-베타 탐색 -----
+            function negamax(p, depth, alpha, beta, ply, L) {
+                if ((++nodes & 511) === 0 && Date.now() > deadline) aborted = true;
+                if (aborted) return 0;
+                const o = 3 - p;
+                if (fiveSpots(p).length) return WIN - ply;
+                const opFive = fiveSpots(o);
+                if (opFive.length >= 2) return -(WIN - ply - 1);
+                if (stones === NN) return 0;
+                // 상대가 4를 만들었으면 막는 수는 깊이에 상관없이 계속 본다
+                if (depth <= 0 && !opFive.length) return evaluate(p);
+
+                const key = h1 ^ (p << 30);
+                const e = tt.get(key);
+                let ttMove = -1;
+                if (e && e.h2 === h2) {
+                    ttMove = e.move;
+                    if (e.depth >= depth) {
+                        if (e.flag === 0) return e.val;
+                        if (e.flag === 1 && e.val >= beta) return e.val;
+                        if (e.flag === 2 && e.val <= alpha) return e.val;
+                    }
+                }
+
+                const moves = opFive.length ? opFive : orderedMoves(p, L.width);
+                const ti = moves.indexOf(ttMove);
+                if (ti > 0) { moves.splice(ti, 1); moves.unshift(ttMove); }
+
+                const a0 = alpha;
+                let best = -Infinity, bestMove = moves[0];
+                for (const m of moves) {
+                    place(m, p);
+                    const v = -negamax(o, depth - 1, -beta, -alpha, ply + 1, L);
+                    remove(m, p);
+                    if (aborted) return 0;
+                    if (v > best) { best = v; bestMove = m; }
+                    if (v > alpha) alpha = v;
+                    if (alpha >= beta) break;
+                }
+                tt.set(key, { h2, depth, val: best, move: bestMove, flag: best <= a0 ? 2 : best >= beta ? 1 : 0 });
+                return best;
+            }
+
+            function think(cells, me, level) {
+                const L = LEVELS[level] || LEVELS[3];
+                const start = Date.now();
+                setup(cells);
+                const o = 3 - me;
+                if (stones === 0) return CENTER;
+
+                // 1) 바로 이기는 수
+                let s = fiveSpots(me);
+                if (s.length) return s[0];
+                // 2) 상대의 5목 막기
+                s = fiveSpots(o);
+                if (s.length && !(L.missBlock && Math.random() < L.missBlock)) return s[0];
+
+                // 입문·초급: 한 수 앞만 보는 탐욕 전략
+                if (L.greedy) {
+                    const list = orderedMoves(me, 60).map(c => [moveScore(c, me) * (1 + (L.noise || 0) * Math.random()), c]);
+                    list.sort((a, b) => b[0] - a[0]);
+                    return list[Math.floor(Math.random() * Math.min(L.pick, list.length))][1];
+                }
+
+                // 3) 내 VCF(강제 승리) 찾기
+                const win = runVcf(me, L.vcf, L.vcfNodes);
+                if (win >= 0) return win;
+
+                // 4) 상대 VCF가 있으면 그것을 깨는 수만 후보로
+                let rootMoves = orderedMoves(me, L.rootWidth);
+                if (L.defend && runVcf(o, L.vcf, L.vcfNodes) >= 0) {
+                    const safe = [];
+                    for (const m of orderedMoves(me, 40)) {
+                        place(m, me);
+                        // 예산이 바닥나서 못 찾은 것은 '안전'으로 치지 않는다
+                        const broken = runVcf(o, L.vcf, Math.max(4000, L.vcfNodes / 5)) < 0 && vcfBudget >= 0;
+                        remove(m, me);
+                        if (broken) safe.push(m);
+                        if (safe.length >= L.rootWidth) break;
+                    }
+                    if (safe.length) rootMoves = safe;
+                } else if (L.vct) {
+                    // 5) 내 VCT(3·4 연속 공격) 찾기
+                    const t = runVct(me, L.vct, L.vctNodes);
+                    if (t >= 0) return t;
+                    // 6) 상대 VCT가 있으면 그것을 깨는 수만 후보로
+                    if (runVct(o, L.vct, L.vctNodes) >= 0) {
+                        const safe = [];
+                        for (const m of orderedMoves(me, 30)) {
+                            place(m, me);
+                            const broken = runVcf(o, L.vcf, 4000) < 0 && vcfBudget >= 0
+                                && runVct(o, L.vct, L.vctNodes / 8) < 0 && vcfBudget >= 0;
+                            remove(m, me);
+                            if (broken) safe.push(m);
+                            if (safe.length >= L.rootWidth) break;
+                        }
+                        if (safe.length) rootMoves = safe;
+                    }
+                }
+
+                // 7) 반복 심화 알파-베타
+                // 수읽기 전체 시간 안에서 남은 만큼만 탐색 (최소 0.5초)
+                deadline = Math.max(start + L.time, Date.now() + 500);
+                aborted = false; nodes = 0; tt = new Map();
+                let best = rootMoves[0];
+                for (let depth = 2; depth <= L.depth; depth++) {
+                    let alpha = -Infinity, bestV = -Infinity, bestD = rootMoves[0];
+                    const vals = [];
+                    for (const m of rootMoves) {
+                        place(m, me);
+                        const v = -negamax(o, depth - 1, -Infinity, -alpha, 1, L);
+                        remove(m, me);
+                        if (aborted) break;
+                        vals.push([v, m]);
+                        if (v > bestV) { bestV = v; bestD = m; }
+                        if (v > alpha) alpha = v;
+                    }
+                    if (aborted) break;
+                    best = bestD;
+                    vals.sort((a, b) => b[0] - a[0]);
+                    rootMoves = vals.map(v => v[1]);
+                    if (Math.abs(bestV) >= WIN - 100) break; // 승패가 확정되면 더 볼 필요 없음
+                }
+                return best;
+            }
+
+            return { think };
+        }
+
+        // =====================================================================
+        // 게임 화면
+        // =====================================================================
         const SIZE = 15;
         const EMPTY = 0, BLACK = 1, WHITE = 2;
         const NAMES = { [BLACK]: '흑', [WHITE]: '백' };
         const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
+        const LEVEL_INFO = {
+            1: '<b>입문</b> · 가끔 실수도 하는 연습 상대',
+            2: '<b>초급</b> · 눈앞의 공격과 수비만 보는 상대',
+            3: '<b>중급</b> · 연속 4 공격을 노리고 몇 수 앞을 읽음',
+            4: '<b>고급</b> · 연속 4 공격·방어 + 최대 8수 앞 읽기',
+            5: '<b>고수</b> · 연속 4 수읽기 20수 + 최대 14수 앞 읽기 (생각이 오래 걸려요)',
+        };
 
         const canvas = document.getElementById('board');
         const ctx = canvas.getContext('2d');
         const statusEl = document.getElementById('status');
         const scoreEl = document.getElementById('score');
         const modeEl = document.getElementById('mode');
+        const levelEl = document.getElementById('level');
+        const sideEl = document.getElementById('side');
+        const levelInfoEl = document.getElementById('levelInfo');
         const undoBtn = document.getElementById('undo');
 
-        let board, turn, moves, winner, winLine, thinking, aiTimer;
-        const wins = { [BLACK]: 0, [WHITE]: 0 };
+        let board, turn, moves, winner, winLine, thinking;
+        let tally = { a: 0, b: 0 }; // 컴퓨터 대결: 나/컴퓨터, 2인 대결: 흑/백
         let px, cell, pad; // 캔버스 픽셀 크기, 칸 간격, 여백
+        let reqId = 0;
 
+        const isAi = () => modeEl.value === 'ai';
+        const human = () => +sideEl.value;
+        const cpu = () => 3 - human();
+
+        // ---------- 엔진 실행 (가능하면 Web Worker로, 안 되면 메인 스레드) ----------
+        let engine = null, worker = null;
+        try {
+            const src = `const E = (${createEngine.toString()})();
+                onmessage = e => postMessage({ id: e.data.id, move: E.think(e.data.cells, e.data.me, e.data.level) });`;
+            worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+            worker.onmessage = e => onAiMove(e.data.id, e.data.move);
+            worker.onerror = () => { worker = null; if (thinking) requestAi(); };
+        } catch (err) {
+            worker = null;
+        }
+
+        function requestAi() {
+            const id = ++reqId;
+            const cells = board.flat();
+            const me = turn, level = +levelEl.value;
+            const started = Date.now();
+            const deliver = (move) => {
+                // 너무 빨리 두면 어색하니 최소 0.35초는 기다린다
+                setTimeout(() => onAiMove(id, move), Math.max(0, 350 - (Date.now() - started)));
+            };
+            if (worker) {
+                pendingDelivery = { id, deliver };
+                worker.postMessage({ id, cells, me, level });
+            } else {
+                setTimeout(() => {
+                    engine = engine || createEngine();
+                    deliver(engine.think(cells, me, level));
+                }, 30);
+            }
+        }
+        let pendingDelivery = null;
+
+        function onAiMove(id, move) {
+            // 워커 응답이면 최소 대기 시간을 적용해서 다시 들어온다
+            if (pendingDelivery && pendingDelivery.id === id) {
+                const { deliver } = pendingDelivery;
+                pendingDelivery = null;
+                deliver(move);
+                return;
+            }
+            if (id !== reqId || !thinking) return;
+            thinking = false;
+            play(move % SIZE, Math.floor(move / SIZE));
+        }
+
+        function maybeAiTurn() {
+            if (!isAi() || winner || turn !== cpu() || thinking) return;
+            thinking = true;
+            update();
+            requestAi();
+        }
+
+        // ---------- 게임 진행 ----------
         function resetGame() {
-            clearTimeout(aiTimer);
+            reqId++;
+            pendingDelivery = null;
             board = Array.from({ length: SIZE }, () => Array(SIZE).fill(EMPTY));
             turn = BLACK;
             moves = [];
@@ -81,6 +567,62 @@
             winLine = null;
             thinking = false;
             update();
+            maybeAiTurn();
+        }
+
+        function resetTally() { tally = { a: 0, b: 0 }; }
+
+        function inBounds(x, y) { return x >= 0 && y >= 0 && x < SIZE && y < SIZE; }
+
+        // (x, y)에 놓인 돌 기준으로 5목 이상이 완성되었는지 확인
+        function findWin(x, y) {
+            const c = board[y][x];
+            for (const [dx, dy] of DIRS) {
+                let a = { x, y }, b = { x, y };
+                while (inBounds(a.x - dx, a.y - dy) && board[a.y - dy][a.x - dx] === c) a = { x: a.x - dx, y: a.y - dy };
+                while (inBounds(b.x + dx, b.y + dy) && board[b.y + dy][b.x + dx] === c) b = { x: b.x + dx, y: b.y + dy };
+                if (Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) + 1 >= 5) return [a, b];
+            }
+            return null;
+        }
+
+        function tallyKey(color) {
+            if (isAi()) return color === human() ? 'a' : 'b';
+            return color === BLACK ? 'a' : 'b';
+        }
+
+        function play(x, y) {
+            if (winner || board[y][x] !== EMPTY) return false;
+            board[y][x] = turn;
+            moves.push({ x, y });
+            winLine = findWin(x, y);
+            if (winLine) {
+                winner = turn;
+                tally[tallyKey(winner)]++;
+            } else if (moves.length === SIZE * SIZE) {
+                winner = 'draw';
+            } else {
+                turn = turn === BLACK ? WHITE : BLACK;
+            }
+            update();
+            return true;
+        }
+
+        function undo() {
+            if (thinking || !moves.length) return;
+            if (winner && winner !== 'draw') tally[tallyKey(winner)]--;
+            const popOne = () => {
+                const { x, y } = moves.pop();
+                board[y][x] = EMPTY;
+                turn = moves.length % 2 === 0 ? BLACK : WHITE;
+            };
+            popOne();
+            // 컴퓨터 대결에서는 다시 내 차례가 될 때까지 무른다
+            while (isAi() && turn !== human() && moves.length) popOne();
+            winner = null;
+            winLine = null;
+            update();
+            maybeAiTurn();
         }
 
         // ---------- 그리기 ----------
@@ -157,137 +699,31 @@
             ctx.shadowColor = 'transparent';
         }
 
-        // ---------- 게임 로직 ----------
-        function inBounds(x, y) { return x >= 0 && y >= 0 && x < SIZE && y < SIZE; }
-
-        // (x, y)에 놓인 돌 기준으로 5목 이상이 완성되었는지 확인
-        function findWin(x, y) {
-            const c = board[y][x];
-            for (const [dx, dy] of DIRS) {
-                let a = { x, y }, b = { x, y };
-                while (inBounds(a.x - dx, a.y - dy) && board[a.y - dy][a.x - dx] === c) a = { x: a.x - dx, y: a.y - dy };
-                while (inBounds(b.x + dx, b.y + dy) && board[b.y + dy][b.x + dx] === c) b = { x: b.x + dx, y: b.y + dy };
-                if (Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) + 1 >= 5) return [a, b];
-            }
-            return null;
-        }
-
-        function play(x, y) {
-            if (winner || board[y][x] !== EMPTY) return false;
-            board[y][x] = turn;
-            moves.push({ x, y });
-            winLine = findWin(x, y);
-            if (winLine) {
-                winner = turn;
-                wins[turn]++;
-            } else if (moves.length === SIZE * SIZE) {
-                winner = 'draw';
-            } else {
-                turn = turn === BLACK ? WHITE : BLACK;
-            }
-            update();
-            return true;
-        }
-
-        function undo() {
-            if (thinking || !moves.length) return;
-            if (winner && winner !== 'draw') wins[winner]--;
-            const popOne = () => {
-                const { x, y } = moves.pop();
-                board[y][x] = EMPTY;
-                turn = moves.length % 2 === 0 ? BLACK : WHITE;
-            };
-            popOne();
-            // 컴퓨터 모드에서는 다시 내(흑) 차례가 될 때까지 무른다
-            if (modeEl.value === 'ai' && turn === WHITE) popOne();
-            winner = null;
-            winLine = null;
-            update();
-        }
-
-        // ---------- 컴퓨터 (휴리스틱) ----------
-        // 한 방향으로 이어진 돌 수와 열린 끝의 수로 점수를 매긴다
-        function lineScore(count, open) {
-            if (count >= 5) return 1e7;
-            if (open === 0) return 0;
-            const table = {
-                4: [0, 1e5, 1e6],
-                3: [0, 1e3, 5e4],
-                2: [0, 100, 800],
-                1: [0, 10, 50],
-            };
-            return table[count][open];
-        }
-
-        function evaluatePoint(x, y, color) {
-            let total = 0;
-            for (const [dx, dy] of DIRS) {
-                let count = 1, open = 0;
-                for (const s of [1, -1]) {
-                    let nx = x + dx * s, ny = y + dy * s;
-                    while (inBounds(nx, ny) && board[ny][nx] === color) { count++; nx += dx * s; ny += dy * s; }
-                    if (inBounds(nx, ny) && board[ny][nx] === EMPTY) open++;
-                }
-                total += lineScore(count, open);
-            }
-            return total;
-        }
-
-        function hasNeighbor(x, y) {
-            for (let dy = -2; dy <= 2; dy++)
-                for (let dx = -2; dx <= 2; dx++)
-                    if ((dx || dy) && inBounds(x + dx, y + dy) && board[y + dy][x + dx]) return true;
-            return false;
-        }
-
-        function aiMove() {
-            if (!moves.length) return { x: 7, y: 7 };
-            const me = turn, opp = turn === BLACK ? WHITE : BLACK;
-            let best = null, bestScore = -1;
-            for (let y = 0; y < SIZE; y++) {
-                for (let x = 0; x < SIZE; x++) {
-                    if (board[y][x] || !hasNeighbor(x, y)) continue;
-                    // 공격 점수를 수비보다 살짝 높게 쳐서, 이길 수 있으면 먼저 이긴다
-                    const score = evaluatePoint(x, y, me) * 1.1 + evaluatePoint(x, y, opp)
-                        + Math.random(); // 동점일 때 약간의 무작위성
-                    if (score > bestScore) { bestScore = score; best = { x, y }; }
-                }
-            }
-            return best;
-        }
-
-        function maybeAiTurn() {
-            if (modeEl.value !== 'ai' || turn !== WHITE || winner) return;
-            thinking = true;
-            update();
-            aiTimer = setTimeout(() => {
-                thinking = false;
-                const m = aiMove();
-                if (m) play(m.x, m.y);
-            }, 350);
-        }
-
         // ---------- UI ----------
         function update() {
+            const ai = isAi();
+            levelEl.hidden = sideEl.hidden = !ai;
+            levelInfoEl.innerHTML = ai ? LEVEL_INFO[levelEl.value] : '흑이 먼저 둡니다. 번갈아 두세요.';
+
             statusEl.classList.toggle('win', !!winner);
             if (winner === 'draw') statusEl.textContent = '무승부입니다!';
             else if (winner) {
-                const who = modeEl.value === 'ai' ? (winner === BLACK ? '당신이' : '컴퓨터가') : `${NAMES[winner]}이`;
+                const who = ai ? (winner === human() ? '당신이' : '컴퓨터가') : `${NAMES[winner]}이`;
                 statusEl.textContent = `🎉 ${who} 이겼습니다!`;
             } else if (thinking) statusEl.textContent = '컴퓨터가 생각 중...';
-            else if (modeEl.value === 'ai') statusEl.textContent = '당신(흑) 차례입니다';
+            else if (ai) statusEl.textContent = `당신(${NAMES[human()]}) 차례입니다`;
             else statusEl.textContent = `${NAMES[turn]} 차례입니다`;
 
-            scoreEl.textContent = modeEl.value === 'ai'
-                ? `전적 — 나 ${wins[BLACK]} : ${wins[WHITE]} 컴퓨터`
-                : `전적 — 흑 ${wins[BLACK]} : ${wins[WHITE]} 백`;
+            scoreEl.textContent = ai
+                ? `전적 — 나 ${tally.a} : ${tally.b} 컴퓨터`
+                : `전적 — 흑 ${tally.a} : ${tally.b} 백`;
             undoBtn.disabled = thinking || !moves.length;
             draw();
         }
 
         canvas.addEventListener('click', (e) => {
             if (thinking || winner) return;
-            if (modeEl.value === 'ai' && turn !== BLACK) return;
+            if (isAi() && turn !== human()) return;
             const rect = canvas.getBoundingClientRect();
             const scale = px / rect.width;
             const x = Math.round(((e.clientX - rect.left) * scale - pad) / cell);
@@ -298,10 +734,8 @@
 
         document.getElementById('restart').addEventListener('click', resetGame);
         undoBtn.addEventListener('click', undo);
-        modeEl.addEventListener('change', () => {
-            wins[BLACK] = wins[WHITE] = 0;
-            resetGame();
-        });
+        for (const el of [modeEl, levelEl, sideEl])
+            el.addEventListener('change', () => { resetTally(); resetGame(); });
         window.addEventListener('resize', resize);
 
         resetGame();
