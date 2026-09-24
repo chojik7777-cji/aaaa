@@ -38,6 +38,11 @@
         .setup .start { display: block; width: 100%; margin-top: 18px; padding: 12px; font-size: 16px; font-weight: 600;
             background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; }
         .setup .start:hover { filter: brightness(1.08); }
+        .online-box { margin-top: 14px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 14px; background: #f8f7ff; }
+        .online-box h2 { font-size: 15px; color: #4a5568; margin-bottom: 8px; }
+        .online-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .online-actions input { flex: 1; min-width: 130px; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 10px; font: inherit; text-transform: uppercase; }
+        .room-code { margin-top: 8px; font-size: 14px; color: #4a5568; line-height: 1.5; }
 
         /* ----- 게임 화면 ----- */
         .game { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
@@ -156,7 +161,16 @@
                 </select>
             </div>
             <div id="playerRows"></div>
-            <button class="start" id="startBtn">시작하기</button>
+            <button class="start" id="startBtn">이 기기에서 시작하기</button>
+            <div class="online-box">
+                <h2>🌐 온라인 여러 명 대국</h2>
+                <div class="online-actions">
+                    <button id="createRoomBtn" type="button">온라인 방 만들기</button>
+                    <input id="roomInput" maxlength="6" placeholder="방 코드 입력" autocomplete="off">
+                    <button id="joinRoomBtn" type="button">방 입장</button>
+                </div>
+                <p class="room-code" id="roomInfo">맥미니 서버로 같은 주소에 접속한 다른 폰과 같이 둘 수 있습니다.</p>
+            </div>
         </div>
 
         <div class="game" id="game" hidden>
@@ -306,6 +320,7 @@
 
         // ---------- 게임 상태 ----------
         let G = null;
+        const NET = { active: false, roomId: null, playerId: null, playerIndex: null, timer: null };
         let aiTimer = null;
         const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -368,6 +383,7 @@
 
         // ---------- 진행 ----------
         async function doThrow() {
+            if (NET.active) return netThrow();
             if (!G || G.phase !== 'throw' || G.busy) return;
             const game = G;
             G.busy = true;
@@ -425,6 +441,7 @@
         }
 
         async function doMove(opt) {
+            if (NET.active) return netMove(opt);
             if (G.busy || G.phase !== 'move') return;
             G.busy = true;
             const pi = G.cur, pl = G.players[pi];
@@ -605,7 +622,9 @@
         }
 
         function humanTurn() {
-            return G && G.winner === null && !G.players[G.cur].ai && !G.busy;
+            if (!G || G.winner !== null || G.busy) return false;
+            if (NET.active && NET.playerIndex !== G.cur) return false;
+            return !G.players[G.cur].ai;
         }
 
         function selectedOptions() {
@@ -792,10 +811,12 @@
             const st = document.getElementById('status');
             st.classList.toggle('win', G.winner !== null);
             const pl = G.players[G.cur];
-            if (G.winner !== null) st.textContent = `🎉 ${who(G.winner)}이(가) 이겼습니다!`;
+            const online = NET.active ? ` · 방 ${NET.roomId} · 나는 ${G.players[NET.playerIndex]?.name || '?'} ` : '';
+            if (G.winner !== null) st.textContent = `🎉 ${who(G.winner)}이(가) 이겼습니다!${online}`;
+            else if (NET.active && NET.playerIndex !== G.cur) st.textContent = `${pl.name} 차례 — 상대를 기다리는 중${online}`;
             else if (pl.ai) st.textContent = `${pl.name}(컴퓨터) 차례 — ${G.phase === 'throw' ? '윷을 던지는 중...' : '말을 고르는 중...'}`;
-            else if (G.phase === 'throw') st.textContent = `${pl.name} 차례 — 윷을 던지세요`;
-            else st.textContent = `${pl.name} 차례 — 움직일 말과 도착 칸을 고르세요`;
+            else if (G.phase === 'throw') st.textContent = `${pl.name} 차례 — 윷을 던지세요${online}`;
+            else st.textContent = `${pl.name} 차례 — 움직일 말과 도착 칸을 고르세요${online}`;
         }
 
         function render() {
@@ -804,6 +825,79 @@
             renderPanel();
             renderStatus();
             scheduleAi();
+        }
+
+        // ---------- 온라인 방 ----------
+        async function api(path, data) {
+            const res = await fetch(path, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data || {}),
+            });
+            const json = await res.json();
+            if (!json.ok) throw new Error(json.error || '서버 오류');
+            return json;
+        }
+        function applyNet(payload) {
+            const keepSelected = G && G.cur === payload.room.game.cur && G.phase === payload.room.game.phase ? G.selected : null;
+            G = payload.room.game;
+            if (keepSelected) G.selected = keepSelected;
+            NET.roomId = payload.room.roomId;
+            if (!document.getElementById('game').hidden) drawBoardBase(document.getElementById('board'));
+            document.getElementById('setup').hidden = true;
+            document.getElementById('game').hidden = false;
+            document.getElementById('roomInfo').textContent = `방 코드: ${NET.roomId} · 이 주소를 다른 폰에서 열고 방 입장하세요.`;
+            render();
+        }
+        function startPolling() {
+            clearInterval(NET.timer);
+            NET.timer = setInterval(async () => {
+                if (!NET.active || !NET.roomId) return;
+                try {
+                    const res = await fetch(`/api/room/state?roomId=${encodeURIComponent(NET.roomId)}`, { cache: 'no-store' });
+                    const json = await res.json();
+                    if (json.ok) applyNet(json);
+                } catch (e) { console.warn(e); }
+            }, 900);
+        }
+        async function createOnlineRoom() {
+            try {
+                clearTimeout(aiTimer);
+                NET.active = true;
+                const data = await api('/api/room/create', { count: +countEl.value, pieces: +piecesEl.value });
+                NET.playerId = data.playerId; NET.playerIndex = data.playerIndex;
+                drawBoardBase(document.getElementById('board'));
+                applyNet(data);
+                startPolling();
+            } catch (e) { alert(e.message); NET.active = false; }
+        }
+        async function joinOnlineRoom() {
+            try {
+                const code = document.getElementById('roomInput').value.trim().toUpperCase();
+                if (!code) return alert('방 코드를 입력하세요.');
+                clearTimeout(aiTimer);
+                NET.active = true;
+                const data = await api('/api/room/join', { roomId: code });
+                NET.playerId = data.playerId; NET.playerIndex = data.playerIndex;
+                drawBoardBase(document.getElementById('board'));
+                applyNet(data);
+                startPolling();
+            } catch (e) { alert(e.message); NET.active = false; }
+        }
+        async function netThrow() {
+            if (!NET.active || !G || G.phase !== 'throw' || NET.playerIndex !== G.cur) return;
+            try { applyNet(await api('/api/room/throw', { roomId: NET.roomId, playerId: NET.playerId })); }
+            catch (e) { alert(e.message); }
+        }
+        async function netMove(opt) {
+            if (!NET.active || !G || G.phase !== 'move' || NET.playerIndex !== G.cur) return;
+            try {
+                const destKey = opt.res.done ? 'exit' : String(opt.res.node);
+                applyNet(await api('/api/room/move', { roomId: NET.roomId, playerId: NET.playerId, srcKey: opt.src.key, r: opt.r, destKey }));
+            } catch (e) { alert(e.message); }
+        }
+        async function netReset() {
+            try { applyNet(await api('/api/room/reset', { roomId: NET.roomId, playerId: NET.playerId })); }
+            catch (e) { alert(e.message); }
         }
 
         // ---------- 설정 ----------
@@ -829,6 +923,7 @@
         countEl.addEventListener('change', renderSetup);
 
         document.getElementById('startBtn').addEventListener('click', () => {
+            NET.active = false; clearInterval(NET.timer);
             const n = +countEl.value, pieces = +piecesEl.value;
             const config = Array.from({ length: n }, (_, i) => ({ ai: saved[i] === 'ai', pieces }));
             document.getElementById('setup').hidden = true;
@@ -837,7 +932,8 @@
             newGame(config);
         });
 
-        document.getElementById('newGame').addEventListener('click', () => {
+        document.getElementById('newGame').addEventListener('click', async () => {
+            if (NET.active) { await netReset(); return; }
             clearTimeout(aiTimer);
             G = null;
             document.getElementById('game').hidden = true;
@@ -847,6 +943,8 @@
             st.textContent = '인원과 말 수를 정하고 시작하세요';
         });
 
+        document.getElementById('createRoomBtn').addEventListener('click', createOnlineRoom);
+        document.getElementById('joinRoomBtn').addEventListener('click', joinOnlineRoom);
         document.getElementById('throwBtn').addEventListener('click', doThrow);
         renderSetup();
     </script>
