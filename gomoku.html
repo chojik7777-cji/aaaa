@@ -22,12 +22,14 @@
         .status { font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 16px; min-height: 22px; }
         .status.win { color: #e53e3e; font-size: 18px; }
         .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-        .controls button, .controls select {
+        .controls button, .controls select, .controls input {
             padding: 9px 14px; background: #f7fafc; color: #4a5568;
             border: 1px solid #e2e8f0; border-radius: 10px;
             font-size: 14px; font-family: inherit; cursor: pointer; transition: all 0.2s;
         }
-        .controls button:focus-visible, .controls select:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
+        .controls button:focus-visible, .controls select:focus-visible, .controls input:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
+        .controls input { min-width: 120px; text-transform: uppercase; }
+        .online-info { font-size: 13px; color: #4a5568; margin: 0 0 10px; min-height: 18px; }
         .controls button:hover { background: #667eea; color: white; border-color: #667eea; }
         .controls button:disabled { opacity: 0.4; cursor: default; background: #f7fafc; color: #4a5568; border-color: #e2e8f0; }
         .level-info { font-size: 13px; color: #718096; margin-bottom: 14px; min-height: 18px; }
@@ -80,6 +82,7 @@
             <select id="mode" aria-label="대결 방식">
                 <option value="ai">컴퓨터와 대결</option>
                 <option value="pvp">2인 대결</option>
+                <option value="net">온라인 방 대결</option>
             </select>
             <select id="level" aria-label="난이도">
                 <option value="1">1단계 · 입문</option>
@@ -101,6 +104,12 @@
             <button id="undo">무르기</button>
             <button id="restart">새 게임</button>
         </div>
+        <div class="controls" id="onlineControls" hidden>
+            <button id="createRoomBtn" type="button">온라인 방 만들기</button>
+            <input id="roomInput" maxlength="6" placeholder="방 코드 입력" autocomplete="off">
+            <button id="joinRoomBtn" type="button">방 입장</button>
+        </div>
+        <p class="online-info" id="onlineInfo"></p>
         <p class="level-info" id="levelInfo"></p>
         <canvas id="board"></canvas>
         <p class="score" id="score"></p>
@@ -711,6 +720,8 @@
         const sideEl = document.getElementById('side');
         const levelInfoEl = document.getElementById('levelInfo');
         const ruleEl = document.getElementById('rule');
+        const onlineControlsEl = document.getElementById('onlineControls');
+        const onlineInfoEl = document.getElementById('onlineInfo');
         const isRenju = () => ruleEl.value === 'renju';
         const ruleEngine = createEngine(); // 금수 표시용 (메인 스레드)
         let forbiddenMap = new Map();
@@ -738,11 +749,13 @@
         const undoBtn = document.getElementById('undo');
 
         let board, turn, moves, winner, winLine, thinking;
+        const NET = { active: false, roomId: null, playerId: null, playerIndex: null, timer: null };
         let tally = { a: 0, b: 0 }; // 컴퓨터 대결: 나/컴퓨터, 2인 대결: 흑/백
         let px, cell, pad; // 캔버스 픽셀 크기, 칸 간격, 여백
         let reqId = 0;
 
         const isAi = () => modeEl.value === 'ai';
+        const isNet = () => modeEl.value === 'net';
         const human = () => +sideEl.value;
         const cpu = () => 3 - human();
 
@@ -793,7 +806,7 @@
         }
 
         function maybeAiTurn() {
-            if (!isAi() || winner || turn !== cpu() || thinking) return;
+            if (isNet() || !isAi() || winner || turn !== cpu() || thinking) return;
             thinking = true;
             update();
             requestAi();
@@ -801,6 +814,7 @@
 
         // ---------- 게임 진행 ----------
         function resetGame() {
+            if (NET.active && !isNet()) { clearInterval(NET.timer); NET.active = false; NET.roomId = NET.playerId = null; NET.playerIndex = null; }
             reqId++;
             pendingDelivery = null;
             notice = '';
@@ -837,6 +851,7 @@
         }
 
         function play(x, y) {
+            if (NET.active) { netMove(x, y); return true; }
             if (winner || board[y][x] !== EMPTY) return false;
             board[y][x] = turn;
             moves.push({ x, y });
@@ -854,6 +869,7 @@
         }
 
         function undo() {
+            if (NET.active) return;
             if (thinking || !moves.length) return;
             if (winner && winner !== 'draw') tally[tallyKey(winner)]--;
             const popOne = () => {
@@ -954,13 +970,70 @@
             ctx.shadowColor = 'transparent';
         }
 
+        // ---------- 온라인 방 ----------
+        async function api(path, data) {
+            const res = await fetch(path, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data || {}),
+            });
+            const json = await res.json();
+            if (!json.ok) throw new Error(json.error || '서버 오류');
+            return json;
+        }
+        function applyNet(payload) {
+            const g = payload.room.game;
+            board = g.board; turn = g.turn; moves = g.moves || []; winner = g.winner; winLine = g.winLine; thinking = false;
+            NET.active = true; NET.roomId = payload.room.roomId;
+            if (g.rule && ruleEl.value !== g.rule) ruleEl.value = g.rule;
+            update(); resize();
+        }
+        function startPolling() {
+            clearInterval(NET.timer);
+            NET.timer = setInterval(async () => {
+                if (!NET.active || !NET.roomId) return;
+                try {
+                    const res = await fetch(`/api/omok/state?roomId=${encodeURIComponent(NET.roomId)}`, { cache: 'no-store' });
+                    const json = await res.json();
+                    if (json.ok) applyNet(json);
+                } catch(e) { console.warn(e); }
+            }, 800);
+        }
+        async function createRoom() {
+            try {
+                modeEl.value = 'net'; NET.active = true; clearInterval(NET.timer);
+                const data = await api('/api/omok/create', { rule: ruleEl.value });
+                NET.playerId = data.playerId; NET.playerIndex = data.playerIndex;
+                applyNet(data); startPolling();
+            } catch(e) { alert(e.message); }
+        }
+        async function joinRoom() {
+            try {
+                const code = document.getElementById('roomInput').value.trim().toUpperCase();
+                if (!code) return alert('방 코드를 입력하세요.');
+                modeEl.value = 'net'; NET.active = true; clearInterval(NET.timer);
+                const data = await api('/api/omok/join', { roomId: code });
+                NET.playerId = data.playerId; NET.playerIndex = data.playerIndex;
+                applyNet(data); startPolling();
+            } catch(e) { alert(e.message); }
+        }
+        async function netMove(x, y) {
+            if (!NET.active || !NET.roomId) return;
+            try { applyNet(await api('/api/omok/move', { roomId: NET.roomId, playerId: NET.playerId, x, y })); }
+            catch(e) { notice = e.message; update(); setTimeout(() => { notice=''; update(); }, 1600); }
+        }
+        async function netReset() {
+            try { applyNet(await api('/api/omok/reset', { roomId: NET.roomId, playerId: NET.playerId })); }
+            catch(e) { alert(e.message); }
+        }
+
         // ---------- UI ----------
         function update() {
-            const ai = isAi();
+            const ai = isAi(), net = isNet();
             levelEl.hidden = sideEl.hidden = !ai;
-            levelInfoEl.innerHTML = ai ? LEVEL_INFO[levelEl.value] : '흑이 먼저 둡니다. 번갈아 두세요.';
+            onlineControlsEl.hidden = !net;
+            levelInfoEl.innerHTML = ai ? LEVEL_INFO[levelEl.value] : net ? '온라인 방을 만들거나 방 코드로 입장하세요.' : '흑이 먼저 둡니다. 번갈아 두세요.';
 
-            const humanBlackTurn = turn === BLACK && !winner && !thinking && (!ai || human() === BLACK);
+            const humanBlackTurn = turn === BLACK && !winner && !thinking && (!ai || human() === BLACK) && (!net || NET.playerIndex === 0);
             forbiddenMap = isRenju() && humanBlackTurn && moves.length >= 4
                 ? new Map(ruleEngine.forbiddenList(board.flat())) : new Map();
 
@@ -970,19 +1043,24 @@
             else if (winner) {
                 const who = ai ? (winner === human() ? '당신이' : '컴퓨터가') : `${NAMES[winner]}이`;
                 statusEl.textContent = `🎉 ${who} 이겼습니다!`;
-            } else if (thinking) statusEl.textContent = '컴퓨터가 생각 중...';
+            } else if (net && !NET.roomId) statusEl.textContent = '온라인 방을 만들거나 방 코드로 입장하세요';
+            else if (net && NET.playerIndex !== (turn === BLACK ? 0 : 1)) statusEl.textContent = `${NAMES[turn]} 차례 — 상대를 기다리는 중`;
+            else if (thinking) statusEl.textContent = '컴퓨터가 생각 중...';
             else if (ai) statusEl.textContent = `당신(${NAMES[human()]}) 차례입니다`;
             else statusEl.textContent = `${NAMES[turn]} 차례입니다`;
 
-            scoreEl.textContent = ai
-                ? `전적 — 나 ${tally.a} : ${tally.b} 컴퓨터`
+            scoreEl.textContent = net
+                ? (NET.roomId ? `온라인 방 ${NET.roomId} — 나는 ${NET.playerIndex === 0 ? '흑' : NET.playerIndex === 1 ? '백' : '?'}` : '온라인 방 대결')
+                : ai ? `전적 — 나 ${tally.a} : ${tally.b} 컴퓨터`
                 : `전적 — 흑 ${tally.a} : ${tally.b} 백`;
-            undoBtn.disabled = thinking || !moves.length;
+            onlineInfoEl.textContent = net && NET.roomId ? `방 코드: ${NET.roomId} · 다른 폰도 같은 주소에서 방 입장` : '';
+            undoBtn.disabled = net || thinking || !moves.length;
             draw();
         }
 
         canvas.addEventListener('click', (e) => {
             if (thinking || winner) return;
+            if (isNet() && (!NET.active || NET.playerIndex !== (turn === BLACK ? 0 : 1))) return;
             if (isAi() && turn !== human()) return;
             const rect = canvas.getBoundingClientRect();
             const scale = px / rect.width;
@@ -1001,10 +1079,12 @@
             if (play(x, y)) maybeAiTurn();
         });
 
-        document.getElementById('restart').addEventListener('click', resetGame);
+        document.getElementById('restart').addEventListener('click', () => { if (NET.active) netReset(); else resetGame(); });
         undoBtn.addEventListener('click', undo);
+        document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+        document.getElementById('joinRoomBtn').addEventListener('click', joinRoom);
         for (const el of [modeEl, levelEl, sideEl, ruleEl])
-            el.addEventListener('change', () => { resetTally(); resetGame(); });
+            el.addEventListener('change', () => { if (!isNet()) { clearInterval(NET.timer); NET.active = false; NET.roomId = NET.playerId = null; NET.playerIndex = null; } resetTally(); resetGame(); });
         window.addEventListener('resize', resize);
 
         resetGame();
