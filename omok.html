@@ -749,7 +749,7 @@
         const undoBtn = document.getElementById('undo');
 
         let board, turn, moves, winner, winLine, thinking;
-        const NET = { active: false, roomId: null, playerId: null, playerIndex: null, timer: null };
+        const NET = { active: false, roomId: null, playerId: null, playerIndex: null, guestCount: 0, timer: null };
         let tally = { a: 0, b: 0 }; // 컴퓨터 대결: 나/컴퓨터, 2인 대결: 흑/백
         let px, cell, pad; // 캔버스 픽셀 크기, 칸 간격, 여백
         let reqId = 0;
@@ -983,7 +983,7 @@
         function applyNet(payload) {
             const g = payload.room.game;
             board = g.board; turn = g.turn; moves = g.moves || []; winner = g.winner; winLine = g.winLine; thinking = false;
-            NET.active = true; NET.roomId = payload.room.roomId;
+            NET.active = true; NET.roomId = payload.room.roomId; NET.guestCount = payload.room.guestCount || 0;
             if (g.rule && ruleEl.value !== g.rule) ruleEl.value = g.rule;
             update(); resize();
         }
@@ -1033,7 +1033,7 @@
             onlineControlsEl.hidden = !net;
             levelInfoEl.innerHTML = ai ? LEVEL_INFO[levelEl.value] : net ? '온라인 방을 만들거나 방 코드로 입장하세요.' : '흑이 먼저 둡니다. 번갈아 두세요.';
 
-            const humanBlackTurn = turn === BLACK && !winner && !thinking && (!ai || human() === BLACK) && (!net || NET.playerIndex === 0);
+            const humanBlackTurn = turn === BLACK && !winner && !thinking && (!ai || human() === BLACK) && (!net || NET.playerIndex === 0 || NET.playerIndex === null);
             forbiddenMap = isRenju() && humanBlackTurn && moves.length >= 4
                 ? new Map(ruleEngine.forbiddenList(board.flat())) : new Map();
 
@@ -1044,23 +1044,24 @@
                 const who = ai ? (winner === human() ? '당신이' : '컴퓨터가') : `${NAMES[winner]}이`;
                 statusEl.textContent = `🎉 ${who} 이겼습니다!`;
             } else if (net && !NET.roomId) statusEl.textContent = '온라인 방을 만들거나 방 코드로 입장하세요';
-            else if (net && NET.playerIndex !== (turn === BLACK ? 0 : 1)) statusEl.textContent = `${NAMES[turn]} 차례 — 상대를 기다리는 중`;
+            else if (net && NET.playerIndex !== null && NET.playerIndex !== (turn === BLACK ? 0 : 1)) statusEl.textContent = `${NAMES[turn]} 차례 — 상대를 기다리는 중`;
             else if (thinking) statusEl.textContent = '컴퓨터가 생각 중...';
             else if (ai) statusEl.textContent = `당신(${NAMES[human()]}) 차례입니다`;
             else statusEl.textContent = `${NAMES[turn]} 차례입니다`;
 
+            const role = NET.playerIndex === 0 ? '흑' : NET.playerIndex === 1 ? '백' : NET.playerIndex === null ? '공동참여자' : '?';
             scoreEl.textContent = net
-                ? (NET.roomId ? `온라인 방 ${NET.roomId} — 나는 ${NET.playerIndex === 0 ? '흑' : NET.playerIndex === 1 ? '백' : '?'}` : '온라인 방 대결')
+                ? (NET.roomId ? `온라인 방 ${NET.roomId} — 나는 ${role}` : '온라인 방 대결')
                 : ai ? `전적 — 나 ${tally.a} : ${tally.b} 컴퓨터`
                 : `전적 — 흑 ${tally.a} : ${tally.b} 백`;
-            onlineInfoEl.textContent = net && NET.roomId ? `방 코드: ${NET.roomId} · 다른 폰도 같은 주소에서 방 입장` : '';
+            onlineInfoEl.textContent = net && NET.roomId ? `방 코드: ${NET.roomId} · 공동참여자 ${NET.guestCount || 0}명 · 다른 폰도 같은 주소에서 방 입장` : '';
             undoBtn.disabled = net || thinking || !moves.length;
             draw();
         }
 
         canvas.addEventListener('click', (e) => {
             if (thinking || winner) return;
-            if (isNet() && (!NET.active || NET.playerIndex !== (turn === BLACK ? 0 : 1))) return;
+            if (isNet() && (!NET.active || (NET.playerIndex !== null && NET.playerIndex !== (turn === BLACK ? 0 : 1)))) return;
             if (isAi() && turn !== human()) return;
             const rect = canvas.getBoundingClientRect();
             const scale = px / rect.width;
@@ -1084,7 +1085,7 @@
         document.getElementById('createRoomBtn').addEventListener('click', createRoom);
         document.getElementById('joinRoomBtn').addEventListener('click', joinRoom);
         for (const el of [modeEl, levelEl, sideEl, ruleEl])
-            el.addEventListener('change', () => { if (!isNet()) { clearInterval(NET.timer); NET.active = false; NET.roomId = NET.playerId = null; NET.playerIndex = null; } resetTally(); resetGame(); });
+            el.addEventListener('change', () => { if (!isNet()) { clearInterval(NET.timer); NET.active = false; NET.roomId = NET.playerId = null; NET.playerIndex = null; NET.guestCount = 0; } resetTally(); resetGame(); });
         window.addEventListener('resize', resize);
 
         resetGame();

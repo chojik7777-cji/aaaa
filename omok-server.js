@@ -48,15 +48,22 @@ function createGame(rule='renju') {
   };
 }
 function publicRoom(room) {
-  return { roomId: room.roomId, playersConnected: room.players.map(Boolean), game: clone(room.game), updatedAt: room.updatedAt };
+  return {
+    roomId: room.roomId,
+    playersConnected: room.players.map(Boolean),
+    guestCount: room.guests ? room.guests.length : 0,
+    game: clone(room.game),
+    updatedAt: room.updatedAt,
+  };
 }
 function assertTurn(room, pid) {
   const pi = room.players.indexOf(pid);
-  if (pi < 0) throw new Error('이 방의 참가자가 아닙니다.');
-  const color = pi === 0 ? BLACK : WHITE;
+  const guest = room.guests && room.guests.includes(pid);
+  if (pi < 0 && !guest) throw new Error('이 방의 참가자가 아닙니다.');
+  const color = guest ? room.game.turn : (pi === 0 ? BLACK : WHITE);
   if (room.game.turn !== color) throw new Error('현재 내 차례가 아닙니다.');
   if (room.game.winner) throw new Error('이미 종료된 게임입니다.');
-  return { pi, color };
+  return { pi: guest ? null : pi, color };
 }
 function handleMove(room, pid, x, y) {
   const { color } = assertTurn(room, pid);
@@ -111,7 +118,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       let id; do { id = roomCode(); } while (rooms.has(id));
       const pid = playerId();
-      const room = { roomId: id, players: [pid, null], game: createGame(body.rule), updatedAt: Date.now() };
+      const room = { roomId: id, players: [pid, null], guests: [], game: createGame(body.rule), updatedAt: Date.now() };
       rooms.set(id, room);
       return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 0 });
     }
@@ -119,10 +126,15 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const room = rooms.get(String(body.roomId || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
-      if (room.players[1]) return json(res, 400, { ok: false, error: '방이 가득 찼습니다.' });
       const pid = playerId();
-      room.players[1] = pid; room.updatedAt = Date.now();
-      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 1 });
+      if (!room.players[1]) {
+        room.players[1] = pid; room.updatedAt = Date.now();
+        return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 1, role: 'player' });
+      }
+      room.guests = room.guests || [];
+      room.guests.push(pid);
+      room.updatedAt = Date.now();
+      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: null, role: 'guest' });
     }
     if (url.pathname === '/api/omok/state') {
       const room = rooms.get(String(url.searchParams.get('roomId') || '').toUpperCase());
@@ -140,7 +152,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const room = rooms.get(String(body.roomId || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
-      if (!room.players.includes(body.playerId)) return json(res, 403, { ok: false, error: '이 방의 참가자가 아닙니다.' });
+      if (!room.players.includes(body.playerId) && !(room.guests || []).includes(body.playerId)) return json(res, 403, { ok: false, error: '이 방의 참가자가 아닙니다.' });
       room.game = createGame(room.game.rule);
       room.updatedAt = Date.now();
       return json(res, 200, { ok: true, room: publicRoom(room) });
