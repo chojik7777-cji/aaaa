@@ -161,6 +161,7 @@ function publicRoom(room) {
     updatedAt: room.updatedAt,
   };
 }
+function connectionLabel(pid) { return pid ? pid.slice(0, 4).toUpperCase() : ''; }
 function dashboardRoom(room) {
   const pub = publicRoom(room);
   const G = room.game;
@@ -171,6 +172,18 @@ function dashboardRoom(room) {
     waiting: p.pieces.filter(isHome).length,
     onBoard: p.pieces.filter((x) => !x.done && !isHome(x)).length,
   }));
+  const teams = room.teams || [];
+  const connections = {
+    teams: teams.map((team, teamIndex) => team.map((pid, idx) => ({
+      id: pid,
+      label: `${teamNames[teamIndex] || `팀${teamIndex + 1}`} #${idx + 1} · ${connectionLabel(pid)}`,
+      role: 'team',
+      teamIndex,
+      primary: room.players[teamIndex] === pid,
+    }))),
+    spectators: (room.spectators || []).map((pid, idx) => ({ id: pid, label: `관전자 #${idx + 1} · ${connectionLabel(pid)}`, role: 'spectator' })),
+    guests: (room.guests || []).map((pid, idx) => ({ id: pid, label: `공동참여자 #${idx + 1} · ${connectionLabel(pid)}`, role: 'guest' })),
+  };
   return {
     roomId: room.roomId,
     teamMode: pub.teamMode,
@@ -189,6 +202,7 @@ function dashboardRoom(room) {
     winnerName: G.winner === null ? '' : (teamNames[G.winner] || ''),
     canUndo: pub.canUndo,
     pieces,
+    connections,
     lastLog: G.log.slice(0, 5),
     updatedAt: room.updatedAt,
     ageSeconds: Math.max(0, Math.round((Date.now() - room.updatedAt) / 1000)),
@@ -208,6 +222,34 @@ function assertParticipant(room, pid) {
 }
 function assertController(room, pid) {
   if (!isController(room, pid)) throw new Error('관전자는 조작할 수 없습니다.');
+}
+function removeConnection(room, targetId) {
+  let removed = false;
+  if (room.teams) {
+    room.teams = room.teams.map((team, idx) => {
+      const next = team.filter((pid) => pid !== targetId);
+      if (next.length !== team.length) removed = true;
+      if (room.players[idx] === targetId) room.players[idx] = next[0] || null;
+      return next;
+    });
+  }
+  if (room.spectators) {
+    const before = room.spectators.length;
+    room.spectators = room.spectators.filter((pid) => pid !== targetId);
+    if (room.spectators.length !== before) removed = true;
+  }
+  if (room.guests) {
+    const before = room.guests.length;
+    room.guests = room.guests.filter((pid) => pid !== targetId);
+    if (room.guests.length !== before) removed = true;
+  }
+  const pi = room.players.indexOf(targetId);
+  if (pi >= 0) { room.players[pi] = null; removed = true; }
+  if (removed) {
+    addLog(room.game, `접속자 ${connectionLabel(targetId)} 님의 접속을 종료했습니다.`);
+    room.updatedAt = Date.now();
+  }
+  return removed;
 }
 function saveHistory(room) {
   room.history = room.history || [];
@@ -322,6 +364,15 @@ const server = http.createServer(async (req, res) => {
         now: Date.now(),
       });
     }
+    if (url.pathname === '/api/dashboard/kick' && req.method === 'POST') {
+      const body = await readBody(req);
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      if (!body.targetId) return json(res, 400, { ok: false, error: '종료할 접속자를 선택하세요.' });
+      const removed = removeConnection(room, String(body.targetId));
+      if (!removed) return json(res, 404, { ok: false, error: '해당 접속자를 찾을 수 없습니다.' });
+      return json(res, 200, { ok: true, room: dashboardRoom(room) });
+    }
     if (url.pathname === '/api/room/create' && req.method === 'POST') {
       const body = await readBody(req);
       let id; do { id = roomCode(); } while (rooms.has(id));
@@ -372,6 +423,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/room/state') {
       const room = rooms.get(String(url.searchParams.get('roomId') || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      const pid = url.searchParams.get('playerId');
+      if (pid && !isController(room, pid) && !isSpectator(room, pid)) return json(res, 403, { ok: false, error: '대시보드에서 접속이 종료되었습니다.' });
       return json(res, 200, { ok: true, room: publicRoom(room) });
     }
     if (url.pathname === '/api/room/throw' && req.method === 'POST') {

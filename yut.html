@@ -914,9 +914,16 @@
             NET.timer = setInterval(async () => {
                 if (!NET.active || !NET.roomId) return;
                 try {
-                    const res = await fetch(`/api/room/state?roomId=${encodeURIComponent(NET.roomId)}`, { cache: 'no-store' });
+                    const stateUrl = `/api/room/state?roomId=${encodeURIComponent(NET.roomId)}&playerId=${encodeURIComponent(NET.playerId || '')}`;
+                    const res = await fetch(stateUrl, { cache: 'no-store' });
                     const json = await res.json();
                     if (json.ok) applyNet(json);
+                    else if (res.status === 403) {
+                        clearInterval(NET.timer);
+                        NET.active = false;
+                        alert(json.error || '접속이 종료되었습니다.');
+                        location.href = 'yut.html';
+                    }
                 } catch (e) { console.warn(e); }
             }, 900);
         }

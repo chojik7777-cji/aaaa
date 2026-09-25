@@ -57,6 +57,13 @@
     .pieces { font-size: 13px; color: #4a5568; line-height: 1.6; margin-top: 6px; }
     .meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
     .meta div { background: #edf2f7; border-radius: 12px; padding: 9px; font-size: 13px; }
+    .connections { margin-top: 12px; background: #f8fafc; border-radius: 14px; padding: 12px; }
+    .connections h3 { margin: 0 0 8px; font-size: 15px; color: #2d3748; }
+    .conn-list { display: grid; gap: 7px; }
+    .conn { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; font-size: 13px; }
+    .conn small { color: #718096; }
+    .kick-btn { background: #e53e3e; color: white; border-radius: 9px; padding: 7px 10px; font-size: 12px; flex: 0 0 auto; }
+    .kick-btn:disabled { opacity: .55; cursor: wait; }
     .log { margin: 12px 0 0; padding: 0; list-style: none; color: #4a5568; font-size: 13px; }
     .log li { border-top: 1px solid #edf2f7; padding: 6px 0; }
     .empty { background: rgba(255,255,255,.95); border-radius: 18px; padding: 28px; text-align: center; color: #4a5568; }
@@ -111,6 +118,28 @@
     function esc(s) {
       return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     }
+    function connRow(roomId, conn) {
+      const primary = conn.primary ? ' · 대표' : '';
+      return `<div class="conn">
+        <span>${esc(conn.label)}<small>${primary}</small></span>
+        <button class="kick-btn" data-room="${esc(roomId)}" data-target="${esc(conn.id)}">접속종료</button>
+      </div>`;
+    }
+    function connectionsHtml(room) {
+      const teams = room.connections?.teams || [[], []];
+      const spectators = room.connections?.spectators || [];
+      const guests = room.connections?.guests || [];
+      const rows = [
+        '<h3>접속자 관리</h3>',
+        '<div class="conn-list">',
+        ...(teams[0] || []).map((c) => connRow(room.roomId, c)),
+        ...(teams[1] || []).map((c) => connRow(room.roomId, c)),
+        ...spectators.map((c) => connRow(room.roomId, c)),
+        ...guests.map((c) => connRow(room.roomId, c)),
+        '</div>'
+      ];
+      return `<div class="connections">${rows.join('')}</div>`;
+    }
     function roomCard(room) {
       const red = room.pieces?.[0] || {done:0,total:0,waiting:0,onBoard:0};
       const blue = room.pieces?.[1] || {done:0,total:0,waiting:0,onBoard:0};
@@ -139,6 +168,7 @@
             <div><b>최근 결과</b><br>${esc(room.lastResult || '-')}</div>
             <div><b>무르기</b><br>${room.canUndo ? '가능' : '불가'}</div>
           </div>
+          ${connectionsHtml(room)}
           <ul class="log">${logs}</ul>
         </article>`;
     }
@@ -162,6 +192,27 @@
         $('liveBadge').textContent = '● 연결 확인 필요';
       }
     }
+    async function kickConnection(roomId, targetId, btn) {
+      if (!confirm('선택한 접속자를 종료시킬까요?')) return;
+      try {
+        if (btn) btn.disabled = true;
+        const res = await fetch('/api/dashboard/kick', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId, targetId })
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || '접속종료 실패');
+        await loadDashboard();
+      } catch (err) {
+        alert(err.message);
+        if (btn) btn.disabled = false;
+      }
+    }
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.kick-btn');
+      if (!btn) return;
+      kickConnection(btn.dataset.room, btn.dataset.target, btn);
+    });
     $('refreshBtn').addEventListener('click', loadDashboard);
     loadDashboard();
     setInterval(loadDashboard, 2000);
