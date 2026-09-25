@@ -148,17 +148,33 @@ function createGame(count, pieces) {
   return G;
 }
 function publicRoom(room) {
+  const teams = room.teams || room.players.map((pid) => pid ? [pid] : []);
   return {
     roomId: room.roomId,
     playersConnected: room.players.map(Boolean),
+    teamMode: !!room.teamMode,
+    teamCounts: teams.map((t) => t.length),
+    spectatorCount: room.spectators ? room.spectators.length : 0,
     guestCount: room.guests ? room.guests.length : 0,
     canUndo: !!(room.history && room.history.length),
     game: clone(room.game),
     updatedAt: room.updatedAt,
   };
 }
+function teamIndexOf(room, pid) {
+  const teams = room.teams || [];
+  for (let i = 0; i < teams.length; i++) if (teams[i].includes(pid)) return i;
+  return -1;
+}
+function isSpectator(room, pid) { return !!(room.spectators || []).includes(pid); }
+function isController(room, pid) {
+  return room.players.includes(pid) || teamIndexOf(room, pid) >= 0 || !!(room.guests || []).includes(pid);
+}
 function assertParticipant(room, pid) {
-  if (!room.players.includes(pid) && !(room.guests || []).includes(pid)) throw new Error('이 방의 참가자가 아닙니다.');
+  if (!isController(room, pid) && !isSpectator(room, pid)) throw new Error('이 방의 참가자가 아닙니다.');
+}
+function assertController(room, pid) {
+  if (!isController(room, pid)) throw new Error('관전자는 조작할 수 없습니다.');
 }
 function saveHistory(room) {
   room.history = room.history || [];
@@ -166,12 +182,15 @@ function saveHistory(room) {
   if (room.history.length > 30) room.history.shift();
 }
 function assertTurn(room, pid) {
-  const pi = room.players.indexOf(pid);
-  const guest = room.guests && room.guests.includes(pid);
-  if (pi < 0 && !guest) throw new Error('이 방의 참가자가 아닙니다.');
-  if (room.game.winner !== null) throw new Error('이미 종료된 게임입니다.');
-  if (!guest && room.game.cur !== pi) throw new Error('현재 내 차례가 아닙니다.');
-  return guest ? room.game.cur : pi;
+  assertController(room, pid);
+  const G = room.game;
+  if (G.winner !== null) throw new Error('이미 종료된 게임입니다.');
+  let pi = room.players.indexOf(pid);
+  const ti = teamIndexOf(room, pid);
+  const legacyGuest = room.guests && room.guests.includes(pid);
+  if (ti >= 0) pi = ti;
+  if (!legacyGuest && G.cur !== pi) throw new Error('현재 내 팀 차례가 아닙니다.');
+  return legacyGuest ? G.cur : pi;
 }
 function handleThrow(room, pid) {
   assertTurn(room, pid);
@@ -263,17 +282,39 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       let id; do { id = roomCode(); } while (rooms.has(id));
       const pid = playerId();
-      const room = { roomId: id, players: [pid], guests: [], history: [], game: createGame(body.count, body.pieces), updatedAt: Date.now() };
+      const teamMode = body.teamMode !== false;
+      const game = createGame(teamMode ? 2 : body.count, body.pieces);
+      const room = {
+        roomId: id,
+        players: teamMode ? [pid, null] : [pid],
+        teams: teamMode ? [[pid], []] : null,
+        spectators: [], guests: [], history: [], teamMode, game, updatedAt: Date.now(),
+      };
       rooms.set(id, room);
-      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 0 });
+      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 0, role: 'team', teamIndex: 0 });
     }
     if (url.pathname === '/api/room/join' && req.method === 'POST') {
       const body = await readBody(req);
       const room = rooms.get(String(body.roomId || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      const pid = playerId();
+      if (room.teamMode) {
+        const requested = String(body.role || '').toLowerCase();
+        if (requested === 'spectator') {
+          room.spectators = room.spectators || [];
+          room.spectators.push(pid);
+          room.updatedAt = Date.now();
+          return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: null, role: 'spectator' });
+        }
+        const teamIndex = Math.max(0, Math.min(1, Number(body.teamIndex || 0)));
+        room.teams = room.teams || [[], []];
+        room.teams[teamIndex].push(pid);
+        if (!room.players[teamIndex]) room.players[teamIndex] = pid;
+        room.updatedAt = Date.now();
+        return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: teamIndex, role: 'team', teamIndex });
+      }
       let idx = room.players.findIndex((x) => !x);
       if (idx < 0) idx = room.players.length;
-      const pid = playerId();
       if (idx < room.game.players.length) {
         room.players[idx] = pid;
         room.updatedAt = Date.now();
@@ -307,7 +348,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const room = rooms.get(String(body.roomId || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
-      assertParticipant(room, body.playerId);
+      assertController(room, body.playerId);
       if (!room.history || !room.history.length) return json(res, 400, { ok: false, error: '무를 수 있는 이전 상태가 없습니다.' });
       room.game = room.history.pop();
       room.game.selected = null;
@@ -320,7 +361,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const room = rooms.get(String(body.roomId || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
-      if (!room.players.includes(body.playerId) && !(room.guests || []).includes(body.playerId)) return json(res, 403, { ok: false, error: '이 방의 참가자가 아닙니다.' });
+      try { assertController(room, body.playerId); } catch (e) { return json(res, 403, { ok: false, error: e.message }); }
       room.game = createGame(room.game.players.length, room.game.players[0].pieces.length);
       room.history = [];
       room.updatedAt = Date.now();
