@@ -39,6 +39,11 @@
             font-size: 14px; transition: all 0.3s; border: 1px solid #e2e8f0;
         }
         .contact a:hover { background: #667eea; color: white; border-color: #667eea; }
+        .contact .disabled {
+            display: inline-block; padding: 10px 20px; background: #edf2f7;
+            color: #a0aec0; border-radius: 10px; font-size: 14px;
+            border: 1px solid #e2e8f0; cursor: not-allowed; user-select: none;
+        }
         .more-links { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
         .more-links h2 { font-size: 15px; color: #4a5568; margin-bottom: 12px; }
         .more-links a {
@@ -64,7 +69,7 @@
         </p>
         <div class="contact">
             <a href="mailto:chojik7777@gmail.com">이메일</a>
-            <a href="https://github.com/chojik7777-cji">GitHub</a>
+            <span class="disabled" aria-disabled="true">GitHub</span>
             <a href="omok.html">오목 게임</a>
             <a href="yut.html">윷놀이</a>
         </div>
