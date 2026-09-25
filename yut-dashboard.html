@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>윷놀이 접속자 현황</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; padding: 20px;
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', '맑은 고딕', sans-serif;
+      background: linear-gradient(135deg, #182848 0%, #4b6cb7 100%);
+      color: #172033;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    header {
+      background: rgba(255,255,255,.94); border-radius: 22px; padding: 24px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.22); margin-bottom: 18px;
+    }
+    h1 { margin: 0 0 8px; font-size: 30px; color: #1a365d; }
+    .sub { margin: 0; color: #4a5568; line-height: 1.6; }
+    .topline { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+    .links { display: flex; gap: 8px; flex-wrap: wrap; }
+    a.btn, button {
+      border: 0; border-radius: 12px; padding: 10px 14px; background: #edf2ff;
+      color: #2b4c9a; text-decoration: none; font-weight: 700; cursor: pointer;
+    }
+    button { background: #2b6cb0; color: white; }
+    .stats {
+      display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 12px;
+      margin: 18px 0;
+    }
+    .stat, .room {
+      background: rgba(255,255,255,.95); border-radius: 18px; padding: 16px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.18);
+    }
+    .stat b { display: block; font-size: 28px; color: #2b6cb0; margin-bottom: 3px; }
+    .stat span { color: #718096; font-size: 13px; }
+    .toolbar {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+      color: white; margin: 12px 2px;
+    }
+    .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 10px; font-size: 13px; font-weight: 800; }
+    .live { background: #c6f6d5; color: #22543d; }
+    .stale { background: #fed7d7; color: #742a2a; }
+    .rooms { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    .room h2 { margin: 0 0 10px; font-size: 22px; color: #1a365d; display: flex; justify-content: space-between; gap: 8px; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 1px; }
+    .phase { color: #2b6cb0; font-size: 14px; }
+    .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+    .team { border-radius: 14px; padding: 12px; border: 2px solid #e2e8f0; background: #f8fafc; }
+    .team.current { border-color: #f6ad55; box-shadow: 0 0 0 3px rgba(246,173,85,.18); }
+    .red .team-name { color: #c53030; }
+    .blue .team-name { color: #2b6cb0; }
+    .team-name { font-weight: 900; font-size: 17px; margin-bottom: 6px; }
+    .team-count { font-size: 26px; font-weight: 900; }
+    .pieces { font-size: 13px; color: #4a5568; line-height: 1.6; margin-top: 6px; }
+    .meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+    .meta div { background: #edf2f7; border-radius: 12px; padding: 9px; font-size: 13px; }
+    .log { margin: 12px 0 0; padding: 0; list-style: none; color: #4a5568; font-size: 13px; }
+    .log li { border-top: 1px solid #edf2f7; padding: 6px 0; }
+    .empty { background: rgba(255,255,255,.95); border-radius: 18px; padding: 28px; text-align: center; color: #4a5568; }
+    .error { background: #fed7d7; color: #742a2a; border-radius: 14px; padding: 14px; margin: 12px 0; display: none; }
+    @media (max-width: 720px) {
+      body { padding: 12px; }
+      h1 { font-size: 24px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .teams { grid-template-columns: 1fr; }
+      .meta { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="topline">
+        <div>
+          <h1>🎲 윷놀이 팀전 접속자 현황</h1>
+          <p class="sub">맥미니 윷놀이 서버의 방별 팀 인원, 관전자, 현재 차례를 실시간으로 확인합니다.</p>
+        </div>
+        <div class="links">
+          <a class="btn" href="yut.html">윷놀이로 이동</a>
+          <a class="btn" href="index.html">자기소개</a>
+          <button id="refreshBtn" type="button">새로고침</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="roomCount">0</b><span>진행/대기 방</span></div>
+        <div class="stat"><b id="memberCount">0</b><span>팀 참가자</span></div>
+        <div class="stat"><b id="spectatorCount">0</b><span>관전자</span></div>
+        <div class="stat"><b id="updatedText">-</b><span>마지막 갱신</span></div>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div id="liveBadge" class="badge live">● 자동 갱신 중</div>
+      <div>약 2초마다 자동 갱신됩니다.</div>
+    </div>
+    <div id="error" class="error"></div>
+    <main id="rooms" class="rooms"></main>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const phaseClass = (room) => room.winnerName ? '종료' : room.phaseLabel;
+    function timeText(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts);
+      return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+    function roomCard(room) {
+      const red = room.pieces?.[0] || {done:0,total:0,waiting:0,onBoard:0};
+      const blue = room.pieces?.[1] || {done:0,total:0,waiting:0,onBoard:0};
+      const logs = (room.lastLog || []).map((m) => `<li>${esc(m)}</li>`).join('') || '<li>기록 없음</li>';
+      const pending = room.pending && room.pending.length ? room.pending.join(', ') : '없음';
+      const updated = room.ageSeconds < 20 ? `<span class="badge live">최근 ${room.ageSeconds}초 전</span>` : `<span class="badge stale">${room.ageSeconds}초 전</span>`;
+      return `
+        <article class="room">
+          <h2><span class="code">${esc(room.roomId)}</span>${updated}</h2>
+          <div class="phase">${room.winnerName ? `🎉 ${esc(room.winnerName)}팀 승리` : `${esc(room.currentTeamName)}팀 · ${esc(phaseClass(room))}`}</div>
+          <div class="teams">
+            <section class="team red ${room.currentTeam === 0 && !room.winnerName ? 'current' : ''}">
+              <div class="team-name">● 빨강팀</div>
+              <div><span class="team-count">${room.teamCounts?.[0] || 0}</span>명 접속</div>
+              <div class="pieces">난 말 ${red.done}/${red.total}<br>판 위 ${red.onBoard} · 대기 ${red.waiting}</div>
+            </section>
+            <section class="team blue ${room.currentTeam === 1 && !room.winnerName ? 'current' : ''}">
+              <div class="team-name">● 파랑팀</div>
+              <div><span class="team-count">${room.teamCounts?.[1] || 0}</span>명 접속</div>
+              <div class="pieces">난 말 ${blue.done}/${blue.total}<br>판 위 ${blue.onBoard} · 대기 ${blue.waiting}</div>
+            </section>
+          </div>
+          <div class="meta">
+            <div><b>관전자</b><br>${room.spectatorCount || 0}명</div>
+            <div><b>남은 결과</b><br>${esc(pending)}</div>
+            <div><b>최근 결과</b><br>${esc(room.lastResult || '-')}</div>
+            <div><b>무르기</b><br>${room.canUndo ? '가능' : '불가'}</div>
+          </div>
+          <ul class="log">${logs}</ul>
+        </article>`;
+    }
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/dashboard', { cache: 'no-store' });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || '대시보드 데이터를 가져오지 못했습니다.');
+        $('error').style.display = 'none';
+        $('roomCount').textContent = data.totalRooms;
+        $('memberCount').textContent = data.totalTeamMembers;
+        $('spectatorCount').textContent = data.totalSpectators;
+        $('updatedText').textContent = timeText(data.now);
+        $('rooms').innerHTML = data.rooms.length ? data.rooms.map(roomCard).join('') : '<div class="empty">아직 생성된 윷놀이 방이 없습니다.</div>';
+        $('liveBadge').className = 'badge live';
+        $('liveBadge').textContent = '● 자동 갱신 중';
+      } catch (err) {
+        $('error').style.display = 'block';
+        $('error').textContent = err.message;
+        $('liveBadge').className = 'badge stale';
+        $('liveBadge').textContent = '● 연결 확인 필요';
+      }
+    }
+    $('refreshBtn').addEventListener('click', loadDashboard);
+    loadDashboard();
+    setInterval(loadDashboard, 2000);
+  </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ const ROOT = __dirname;
 
 const TARGETS = {
   '/api/room': 'http://127.0.0.1:8791',   // yut-server.js
+  '/api/dashboard': 'http://127.0.0.1:8791', // yut dashboard summary
   '/api/omok': 'http://127.0.0.1:8792',   // omok-server.js
 };
 

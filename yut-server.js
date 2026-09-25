@@ -161,6 +161,39 @@ function publicRoom(room) {
     updatedAt: room.updatedAt,
   };
 }
+function dashboardRoom(room) {
+  const pub = publicRoom(room);
+  const G = room.game;
+  const teamNames = G.players.map((p) => p.name);
+  const pieces = G.players.map((p) => ({
+    done: p.pieces.filter((x) => x.done).length,
+    total: p.pieces.length,
+    waiting: p.pieces.filter(isHome).length,
+    onBoard: p.pieces.filter((x) => !x.done && !isHome(x)).length,
+  }));
+  return {
+    roomId: room.roomId,
+    teamMode: pub.teamMode,
+    teamCounts: pub.teamCounts,
+    spectatorCount: pub.spectatorCount,
+    guestCount: pub.guestCount,
+    playersConnected: pub.playersConnected,
+    currentTeam: G.cur,
+    currentTeamName: teamNames[G.cur] || '',
+    phase: G.phase,
+    phaseLabel: G.phase === 'throw' ? '윷 던질 차례' : G.phase === 'move' ? '말 이동 차례' : G.phase === 'over' ? '종료' : G.phase,
+    pending: G.pending.map((r) => NAMES[r]),
+    throwsLeft: G.throwsLeft,
+    lastResult: G.lastResult,
+    winner: G.winner,
+    winnerName: G.winner === null ? '' : (teamNames[G.winner] || ''),
+    canUndo: pub.canUndo,
+    pieces,
+    lastLog: G.log.slice(0, 5),
+    updatedAt: room.updatedAt,
+    ageSeconds: Math.max(0, Math.round((Date.now() - room.updatedAt) / 1000)),
+  };
+}
 function teamIndexOf(room, pid) {
   const teams = room.teams || [];
   for (let i = 0; i < teams.length; i++) if (teams[i].includes(pid)) return i;
@@ -278,6 +311,17 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size });
+    if (url.pathname === '/api/dashboard') {
+      const list = [...rooms.values()].map(dashboardRoom).sort((a, b) => b.updatedAt - a.updatedAt);
+      return json(res, 200, {
+        ok: true,
+        rooms: list,
+        totalRooms: list.length,
+        totalTeamMembers: list.reduce((sum, r) => sum + (r.teamCounts || []).reduce((a, b) => a + b, 0), 0),
+        totalSpectators: list.reduce((sum, r) => sum + (r.spectatorCount || 0), 0),
+        now: Date.now(),
+      });
+    }
     if (url.pathname === '/api/room/create' && req.method === 'POST') {
       const body = await readBody(req);
       let id; do { id = roomCode(); } while (rooms.has(id));
