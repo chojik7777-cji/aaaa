@@ -190,10 +190,32 @@
                 <div class="options" id="options"></div>
                 <div class="log" id="log" aria-live="polite"></div>
                 <div class="game-controls">
+                    <button id="undoBtn" disabled>무르기</button>
                     <button id="newGame">새 게임</button>
                 </div>
             </div>
         </div>
+
+        <details class="rules" open>
+            <summary>🧭 사용설명서</summary>
+            <div class="rules-body">
+                <p><b>온라인으로 같이 하기</b></p>
+                <ul>
+                    <li>첫 번째 사람은 <b>온라인 방 만들기</b>를 누르고 나온 6자리 방 코드를 공유합니다.</li>
+                    <li>다른 사람은 같은 링크로 접속해 방 코드를 입력하고 <b>방 입장</b>을 누릅니다.</li>
+                    <li>정원 안에 들어온 사람은 색상 담당, 정원 이후 접속자는 <b>공동참여자</b>입니다.</li>
+                    <li>공동참여자도 같은 판을 보며 현재 차례의 윷 던지기/말 이동을 대신 진행할 수 있습니다.</li>
+                </ul>
+                <p><b>게임 진행</b></p>
+                <ul>
+                    <li>현재 차례 표시를 보고 <b>윷 던지기</b>를 누릅니다.</li>
+                    <li>던진 결과가 아래 <b>남은 결과</b>에 쌓입니다. 윷/모/잡기는 한 번 더 진행됩니다.</li>
+                    <li>움직일 말이 있으면 판 위 말 또는 이름 옆 대기 말을 고릅니다.</li>
+                    <li>판 위에 표시된 도착 칸이나 <b>움직일 곳</b> 버튼을 누르면 말이 이동합니다.</li>
+                </ul>
+                <p><b>무르기</b>: 직전 윷 던지기 또는 말 이동 한 단계를 되돌립니다. 온라인 방에서는 모든 접속자 화면에 함께 반영됩니다.</p>
+            </div>
+        </details>
 
         <details class="rules">
             <summary>📖 윷놀이 규칙</summary>
@@ -320,11 +342,13 @@
 
         // ---------- 게임 상태 ----------
         let G = null;
-        const NET = { active: false, roomId: null, playerId: null, playerIndex: null, timer: null };
+        const NET = { active: false, roomId: null, playerId: null, playerIndex: null, canUndo: false, timer: null };
+        let HISTORY = [];
         let aiTimer = null;
         const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
         function newGame(config) {
+            HISTORY = [];
             G = {
                 players: config.map((c, i) => ({
                     ...PLAYER_DEFS[i], ai: c.ai,
@@ -339,6 +363,21 @@
 
         const who = (i) => `${G.players[i].name}${G.players[i].ai ? '(컴퓨터)' : ''}`;
         function addLog(msg) { G.log.unshift(msg); G.log.length = Math.min(G.log.length, 30); }
+        function cloneGame(game) { return JSON.parse(JSON.stringify(game)); }
+        function saveLocalHistory() {
+            if (!G) return;
+            HISTORY.push(cloneGame(G));
+            if (HISTORY.length > 30) HISTORY.shift();
+        }
+        function undoLocal() {
+            if (!HISTORY.length) return;
+            clearTimeout(aiTimer);
+            G = HISTORY.pop();
+            G.selected = null;
+            G.busy = false;
+            addLog('↩ 무르기로 직전 상태로 돌아갔습니다.');
+            render();
+        }
 
         // 움직일 수 있는 무리: 판 위의 칸별 무리 + 대기 말 하나
         function sources(pi) {
@@ -386,6 +425,7 @@
             if (NET.active) return netThrow();
             if (!G || G.phase !== 'throw' || G.busy) return;
             const game = G;
+            saveLocalHistory();
             G.busy = true;
             const { r, faces } = roll();
             G.faces = faces;
@@ -443,6 +483,7 @@
         async function doMove(opt) {
             if (NET.active) return netMove(opt);
             if (G.busy || G.phase !== 'move') return;
+            saveLocalHistory();
             G.busy = true;
             const pi = G.cur, pl = G.players[pi];
             G.pending.splice(G.pending.indexOf(opt.r), 1);
@@ -798,6 +839,9 @@
                 optionsEl.innerHTML = '<span class="empty">—</span>';
             }
 
+            const undoBtn = document.getElementById('undoBtn');
+            if (undoBtn) undoBtn.disabled = NET.active ? !NET.canUndo : !HISTORY.length;
+
             const logEl = document.getElementById('log');
             logEl.innerHTML = '';
             for (const m of G.log.slice(0, 12)) {
@@ -843,6 +887,7 @@
             G = payload.room.game;
             if (keepSelected) G.selected = keepSelected;
             NET.roomId = payload.room.roomId;
+            NET.canUndo = !!payload.room.canUndo;
             if (!document.getElementById('game').hidden) drawBoardBase(document.getElementById('board'));
             document.getElementById('setup').hidden = true;
             document.getElementById('game').hidden = false;
@@ -901,6 +946,14 @@
             try { applyNet(await api('/api/room/reset', { roomId: NET.roomId, playerId: NET.playerId })); }
             catch (e) { alert(e.message); }
         }
+        async function netUndo() {
+            try { applyNet(await api('/api/room/undo', { roomId: NET.roomId, playerId: NET.playerId })); }
+            catch (e) { alert(e.message); }
+        }
+        function undoGame() {
+            if (NET.active) return netUndo();
+            undoLocal();
+        }
 
         // ---------- 설정 ----------
         const countEl = document.getElementById('count');
@@ -948,6 +1001,7 @@
         document.getElementById('createRoomBtn').addEventListener('click', createOnlineRoom);
         document.getElementById('joinRoomBtn').addEventListener('click', joinOnlineRoom);
         document.getElementById('throwBtn').addEventListener('click', doThrow);
+        document.getElementById('undoBtn').addEventListener('click', undoGame);
         renderSetup();
     </script>
 </body>

@@ -152,9 +152,18 @@ function publicRoom(room) {
     roomId: room.roomId,
     playersConnected: room.players.map(Boolean),
     guestCount: room.guests ? room.guests.length : 0,
+    canUndo: !!(room.history && room.history.length),
     game: clone(room.game),
     updatedAt: room.updatedAt,
   };
+}
+function assertParticipant(room, pid) {
+  if (!room.players.includes(pid) && !(room.guests || []).includes(pid)) throw new Error('이 방의 참가자가 아닙니다.');
+}
+function saveHistory(room) {
+  room.history = room.history || [];
+  room.history.push(clone(room.game));
+  if (room.history.length > 30) room.history.shift();
 }
 function assertTurn(room, pid) {
   const pi = room.players.indexOf(pid);
@@ -168,6 +177,7 @@ function handleThrow(room, pid) {
   assertTurn(room, pid);
   const G = room.game;
   if (G.phase !== 'throw') throw new Error('지금은 윷을 던질 수 없습니다.');
+  saveHistory(room);
   const { r, faces } = roll();
   G.faces = faces;
   G.throwsLeft--;
@@ -190,6 +200,7 @@ function handleMove(room, pid, body) {
   const opts = optionsFor(G, pi, src);
   const opt = opts.find((o) => o.r === Number(body.r) && String(o.res.done ? 'exit' : o.res.node) === String(body.destKey));
   if (!opt) throw new Error('선택한 이동을 할 수 없습니다.');
+  saveHistory(room);
   const pl = G.players[pi];
   G.pending.splice(G.pending.indexOf(opt.r), 1);
   G.selected = null;
@@ -252,7 +263,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       let id; do { id = roomCode(); } while (rooms.has(id));
       const pid = playerId();
-      const room = { roomId: id, players: [pid], guests: [], game: createGame(body.count, body.pieces), updatedAt: Date.now() };
+      const room = { roomId: id, players: [pid], guests: [], history: [], game: createGame(body.count, body.pieces), updatedAt: Date.now() };
       rooms.set(id, room);
       return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 0 });
     }
@@ -292,12 +303,26 @@ const server = http.createServer(async (req, res) => {
       handleMove(room, body.playerId, body);
       return json(res, 200, { ok: true, room: publicRoom(room) });
     }
+    if (url.pathname === '/api/room/undo' && req.method === 'POST') {
+      const body = await readBody(req);
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      assertParticipant(room, body.playerId);
+      if (!room.history || !room.history.length) return json(res, 400, { ok: false, error: '무를 수 있는 이전 상태가 없습니다.' });
+      room.game = room.history.pop();
+      room.game.selected = null;
+      room.game.busy = false;
+      addLog(room.game, '↩ 무르기로 직전 상태로 돌아갔습니다.');
+      room.updatedAt = Date.now();
+      return json(res, 200, { ok: true, room: publicRoom(room) });
+    }
     if (url.pathname === '/api/room/reset' && req.method === 'POST') {
       const body = await readBody(req);
       const room = rooms.get(String(body.roomId || '').toUpperCase());
       if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
       if (!room.players.includes(body.playerId) && !(room.guests || []).includes(body.playerId)) return json(res, 403, { ok: false, error: '이 방의 참가자가 아닙니다.' });
       room.game = createGame(room.game.players.length, room.game.players[0].pieces.length);
+      room.history = [];
       room.updatedAt = Date.now();
       return json(res, 200, { ok: true, room: publicRoom(room) });
     }
