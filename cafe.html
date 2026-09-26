@@ -581,8 +581,15 @@ const Scene = (() => {
     const TABLE_POS = [[118, 236], [250, 236], [118, 300], [250, 300]];
     const SKINS = ['#f6d2b8', '#eab58f', '#c98e64', '#8d5a3b', '#f3c9a0'];
     const HAIRS = ['#2d2320', '#5a3825', '#a0522d', '#d8b36a', '#1b1b1b', '#9e9e9e', '#7a2e3a'];
-    const SHIRTS = ['#e76f51', '#2a9d8f', '#457b9d', '#f4a261', '#8e7dbe', '#e9c46a', '#6c757d', '#d62828', '#43aa8b', '#f28482'];
-    const PANTS = ['#264653', '#3d405b', '#5c4033', '#343a40', '#6d597a', '#1d3557'];
+    const SHIRTS = ['#e76f51', '#2a9d8f', '#457b9d', '#f4a261', '#8e7dbe', '#e9c46a', '#6c757d', '#d62828', '#43aa8b', '#f28482',
+                    '#ffafcc', '#a2d2ff', '#cdb4db', '#b5e48c', '#ffd6a5', '#fdffb6', '#9bf6ff', '#bdb2ff', '#f1faee', '#e5e5e5',
+                    '#6a994e', '#bc4749', '#386641', '#7f5539', '#b08968', '#023e8a', '#ff7b00', '#ff006e', '#8338ec', '#264653',
+                    '#fb8500', '#219ebc', '#d4a373', '#588157', '#9d0208', '#f7b267', '#22223b', '#c9ada7'];
+    const ACCENTS = ['#ffffff', '#f8f1e5', '#222222', '#ffd166', '#90e0ef', '#f4acb7', '#b5e48c', '#e63946', '#1d3557', '#ff9f1c', '#8ecae6', '#6d597a'];
+    const PANTS = ['#264653', '#3d405b', '#5c4033', '#343a40', '#6d597a', '#1d3557', '#3a5a8c', '#4f6d9a', '#6f8fb8',
+                   '#b59f7b', '#8d7b68', '#2b2b2b', '#6b705c', '#dcd3c3', '#7f4f24', '#495057'];
+    const SHOES = ['#222222', '#f8f9fa', '#8b5e3c', '#e63946', '#1d3557', '#adb5bd', '#5c4033'];
+    const TOPS = ['tee', 'stripe', 'hoodie', 'jacket', 'check', 'sweater', 'shirt', 'dress'];
     const LIQUID = { shot: '#3b2314', water: '#cfe8f7', milk: '#f7f1e8', syrup: '#e0b050', choco: '#4a2a18', matcha: '#7fb24a' };
     const DRINK_COLOR = { americano: '#3b2314', latte: '#c69c6d', vanilla: '#dcb67f', mocha: '#5a3322', greentea: '#8cbf5a' };
     const INTERIOR_WALL = ['#f1e3cf', '#efdcc2', '#e9d6bb'];
@@ -601,16 +608,41 @@ const Scene = (() => {
     function rr(x, y, w, h, r) { c.beginPath(); if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); }
     function ell(x, y, rx, ry) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); }
     function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+    // 색을 밝게(+)/어둡게(-)
+    function shade(hex, amt) {
+        const f = v => Math.max(0, Math.min(255, Math.round(amt >= 0 ? v + (255 - v) * amt : v * (1 + amt))));
+        return `rgb(${hexToRgb(hex).map(f).join(',')})`;
+    }
+    // 왼쪽(창문 쪽)은 밝고 오른쪽은 어두운 원통형 입체 그라데이션
+    function volGrad(x0, x1, hex) {
+        const g = c.createLinearGradient(x0, 0, x1, 0);
+        g.addColorStop(0, shade(hex, 0.28)); g.addColorStop(0.4, shade(hex, 0.05)); g.addColorStop(1, shade(hex, -0.32));
+        return g;
+    }
     function mix(a, b, k) {
         const A = hexToRgb(a), B = hexToRgb(b);
         return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], k))).join(',')})`;
     }
 
     function randomLook() {
-        return { skin: pick(SKINS), hair: pick(HAIRS), style: Math.floor(Math.random() * 4), shirt: pick(SHIRTS), pants: pick(PANTS), h: rnd(0.92, 1.06) };
+        let top = pick(TOPS);
+        // 날씨에 맞는 옷차림
+        if (S.weather === 'cold' && Math.random() < 0.65) top = pick(['jacket', 'hoodie', 'sweater']);
+        if (S.weather === 'hot' && ['jacket', 'hoodie', 'sweater'].includes(top) && Math.random() < 0.75) top = pick(['tee', 'stripe', 'dress']);
+        const shirt = pick(SHIRTS);
+        let shirt2 = pick(ACCENTS);
+        if (shirt2 === shirt) shirt2 = '#ffffff';
+        return {
+            skin: pick(SKINS), hair: pick(HAIRS), style: Math.floor(Math.random() * 4),
+            top, shirt, shirt2, short: (top === 'tee' || top === 'dress' || (top === 'stripe' && S.weather === 'hot')) && S.weather !== 'cold',
+            pants: pick(PANTS), shoes: pick(SHOES),
+            scarf: S.weather === 'cold' && Math.random() < 0.55 ? pick(SHIRTS) : null,
+            bag: Math.random() < 0.3 ? pick(['#8d5a3b', '#343a40', '#c9ada7', '#e76f51', '#1d3557']) : null,
+            h: rnd(0.92, 1.06),
+        };
     }
     function newWorker(apron, hat, x) {
-        return { x, y: WORKER_Y, tx: x, look: { skin: pick(SKINS), hair: pick(HAIRS), style: 0, shirt: '#f8f9fa', pants: '#343a40', h: 1 },
+        return { x, y: WORKER_Y, tx: x, look: { skin: pick(SKINS), hair: pick(HAIRS), style: 0, top: 'shirt', shirt: '#f8f9fa', shirt2: '#ffffff', short: false, pants: '#343a40', shoes: '#222222', h: 1 },
                  apron, hat, arm: 0, phase: 0, pending: null, moving: false, worker: true, alpha: 1 };
     }
 
@@ -771,7 +803,7 @@ const Scene = (() => {
         // 창밖 행인
         if (Math.random() < dt * 0.25 && walkers.length < 3) {
             const dir = Math.random() < 0.5 ? 1 : -1;
-            walkers.push({ x: dir > 0 ? 118 : 302, dir, speed: rnd(14, 26), color: pick(SHIRTS), umbrella: S.weather === 'rain' ? pick(['#e63946', '#1d3557', '#ffb703', '#2a9d8f']) : null });
+            walkers.push({ x: dir > 0 ? 118 : 302, dir, speed: rnd(14, 26), color: pick(SHIRTS), pants: pick(PANTS), umbrella: S.weather === 'rain' ? pick(['#e63946', '#1d3557', '#ffb703', '#2a9d8f']) : null });
         }
         for (const w of walkers) w.x += w.dir * w.speed * dt;
         walkers = walkers.filter(w => w.x > 100 && w.x < 320);
@@ -845,8 +877,8 @@ const Scene = (() => {
         c.fillStyle = '#9d968a'; c.fillRect(x, y + h - 22, w, 3);
         for (const p of walkers) {
             const px = p.x, py = y + h - 6, bob = Math.sin(t * 8 + px) * 1;
-            c.fillStyle = '#3d3d3d'; c.fillRect(px - 3, py - 8, 2, 8); c.fillRect(px + 1, py - 8, 2, 8);
-            c.fillStyle = p.color; rr(px - 5, py - 22 + bob, 10, 15, 3); c.fill();
+            c.fillStyle = p.pants; c.fillRect(px - 3, py - 8, 2, 8); c.fillRect(px + 1, py - 8, 2, 8);
+            c.fillStyle = volGrad(px - 5, px + 5, p.color); rr(px - 5, py - 22 + bob, 10, 15, 3); c.fill();
             c.fillStyle = '#e9c3a0'; ell(px, py - 27 + bob, 4.5, 4.5); c.fill();
             if (p.umbrella) {
                 c.fillStyle = p.umbrella; c.beginPath(); c.arc(px, py - 32 + bob, 12, Math.PI, 0); c.fill();
@@ -1107,6 +1139,125 @@ const Scene = (() => {
         c.fillRect(x - 13, y - 40, 4, 28);
     }
 
+    function drawLegs(L, seated, sw) {
+        const shoe = (x, y, w) => {
+            c.fillStyle = L.shoes || '#222'; rr(x, y, w, 4, 2); c.fill();
+            c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + 1, y + 0.5, w - 3, 1);
+        };
+        if (seated) {
+            c.fillStyle = volGrad(-6, 14, L.pants); rr(-6, -18, 20, 7, 3); c.fill();
+            c.fillStyle = volGrad(9, 15, L.pants); rr(9, -16, 6, 16, 3); c.fill();
+            shoe(8, -3, 10);
+            return;
+        }
+        for (const [x, off] of [[-9, sw * 3], [1, -sw * 3]]) {
+            c.fillStyle = volGrad(x + off, x + off + 8, L.pants);
+            rr(x + off, -24, 8, 24, 3); c.fill();
+            if (/^#(3a5a8c|4f6d9a|6f8fb8)$/.test(L.pants)) { // 청바지 박음선
+                c.strokeStyle = 'rgba(255,210,120,0.35)'; c.beginPath(); c.moveTo(x + off + 5, -22); c.lineTo(x + off + 5, -5); c.stroke();
+            }
+        }
+        shoe(-10 + sw * 3, -4, 10); shoe(0 - sw * 3, -4, 10);
+    }
+    function drawArm(L, x, y, back) {
+        const len = 24, sleeve = L.short ? 10 : len;
+        if (L.short) { c.fillStyle = volGrad(x + 0.5, x + 6.5, L.skin); rr(x + 0.5, y + 6, 6, len - 6, 3); c.fill(); }
+        c.fillStyle = volGrad(x, x + 7, L.shirt); rr(x, y, 7, sleeve, 3); c.fill();
+        if (L.top === 'stripe') { c.fillStyle = L.shirt2; for (let yy = y + 4; yy < y + sleeve - 1; yy += 7) c.fillRect(x, yy, 7, 2.5); }
+        if (!L.short && (L.top === 'sweater' || L.top === 'hoodie')) { c.fillStyle = shade(L.shirt, -0.2); c.fillRect(x, y + len - 5, 7, 4); }
+        if (!L.short && L.top === 'jacket') { c.fillStyle = L.shirt2; c.fillRect(x, y + len - 3, 7, 2); }
+        if (back) { c.fillStyle = 'rgba(0,0,0,0.13)'; rr(x, y, 7, len, 3); c.fill(); }
+        c.fillStyle = L.skin; ell(x + 3.5, y + len + 1, 4, 4); c.fill();
+        c.fillStyle = 'rgba(0,0,0,0.12)'; ell(x + 4.5, y + len + 2, 2.5, 2.5); c.fill();
+    }
+    function drawTorso(L, dy, apron, seated) {
+        const top = L.top || 'tee', y0 = -60 + dy, x0 = -14, w = 28, h = 38;
+        if (top === 'dress') { // 치마
+            c.fillStyle = volGrad(-18, 18, L.shirt);
+            c.beginPath();
+            if (seated) { c.moveTo(-12, y0 + 30); c.lineTo(12, y0 + 30); c.lineTo(18, y0 + 44); c.lineTo(-10, y0 + 44); }
+            else { c.moveTo(-13, y0 + 30); c.lineTo(13, y0 + 30); c.lineTo(17, y0 + 50); c.lineTo(-17, y0 + 50); }
+            c.closePath(); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.12)';
+            for (const fx of [-6, 2, 9]) { c.beginPath(); c.moveTo(fx, y0 + 32); c.lineTo(fx + 1.5, y0 + (seated ? 44 : 50)); c.lineTo(fx + 3, y0 + 32); c.fill(); }
+        }
+        if (top === 'hoodie') { c.fillStyle = shade(L.shirt, -0.22); ell(0, y0 + 1, 12, 6); c.fill(); }
+        c.save();
+        rr(x0, y0, w, h, 9);
+        c.fillStyle = volGrad(x0, x0 + w, L.shirt); c.fill();
+        c.clip();
+        switch (top) {
+            case 'stripe':
+                c.fillStyle = L.shirt2;
+                for (let y = y0 + 5; y < y0 + h; y += 7) c.fillRect(x0 - 1, y, w + 2, 3);
+                break;
+            case 'check':
+                c.globalAlpha = 0.35; c.fillStyle = L.shirt2;
+                for (let x = x0 + 3; x < x0 + w; x += 8) c.fillRect(x, y0, 3, h);
+                for (let y = y0 + 3; y < y0 + h; y += 8) c.fillRect(x0, y, w, 3);
+                c.globalAlpha = 1;
+                c.fillStyle = shade(L.shirt, -0.3); for (let i = 0; i < 3; i++) { ell(0, y0 + 9 + i * 8, 1.1, 1.1); c.fill(); }
+                break;
+            case 'jacket':
+                c.fillStyle = volGrad(-5, 5, L.shirt2); c.fillRect(-5, y0, 10, h);
+                c.fillStyle = shade(L.shirt, -0.15);
+                c.beginPath(); c.moveTo(-5, y0); c.lineTo(-1, y0 + 14); c.lineTo(-7, y0 + 8); c.fill();
+                c.beginPath(); c.moveTo(5, y0); c.lineTo(1, y0 + 14); c.lineTo(7, y0 + 8); c.fill();
+                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.moveTo(-11, y0 + 28); c.lineTo(-6, y0 + 28); c.moveTo(6, y0 + 28); c.lineTo(11, y0 + 28); c.stroke();
+                break;
+            case 'hoodie':
+                c.fillStyle = shade(L.shirt, -0.15); rr(-9, y0 + 22, 18, 10, 3); c.fill();
+                c.strokeStyle = L.shirt2; c.lineWidth = 1.2;
+                c.beginPath(); c.moveTo(-3, y0 + 3); c.lineTo(-3.5, y0 + 13); c.moveTo(3, y0 + 3); c.lineTo(3.5, y0 + 13); c.stroke();
+                c.lineWidth = 1;
+                break;
+            case 'sweater':
+                c.fillStyle = L.shirt2; c.beginPath(); c.moveTo(-6, y0); c.lineTo(0, y0 + 10); c.lineTo(6, y0); c.fill();
+                c.fillStyle = shade(L.shirt, -0.2); c.fillRect(x0, y0 + h - 6, w, 6);
+                c.strokeStyle = 'rgba(0,0,0,0.12)';
+                for (let x = x0 + 2; x < x0 + w; x += 3) { c.beginPath(); c.moveTo(x, y0 + h - 6); c.lineTo(x, y0 + h); c.stroke(); }
+                c.strokeStyle = 'rgba(255,255,255,0.18)';
+                for (let y = y0 + 14; y < y0 + h - 8; y += 6) { c.beginPath(); c.moveTo(-10, y); c.lineTo(-6, y + 3); c.lineTo(-2, y); c.moveTo(2, y); c.lineTo(6, y + 3); c.lineTo(10, y); c.stroke(); }
+                break;
+            case 'shirt':
+                c.strokeStyle = shade(L.shirt, -0.25); c.beginPath(); c.moveTo(0, y0 + 4); c.lineTo(0, y0 + h); c.stroke();
+                c.fillStyle = shade(L.shirt, -0.35); for (let i = 0; i < 4; i++) { ell(1.8, y0 + 10 + i * 7, 0.9, 0.9); c.fill(); }
+                c.fillStyle = L.shirt2 === '#222222' ? '#ffffff' : L.shirt2;
+                c.beginPath(); c.moveTo(-7, y0); c.lineTo(0, y0 + 5); c.lineTo(-2, y0 + 9); c.lineTo(-8, y0 + 3); c.fill();
+                c.beginPath(); c.moveTo(7, y0); c.lineTo(0, y0 + 5); c.lineTo(2, y0 + 9); c.lineTo(8, y0 + 3); c.fill();
+                break;
+            case 'dress':
+                c.fillStyle = L.shirt2; c.fillRect(x0, y0 + 26, w, 4);
+                c.fillStyle = shade(L.shirt, 0.35); ell(0, y0 + 1, 7, 3); c.fill();
+                break;
+            default: // tee: 가슴 프린트
+                c.fillStyle = L.shirt2; ell(3, y0 + 15, 4.5, 4.5); c.fill();
+                c.fillStyle = shade(L.shirt, -0.2); ell(0, y0 + 1, 7, 3); c.fill();
+        }
+        // 위는 밝고 아래는 그늘진 음영, 목 그림자
+        const g = c.createLinearGradient(0, y0, 0, y0 + h);
+        g.addColorStop(0, 'rgba(255,255,255,0.14)'); g.addColorStop(0.45, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.18)');
+        c.fillStyle = g; c.fillRect(x0, y0, w, h);
+        c.fillStyle = 'rgba(0,0,0,0.13)'; ell(0, y0, 8, 3); c.fill();
+        c.restore();
+        rr(x0, y0, w, h, 9); c.strokeStyle = 'rgba(0,0,0,0.16)'; c.stroke();
+        if (apron) {
+            c.fillStyle = volGrad(-10, 10, apron); rr(-10, y0 + 10, 20, 30, 4); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.15)'; rr(-6, y0 + 24, 12, 7, 2); c.fill();
+            c.strokeStyle = apron; c.lineWidth = 2; c.beginPath(); c.moveTo(-6, y0 + 10); c.lineTo(-4, y0); c.moveTo(6, y0 + 10); c.lineTo(4, y0); c.stroke(); c.lineWidth = 1;
+        }
+        if (L.bag) {
+            c.strokeStyle = L.bag; c.lineWidth = 2; c.beginPath(); c.moveTo(-11, y0 + 2); c.lineTo(11, y0 + 26); c.stroke(); c.lineWidth = 1;
+            c.fillStyle = volGrad(9, 20, L.bag); rr(9, y0 + 24, 11, 10, 2); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.2)'; c.fillRect(9, y0 + 27, 11, 1.5);
+        }
+        if (L.scarf) {
+            c.fillStyle = volGrad(-12, 12, L.scarf); rr(-12, y0 - 3, 24, 7, 3); c.fill();
+            c.fillStyle = volGrad(4, 10, L.scarf); rr(4, y0 + 2, 6, 15, 2); c.fill();
+            c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(4, y0 + 13, 6, 1.5);
+        }
+    }
+
     function drawPerson(p) {
         const L = p.look, s = L.h;
         const seated = p.seated && p.state === 'seated';
@@ -1122,34 +1273,17 @@ const Scene = (() => {
         if (!p.worker) { c.fillStyle = 'rgba(0,0,0,0.15)'; ell(0, 0, 15, 4); c.fill(); }
         const dy = seated ? 12 : -bob;
         // 다리
-        c.fillStyle = L.pants;
-        if (seated) {
-            rr(-6, -18, 20, 7, 3); c.fill();
-            rr(9, -16, 6, 16, 3); c.fill();
-            c.fillStyle = '#222'; rr(8, -3, 10, 4, 2); c.fill();
-        } else {
-            rr(-9 + sw * 3, -24, 8, 24, 3); c.fill();
-            rr(1 - sw * 3, -24, 8, 24, 3); c.fill();
-            c.fillStyle = '#222'; rr(-10 + sw * 3, -4, 10, 4, 2); c.fill(); rr(0 - sw * 3, -4, 10, 4, 2); c.fill();
-        }
-        // 몸
-        c.fillStyle = L.shirt; rr(-14, -60 + dy, 28, 38, 9); c.fill();
-        if (p.apron) {
-            c.fillStyle = p.apron; rr(-10, -50 + dy, 20, 30, 4); c.fill();
-            c.strokeStyle = p.apron; c.lineWidth = 2; c.beginPath(); c.moveTo(-6, -50 + dy); c.lineTo(-4, -60 + dy); c.moveTo(6, -50 + dy); c.lineTo(4, -60 + dy); c.stroke(); c.lineWidth = 1;
-        }
-        // 팔
-        c.fillStyle = L.shirt;
+        drawLegs(L, seated, sw);
+        // 몸통 (옷 종류별 무늬 + 입체 음영)
         const armSwing = walking ? sw * 4 : 0;
-        rr(-19, -56 + dy + armSwing, 7, 24, 3); c.fill();
+        drawArm(L, -19, -56 + dy + armSwing, true);
+        drawTorso(L, dy, p.apron, seated);
+        // 팔
         if (p.arm > 0) {
-            c.save(); c.translate(15, -54 + dy); c.rotate(-1.2); rr(-3, 0, 7, 22, 3); c.fill();
-            c.fillStyle = L.skin; ell(0, 23, 4, 4); c.fill(); c.restore();
+            c.save(); c.translate(15, -54 + dy); c.rotate(-1.2); drawArm(L, -3, 0, false); c.restore();
         } else {
-            rr(12, -56 + dy - armSwing, 7, 24, 3); c.fill();
-            c.fillStyle = L.skin; ell(15.5, -31 + dy - armSwing, 4, 4); c.fill();
+            drawArm(L, 12, -56 + dy - armSwing, false);
         }
-        c.fillStyle = L.skin; ell(-15.5, -31 + dy + armSwing, 4, 4); c.fill();
         if (p.hold && !seated) {
             drawCupShape(17, -30 + dy, 0.7, p.hold.color, p.hold.iced, !p.hold.iced);
             if (p.hold.cake) drawCake(-17, -30 + dy, 0.7);
@@ -1157,6 +1291,9 @@ const Scene = (() => {
         // 머리
         const hy = -72 + dy;
         c.fillStyle = L.skin; ell(0, hy, 13, 13); c.fill();
+        const hg = c.createRadialGradient(-5, hy - 5, 1, 0, hy, 14);
+        hg.addColorStop(0, 'rgba(255,255,255,0.3)'); hg.addColorStop(0.55, 'rgba(255,255,255,0)'); hg.addColorStop(1, 'rgba(0,0,0,0.14)');
+        c.fillStyle = hg; ell(0, hy, 13, 13); c.fill();
         c.fillStyle = L.hair;
         if (p.worker) {
             c.fillStyle = p.hat; c.beginPath(); c.arc(0, hy - 3, 13.5, Math.PI, 0); c.fill();
