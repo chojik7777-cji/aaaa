@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>카페 운영 게임</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body {
+            font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex;
+            justify-content: center; align-items: flex-start; padding: 16px;
+            color: #2d3748;
+        }
+        .card {
+            background: white; border-radius: 20px;
+            padding: 24px 20px; max-width: 720px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { font-size: 26px; text-align: center; margin-bottom: 4px; }
+        .sub { text-align: center; font-size: 13px; color: #718096; margin-bottom: 14px; }
+        h2 { font-size: 16px; color: #4a5568; margin: 18px 0 8px; }
+        button {
+            font-family: inherit; font-size: 14px; cursor: pointer;
+            padding: 8px 12px; border-radius: 10px; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; transition: all 0.15s;
+        }
+        button:hover:not(:disabled) { background: #667eea; color: white; border-color: #667eea; }
+        button:disabled { opacity: 0.4; cursor: default; }
+        button:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
+        .primary { background: #667eea; color: white; border-color: #667eea; font-weight: 600; }
+        .primary:hover:not(:disabled) { background: #5a67d8; }
+
+        .stats {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+            background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat { text-align: center; }
+        .stat .k { font-size: 12px; color: #718096; }
+        .stat .v { font-size: 16px; font-weight: 700; color: #2d3748; white-space: nowrap; }
+        .stars { color: #d69e2e; letter-spacing: 1px; }
+
+        /* 준비 화면 */
+        .forecast { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #fefcbf; color: #744210; font-size: 14px; }
+        .shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .item {
+            border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px;
+            display: flex; flex-direction: column; gap: 6px; font-size: 13px;
+        }
+        .item .t { font-weight: 700; font-size: 14px; }
+        .item .d { color: #718096; line-height: 1.5; flex: 1; }
+        .item.done { background: #f0fff4; border-color: #9ae6b4; }
+        .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+        .seg button.on { background: #764ba2; color: white; border-color: #764ba2; }
+        .toggles { display: grid; gap: 8px; }
+        .toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; font-size: 13px; }
+        .toggle.on { background: #faf5ff; border-color: #b794f4; }
+        .start-row { display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+        .start-row .primary { padding: 12px 28px; font-size: 16px; }
+
+        /* 영업 화면 */
+        .timebar { height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden; margin: 12px 0 4px; }
+        .timebar div { height: 100%; background: linear-gradient(90deg, #f6ad55, #ed64a6); width: 0; }
+        .clock { display: flex; justify-content: space-between; font-size: 12px; color: #718096; }
+        .counter {
+            margin-top: 10px; min-height: 150px; border-radius: 14px; padding: 10px;
+            background: repeating-linear-gradient(90deg, #f7ecdf 0 40px, #f3e3d0 40px 80px);
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+        }
+        .slot { border: 2px dashed #e2cfb6; border-radius: 12px; min-height: 130px; }
+        .cust {
+            background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 8px 6px;
+            text-align: center; cursor: pointer; min-height: 130px; display: flex; flex-direction: column;
+            align-items: center; gap: 4px; position: relative; animation: pop 0.25s ease-out;
+        }
+        .cust:hover { border-color: #667eea; box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+        .cust .face { font-size: 30px; line-height: 1; }
+        .cust .order { font-size: 12px; font-weight: 700; line-height: 1.35; word-break: keep-all; }
+        .cust .price { font-size: 11px; color: #718096; }
+        .cust .key { position: absolute; top: 4px; left: 6px; font-size: 10px; color: #a0aec0; font-weight: 700; }
+        .pbar { width: 100%; height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; margin-top: auto; }
+        .pbar div { height: 100%; background: #48bb78; }
+        .cust.warn { border-color: #f6ad55; }
+        .cust.danger { border-color: #fc8181; animation: shake 0.4s infinite; }
+        .cust.bad { background: #fff5f5; }
+        @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+
+        .work { display: grid; grid-template-columns: 1fr 190px; gap: 10px; margin-top: 12px; }
+        .ings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; align-content: start; }
+        .ing {
+            position: relative; padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+            overflow: hidden;
+        }
+        .ing .ic { font-size: 24px; line-height: 1; }
+        .ing .nm { font-size: 12px; }
+        .ing .cnt { font-size: 11px; color: #718096; }
+        .ing:hover:not(:disabled) .cnt { color: white; }
+        .ing .kb { position: absolute; top: 3px; left: 6px; font-size: 10px; color: #a0aec0; }
+        .ing .brew { position: absolute; left: 0; bottom: 0; height: 4px; background: #975a16; width: 0; }
+        .cup {
+            border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+            background: #fffaf0;
+        }
+        .cup .title { font-size: 13px; font-weight: 700; color: #744210; }
+        .cup .contents { min-height: 64px; font-size: 14px; line-height: 1.7; }
+        .cup .contents .empty { color: #a0aec0; font-size: 13px; }
+        .chip { display: inline-block; background: white; border: 1px solid #fbd38d; border-radius: 999px; padding: 0 8px; margin: 2px; font-size: 13px; }
+        .guess { font-size: 12px; color: #2f855a; font-weight: 600; min-height: 16px; }
+        .row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .hint { font-size: 12px; color: #718096; margin-top: 10px; line-height: 1.6; text-align: center; }
+
+        .toast-wrap { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 20; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
+        .toast { background: rgba(45,55,72,0.92); color: white; padding: 8px 14px; border-radius: 999px; font-size: 14px; animation: pop 0.2s ease-out; text-align: center; }
+        .toast.good { background: rgba(47,133,90,0.95); }
+        .toast.bad { background: rgba(197,48,48,0.95); }
+
+        details.recipes { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7fafc; }
+        details.recipes summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 14px; color: #4a5568; }
+        .recipe-list { padding: 0 14px 12px; font-size: 13px; line-height: 1.9; color: #4a5568; }
+
+        .modal-bg { position: fixed; inset: 0; background: rgba(26,32,44,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+        .modal { background: white; border-radius: 18px; padding: 24px; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+        .modal h3 { font-size: 20px; text-align: center; margin-bottom: 14px; }
+        .report { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+        .report td { padding: 6px 4px; border-bottom: 1px solid #edf2f7; }
+        .report td:last-child { text-align: right; font-weight: 600; }
+        .report tr.total td { border-top: 2px solid #cbd5e0; border-bottom: none; font-size: 16px; }
+        .plus { color: #2f855a; } .minus { color: #c53030; }
+        .modal .msg { text-align: center; font-size: 14px; color: #4a5568; margin: 12px 0; line-height: 1.6; }
+        .modal .row { justify-content: center; margin-top: 14px; }
+        .footer { margin-top: 18px; font-size: 13px; text-align: center; }
+        .footer a { color: #667eea; text-decoration: none; }
+
+        @media (max-width: 560px) {
+            .card { padding: 18px 12px; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .counter { grid-template-columns: repeat(3, 1fr); }
+            .work { grid-template-columns: 1fr; }
+            .cust .key, .ing .kb { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>☕ 조이이익 카페</h1>
+    <p class="sub">음료를 만들어 손님을 만족시키고 카페를 키워보세요! 목표: 💰 1,000,000원</p>
+
+    <div class="stats">
+        <div class="stat"><div class="k">날짜</div><div class="v" id="sDay"></div></div>
+        <div class="stat"><div class="k">자금</div><div class="v" id="sMoney"></div></div>
+        <div class="stat"><div class="k">평판</div><div class="v stars" id="sRep"></div></div>
+        <div class="stat"><div class="k">날씨</div><div class="v" id="sWeather"></div></div>
+    </div>
+
+    <!-- 준비 화면 -->
+    <section id="prep">
+        <div class="forecast" id="forecast"></div>
+
+        <h2>🛒 재료 구매</h2>
+        <div class="shop" id="shopStock"></div>
+
+        <h2>📋 메뉴 개발</h2>
+        <div class="shop" id="shopMenu"></div>
+
+        <h2>🔧 가게 업그레이드</h2>
+        <div class="shop" id="shopUpg"></div>
+
+        <h2>💸 오늘의 가격 정책</h2>
+        <div class="seg" id="priceSeg"></div>
+
+        <h2>📣 오늘의 운영</h2>
+        <div class="toggles" id="dailyOpts"></div>
+
+        <div class="start-row">
+            <button class="primary" id="openBtn">🔔 영업 시작</button>
+            <button id="resetBtn">처음부터 다시</button>
+        </div>
+    </section>
+
+    <!-- 영업 화면 -->
+    <section id="play" hidden>
+        <div class="timebar"><div id="timeFill"></div></div>
+        <div class="clock"><span>09:00 오픈</span><span id="clockNow">09:00</span><span>21:00 마감</span></div>
+        <div class="counter" id="counter"></div>
+
+        <div class="work">
+            <div class="ings" id="ings"></div>
+            <div class="cup">
+                <div class="title">🥤 제조 중인 컵</div>
+                <div class="contents" id="cupContents"></div>
+                <div class="guess" id="cupGuess"></div>
+                <div class="row">
+                    <button id="trashBtn" title="단축키: X 또는 Backspace">🗑️ 버리기</button>
+                    <button id="pauseBtn" title="단축키: P">⏸️ 일시정지</button>
+                </div>
+            </div>
+        </div>
+        <p class="hint">재료를 눌러 컵에 담고 → 주문과 같아지면 <b>손님 카드를 눌러 서빙</b>하세요.<br>
+            키보드: 숫자 <b>1~8</b> 재료 · <b>Q W E R T</b> 손님에게 서빙 · <b>X</b> 버리기 · <b>P</b> 일시정지</p>
+
+        <details class="recipes" open>
+            <summary>📖 레시피 북</summary>
+            <div class="recipe-list" id="recipeList"></div>
+        </details>
+    </section>
+
+    <p class="footer"><a href="index.html">← 메인으로</a></p>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+<div class="modal-bg" id="modalBg" hidden><div class="modal" id="modal"></div></div>
+
+<script>
+'use strict';
+
+// ===== 게임 데이터 =====
+const DAY_LEN = 90;            // 하루 영업 시간(초)
+const GOAL = 1000000;
+const SAVE_KEY = 'cafe-game-save-v1';
+const ALBA_WAGE = 25000;
+const FLYER_COST = 10000;
+
+const INGS = {
+    shot:   { name: '에스프레소', icon: '☕', stock: true },
+    water:  { name: '물',        icon: '💧', stock: false },
+    milk:   { name: '우유',      icon: '🥛', stock: true },
+    ice:    { name: '얼음',      icon: '🧊', stock: false },
+    syrup:  { name: '바닐라시럽', icon: '🍯', stock: true, need: 'vanilla' },
+    choco:  { name: '초코',      icon: '🍫', stock: true, need: 'mocha' },
+    matcha: { name: '녹차가루',   icon: '🍵', stock: true, need: 'greentea' },
+    cake:   { name: '케이크',     icon: '🍰', stock: true, need: 'cake' },
+};
+const ING_ORDER = ['shot', 'water', 'milk', 'ice', 'syrup', 'choco', 'matcha', 'cake'];
+
+const PACKS = {
+    shot:   { qty: 10, cost: 5000 },
+    milk:   { qty: 10, cost: 6000 },
+    syrup:  { qty: 10, cost: 3000 },
+    choco:  { qty: 10, cost: 4000 },
+    matcha: { qty: 10, cost: 5000 },
+    cake:   { qty: 5,  cost: 10000 },
+};
+
+const MENU = {
+    americano: { name: '아메리카노', base: { shot: 1, water: 1 }, price: 3000, coffee: true },
+    latte:     { name: '카페라떼',   base: { shot: 1, milk: 1 },  price: 4000, coffee: true },
+    vanilla:   { name: '바닐라라떼', base: { shot: 1, milk: 1, syrup: 1 }, price: 4500, coffee: true, unlock: 20000 },
+    mocha:     { name: '카페모카',   base: { shot: 1, milk: 1, choco: 1 }, price: 5000, coffee: true, unlock: 30000 },
+    greentea:  { name: '녹차라떼',   base: { matcha: 1, milk: 1 }, price: 4500, coffee: false, unlock: 30000 },
+};
+const CAKE = { name: '조각 케이크', price: 5500, unlock: 40000 };
+
+const UPGRADES = {
+    machine:  { name: '에스프레소 머신', icon: '⚙️', costs: [40000, 90000], vals: [1.6, 1.0, 0.5],
+                desc: v => `샷 추출 ${v}초` },
+    seats:    { name: '좌석 확장', icon: '🪑', costs: [40000, 100000], vals: [3, 4, 5],
+                desc: v => `동시 손님 ${v}명 (임대료 +5,000원)` },
+    interior: { name: '인테리어', icon: '🪴', costs: [50000, 120000], vals: [1, 1.25, 1.5],
+                desc: v => `손님 인내심 x${v}` },
+};
+
+const PRICE_LEVELS = [
+    { name: '할인 (x0.8)', mul: 0.8, traffic: 1.3 },
+    { name: '보통 (x1.0)', mul: 1.0, traffic: 1.0 },
+    { name: '프리미엄 (x1.25)', mul: 1.25, traffic: 0.7 },
+];
+
+const WEATHERS = {
+    sunny: { name: '맑음', icon: '☀️', ice: 0.45, traffic: 1.1, text: '손님이 조금 많아요.' },
+    hot:   { name: '폭염', icon: '🔥', ice: 0.85, traffic: 1.0, text: '아이스 음료 주문이 쏟아져요!' },
+    rain:  { name: '비',   icon: '🌧️', ice: 0.25, traffic: 0.8, text: '손님이 적고 따뜻한 음료가 인기예요.' },
+    cold:  { name: '한파', icon: '❄️', ice: 0.08, traffic: 0.95, text: '거의 다 따뜻한 음료를 찾아요.' },
+};
+
+const FACES = ['🧑', '👩', '👨', '👧', '👦', '🧑‍💼', '👩‍🎓', '👨‍💻', '👵', '👴', '🧑‍🎨', '👩‍🔬', '🧔', '👱‍♀️'];
+const SLOT_KEYS = ['Q', 'W', 'E', 'R', 'T'];
+
+// ===== 상태 =====
+function newState() {
+    return {
+        day: 1, money: 50000, rep: 30,
+        stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, cake: 0 },
+        unlocked: { vanilla: false, mocha: false, greentea: false, cake: false },
+        up: { machine: 0, seats: 0, interior: 0 },
+        priceLevel: 1, alba: false, flyer: false,
+        weather: rollWeather(), won: false,
+    };
+}
+function rollWeather() {
+    const r = Math.random();
+    return r < 0.4 ? 'sunny' : r < 0.6 ? 'hot' : r < 0.8 ? 'rain' : 'cold';
+}
+function load() {
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (raw) {
+            const s = JSON.parse(raw);
+            if (s && typeof s.day === 'number') return Object.assign(newState(), s);
+        }
+    } catch (e) { /* 저장소 사용 불가 */ }
+    return newState();
+}
+function save() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ }
+}
+
+let S = load();
+let G = null; // 영업 중 상태
+
+// ===== 유틸 =====
+const $ = id => document.getElementById(id);
+const won = n => (n < 0 ? '-' : '') + Math.abs(Math.round(n)).toLocaleString('ko-KR') + '원';
+const round100 = n => Math.round(n / 100) * 100;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function stars(rep) {
+    const n = clamp(Math.round(rep / 20), 0, 5);
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+function toast(msg, cls = '') {
+    const el = document.createElement('div');
+    el.className = 'toast ' + cls;
+    el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+    while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+}
+let audioCtx = null;
+function beep(freq, dur = 0.08, type = 'sine', vol = 0.06) {
+    try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.value = freq;
+        g.gain.value = vol;
+        g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + dur);
+    } catch (e) { /* 소리 없이 진행 */ }
+}
+const ingAvailable = k => !INGS[k].need || S.unlocked[INGS[k].need];
+const menuAvailable = k => !MENU[k].unlock || S.unlocked[k];
+const rent = () => 15000 + 5000 * S.up.seats;
+
+function renderStats() {
+    $('sDay').textContent = S.day + '일차';
+    $('sMoney').textContent = won(S.money);
+    $('sRep').textContent = stars(S.rep);
+    $('sRep').title = '평판 ' + Math.round(S.rep) + '/100';
+    const w = WEATHERS[S.weather];
+    $('sWeather').textContent = w.icon + ' ' + w.name;
+}
+
+// ===== 준비 화면 =====
+function renderPrep() {
+    renderStats();
+    const w = WEATHERS[S.weather];
+    $('forecast').innerHTML = `<b>${S.day}일차 일기예보</b>: ${w.icon} ${w.name} — ${w.text}<br>
+        오늘 마감 후 임대료 <b>${won(rent())}</b>이 나갑니다.`;
+
+    // 재료
+    $('shopStock').innerHTML = Object.keys(PACKS).filter(ingAvailable).map(k => {
+        const p = PACKS[k], ing = INGS[k];
+        return `<div class="item">
+            <div class="t">${ing.icon} ${ing.name}</div>
+            <div class="d">보유 <b>${S.stock[k]}</b>개 · ${p.qty}개 묶음 ${won(p.cost)}</div>
+            <button data-buy="${k}" ${S.money < p.cost ? 'disabled' : ''}>+${p.qty}개 구매</button>
+        </div>`;
+    }).join('');
+
+    // 메뉴 해금
+    const menuItems = Object.keys(MENU).filter(k => MENU[k].unlock).map(k => {
+        const m = MENU[k];
+        const recipe = Object.keys(m.base).map(i => INGS[i].icon).join(' + ');
+        return S.unlocked[k]
+            ? `<div class="item done"><div class="t">${m.name}</div><div class="d">${recipe}<br>판매가 ${won(m.price)}</div><button disabled>✅ 판매 중</button></div>`
+            : `<div class="item"><div class="t">${m.name}</div><div class="d">${recipe}<br>판매가 ${won(m.price)}</div>
+               <button data-unlock="${k}" ${S.money < m.unlock ? 'disabled' : ''}>개발하기 ${won(m.unlock)}</button></div>`;
+    });
+    menuItems.push(S.unlocked.cake
+        ? `<div class="item done"><div class="t">🍰 ${CAKE.name}</div><div class="d">음료와 함께 주문돼요<br>판매가 ${won(CAKE.price)}</div><button disabled>✅ 판매 중</button></div>`
+        : `<div class="item"><div class="t">🍰 ${CAKE.name}</div><div class="d">음료와 함께 주문돼요<br>판매가 ${won(CAKE.price)}</div>
+           <button data-unlock="cake" ${S.money < CAKE.unlock ? 'disabled' : ''}>들여놓기 ${won(CAKE.unlock)}</button></div>`);
+    $('shopMenu').innerHTML = menuItems.join('');
+
+    // 업그레이드
+    $('shopUpg').innerHTML = Object.keys(UPGRADES).map(k => {
+        const u = UPGRADES[k], lv = S.up[k];
+        const max = lv >= u.costs.length;
+        return `<div class="item ${max ? 'done' : ''}">
+            <div class="t">${u.icon} ${u.name} Lv.${lv + 1}</div>
+            <div class="d">현재: ${u.desc(u.vals[lv])}${max ? '' : `<br>다음: ${u.desc(u.vals[lv + 1])}`}</div>
+            ${max ? '<button disabled>최고 레벨</button>'
+                  : `<button data-upg="${k}" ${S.money < u.costs[lv] ? 'disabled' : ''}>업그레이드 ${won(u.costs[lv])}</button>`}
+        </div>`;
+    }).join('');
+
+    // 가격
+    $('priceSeg').innerHTML = PRICE_LEVELS.map((p, i) =>
+        `<button data-price="${i}" class="${S.priceLevel === i ? 'on' : ''}">${p.name}</button>`).join('') +
+        `<span style="font-size:12px;color:#718096;align-self:center">싸면 손님이 늘고, 비싸면 줄어요.</span>`;
+
+    // 일일 옵션
+    $('dailyOpts').innerHTML = `
+        <div class="toggle ${S.alba ? 'on' : ''}">
+            <span>🧑‍🍳 <b>알바생 고용</b> — 재고로 손님을 자동 서빙 (일당 ${won(ALBA_WAGE)}, 마감 후 지급)</span>
+            <button data-opt="alba">${S.alba ? '고용 중 ✓' : '고용하기'}</button>
+        </div>
+        <div class="toggle ${S.flyer ? 'on' : ''}">
+            <span>📣 <b>전단지 돌리기</b> — 오늘 손님 +40% (${won(FLYER_COST)}, 즉시 지불)</span>
+            <button data-opt="flyer" ${S.flyer || S.money < FLYER_COST ? 'disabled' : ''}>${S.flyer ? '배포 완료 ✓' : '돌리기'}</button>
+        </div>`;
+}
+
+$('prep').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    const d = b.dataset;
+    if (d.buy) {
+        const p = PACKS[d.buy];
+        if (S.money >= p.cost) { S.money -= p.cost; S.stock[d.buy] += p.qty; beep(880); }
+    } else if (d.unlock) {
+        const cost = d.unlock === 'cake' ? CAKE.unlock : MENU[d.unlock].unlock;
+        if (S.money >= cost) {
+            S.money -= cost; S.unlocked[d.unlock] = true;
+            const ingKey = Object.keys(INGS).find(i => INGS[i].need === d.unlock);
+            if (ingKey) S.stock[ingKey] += PACKS[ingKey].qty; // 개발 기념 재료 1묶음 증정
+            toast('새 메뉴 등록! 재료 1묶음 증정 🎁', 'good'); beep(660); beep(990, 0.15);
+        }
+    } else if (d.upg) {
+        const cost = UPGRADES[d.upg].costs[S.up[d.upg]];
+        if (S.money >= cost) { S.money -= cost; S.up[d.upg]++; toast(UPGRADES[d.upg].name + ' 업그레이드 완료!', 'good'); beep(660); }
+    } else if (d.price !== undefined) {
+        S.priceLevel = Number(d.price);
+    } else if (d.opt === 'alba') {
+        S.alba = !S.alba;
+    } else if (d.opt === 'flyer') {
+        if (S.money >= FLYER_COST) { S.money -= FLYER_COST; S.flyer = true; }
+    }
+    save();
+    renderPrep();
+});
+
+$('resetBtn').addEventListener('click', () => {
+    if (!confirm('정말 처음부터 다시 시작할까요? 진행 상황이 사라집니다.')) return;
+    S = newState(); save(); renderPrep();
+});
+$('openBtn').addEventListener('click', startDay);
+
+// ===== 영업 =====
+function startDay() {
+    const slots = UPGRADES.seats.vals[S.up.seats];
+    G = {
+        t: 0, paused: false, over: false,
+        slots: new Array(slots).fill(null),
+        cup: {}, brewing: null,
+        nextSpawn: 1.5, albaTimer: 6,
+        revenue: 0, tips: 0, served: 0, missed: 0, wrong: 0, walked: 0,
+        repStart: S.rep, stockStart: { ...S.stock },
+        last: performance.now(),
+    };
+    $('prep').hidden = true;
+    $('play').hidden = false;
+    $('pauseBtn').textContent = '⏸️ 일시정지';
+    buildIngs();
+    buildCounter();
+    renderCup();
+    renderRecipes();
+    renderStats();
+    beep(1047, 0.2, 'triangle');
+    requestAnimationFrame(loop);
+}
+
+function buildIngs() {
+    const keys = ING_ORDER.filter(ingAvailable);
+    $('ings').innerHTML = keys.map((k, i) => `
+        <button class="ing" data-ing="${k}">
+            <span class="kb">${i + 1}</span>
+            <span class="ic">${INGS[k].icon}</span>
+            <span class="nm">${INGS[k].name}</span>
+            <span class="cnt" id="cnt-${k}"></span>
+            ${k === 'shot' ? '<span class="brew" id="brewBar"></span>' : ''}
+        </button>`).join('');
+    G.ingKeys = keys;
+    updateIngCounts();
+}
+function updateIngCounts() {
+    for (const k of G.ingKeys) {
+        const el = $('cnt-' + k);
+        const btn = el.parentElement;
+        if (INGS[k].stock) {
+            el.textContent = '재고 ' + S.stock[k];
+            btn.disabled = S.stock[k] <= 0 || (k === 'shot' && !!G.brewing);
+        } else {
+            el.textContent = '무제한';
+        }
+    }
+}
+
+function buildCounter() {
+    $('counter').style.gridTemplateColumns = window.innerWidth <= 560 ? '' : `repeat(${G.slots.length}, 1fr)`;
+    $('counter').innerHTML = G.slots.map((_, i) => `<div class="slot" id="slot-${i}" data-slot="${i}"></div>`).join('');
+}
+
+function renderRecipes() {
+    const lines = Object.keys(MENU).filter(menuAvailable).map(k => {
+        const m = MENU[k];
+        return `<b>${m.name}</b> = ${Object.keys(m.base).map(i => INGS[i].icon + INGS[i].name).join(' + ')}`;
+    });
+    lines.push('<b>아이스</b> 음료는 🧊얼음 추가 · <b>샷추가</b>는 ☕ 한 번 더');
+    if (S.unlocked.cake) lines.push('<b>+🍰</b> 주문은 케이크도 함께 담아 서빙');
+    $('recipeList').innerHTML = lines.join('<br>');
+}
+
+function makeOrder() {
+    const w = WEATHERS[S.weather];
+    const keys = Object.keys(MENU).filter(menuAvailable);
+    const k = keys[Math.floor(Math.random() * keys.length)];
+    const m = MENU[k];
+    const iced = Math.random() < w.ice;
+    const extra = m.coffee && Math.random() < 0.15;
+    const cake = S.unlocked.cake && Math.random() < 0.25;
+    const req = { ...m.base };
+    if (iced) req.ice = 1;
+    if (extra) req.shot = 2;
+    if (cake) req.cake = 1;
+    let price = m.price + (iced ? 500 : 0) + (extra ? 500 : 0);
+    price = round100(price * PRICE_LEVELS[S.priceLevel].mul);
+    const cakePrice = cake ? round100(CAKE.price * PRICE_LEVELS[S.priceLevel].mul) : 0;
+    const label = (iced ? '아이스 ' : '따뜻한 ') + m.name + (extra ? ' (샷추가)' : '');
+    return { key: k, req, price: price + cakePrice, label, cake };
+}
+
+function spawnCustomer() {
+    const idx = G.slots.findIndex(s => s === null);
+    if (idx < 0) { G.walked++; return; }
+    const patience = (22 + Math.random() * 8) * UPGRADES.interior.vals[S.up.interior] * (0.8 + S.rep / 250);
+    const order = makeOrder();
+    G.slots[idx] = {
+        face: FACES[Math.floor(Math.random() * FACES.length)],
+        order, patience, maxPatience: patience,
+    };
+    drawCustomer(idx);
+    beep(740, 0.06, 'triangle');
+}
+
+function drawCustomer(i) {
+    const c = G.slots[i];
+    const slot = $('slot-' + i);
+    if (!c) { slot.className = 'slot'; slot.innerHTML = ''; return; }
+    slot.className = 'cust';
+    slot.innerHTML = `
+        <span class="key">${SLOT_KEYS[i]}</span>
+        <div class="face">${c.face}</div>
+        <div class="order">${c.order.label}${c.order.cake ? '<br>+ 🍰케이크' : ''}</div>
+        <div class="price">${won(c.order.price)}</div>
+        <div class="pbar"><div id="pb-${i}"></div></div>`;
+}
+
+function spawnRate() {
+    return (0.14 + S.rep * 0.0022)
+        * PRICE_LEVELS[S.priceLevel].traffic
+        * WEATHERS[S.weather].traffic
+        * (S.flyer ? 1.4 : 1);
+}
+
+function loop(now) {
+    if (!G || G.over) return;
+    const dt = Math.min(0.1, (now - G.last) / 1000);
+    G.last = now;
+    if (!G.paused) tick(dt);
+    if (!G.over) requestAnimationFrame(loop);
+}
+
+function tick(dt) {
+    G.t += dt;
+
+    // 시계
+    const frac = clamp(G.t / DAY_LEN, 0, 1);
+    $('timeFill').style.width = (frac * 100) + '%';
+    const mins = 9 * 60 + Math.floor(frac * 12 * 60);
+    $('clockNow').textContent = String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0');
+
+    // 손님 등장
+    if (G.t < DAY_LEN - 4) {
+        G.nextSpawn -= dt;
+        if (G.nextSpawn <= 0) {
+            spawnCustomer();
+            G.nextSpawn = -Math.log(1 - Math.random()) / spawnRate();
+            G.nextSpawn = clamp(G.nextSpawn, 1.2, 14);
+        }
+    }
+
+    // 샷 추출
+    if (G.brewing) {
+        G.brewing.left -= dt;
+        const total = UPGRADES.machine.vals[S.up.machine];
+        const bar = $('brewBar');
+        if (bar) bar.style.width = ((1 - G.brewing.left / total) * 100) + '%';
+        if (G.brewing.left <= 0) {
+            G.brewing = null;
+            if (bar) bar.style.width = '0';
+            G.cup.shot = (G.cup.shot || 0) + 1;
+            beep(520, 0.05);
+            renderCup();
+            updateIngCounts();
+        }
+    }
+
+    // 인내심
+    G.slots.forEach((c, i) => {
+        if (!c) return;
+        c.patience -= dt;
+        const r = c.patience / c.maxPatience;
+        const pb = $('pb-' + i);
+        if (pb) {
+            pb.style.width = clamp(r * 100, 0, 100) + '%';
+            pb.style.background = r > 0.5 ? '#48bb78' : r > 0.25 ? '#ed8936' : '#e53e3e';
+        }
+        const slot = $('slot-' + i);
+        slot.classList.toggle('warn', r <= 0.5 && r > 0.25);
+        slot.classList.toggle('danger', r <= 0.25);
+        if (c.patience <= 0) {
+            G.slots[i] = null;
+            G.missed++;
+            S.rep = clamp(S.rep - 4, 0, 100);
+            toast(c.face + ' 너무 오래 기다렸어요… 😠 평판 -4', 'bad');
+            beep(200, 0.25, 'sawtooth');
+            drawCustomer(i);
+            renderStats();
+        }
+    });
+
+    // 알바생
+    if (S.alba) {
+        G.albaTimer -= dt;
+        if (G.albaTimer <= 0) {
+            G.albaTimer = 7;
+            albaServe();
+        }
+    }
+
+    if (G.t >= DAY_LEN) endDay();
+}
+
+function albaServe() {
+    // 가장 오래 기다린(인내심 비율이 낮은) 손님 중 재고로 만들 수 있는 주문을 처리
+    const order = G.slots.map((c, i) => ({ c, i })).filter(x => x.c)
+        .sort((a, b) => a.c.patience / a.c.maxPatience - b.c.patience / b.c.maxPatience);
+    for (const { c, i } of order) {
+        const ok = Object.entries(c.order.req).every(([k, n]) => !INGS[k].stock || S.stock[k] >= n);
+        if (!ok) continue;
+        for (const [k, n] of Object.entries(c.order.req)) if (INGS[k].stock) S.stock[k] -= n;
+        G.revenue += c.order.price;
+        S.money += c.order.price;
+        G.served++;
+        S.rep = clamp(S.rep + 1, 0, 100);
+        G.slots[i] = null;
+        drawCustomer(i);
+        toast('🧑‍🍳 알바생이 ' + c.order.label + ' 서빙!');
+        updateIngCounts();
+        renderStats();
+        return;
+    }
+}
+
+function addIng(k) {
+    if (!G || G.paused || G.over || !G.ingKeys.includes(k)) return;
+    if (INGS[k].stock && S.stock[k] <= 0) { toast(INGS[k].name + ' 재고가 없어요!', 'bad'); return; }
+    if (k === 'shot') {
+        if (G.brewing) return;
+        S.stock.shot--;
+        G.brewing = { left: UPGRADES.machine.vals[S.up.machine] };
+        beep(330, 0.1, 'square', 0.03);
+        updateIngCounts();
+        return;
+    }
+    if (INGS[k].stock) S.stock[k]--;
+    G.cup[k] = (G.cup[k] || 0) + 1;
+    beep(600 + ING_ORDER.indexOf(k) * 40, 0.04);
+    renderCup();
+    updateIngCounts();
+}
+
+function trashCup() {
+    if (!G || G.paused || G.over) return;
+    if (!Object.keys(G.cup).length) return;
+    G.cup = {};
+    renderCup();
+    beep(160, 0.1, 'square', 0.04);
+}
+
+function cupMatches(req) {
+    const keys = new Set([...Object.keys(req), ...Object.keys(G.cup)]);
+    for (const k of keys) if ((req[k] || 0) !== (G.cup[k] || 0)) return false;
+    return true;
+}
+
+function renderCup() {
+    const keys = ING_ORDER.filter(k => G.cup[k]);
+    $('cupContents').innerHTML = keys.length
+        ? keys.map(k => `<span class="chip">${INGS[k].icon} ${INGS[k].name}${G.cup[k] > 1 ? ' x' + G.cup[k] : ''}</span>`).join('')
+        : '<span class="empty">비어 있어요. 재료를 눌러 담아보세요.</span>';
+    // 어떤 손님 주문과 일치하는지 안내
+    const hit = G.slots.findIndex(c => c && cupMatches(c.order.req));
+    $('cupGuess').textContent = hit >= 0 ? `✔ ${SLOT_KEYS[hit]} 손님 주문과 일치!` : '';
+}
+
+function serve(i) {
+    if (!G || G.paused || G.over) return;
+    const c = G.slots[i];
+    if (!c) return;
+    if (!Object.keys(G.cup).length && !G.brewing) { toast('컵이 비어 있어요!'); return; }
+    if (G.brewing) { toast('샷 추출이 끝날 때까지 기다려요 ☕'); return; }
+    if (cupMatches(c.order.req)) {
+        const r = c.patience / c.maxPatience;
+        const tip = r > 0.6 ? round100(c.order.price * 0.3 * r) : 0;
+        const repGain = r > 0.6 ? 3 : r > 0.25 ? 1 : 0;
+        G.revenue += c.order.price;
+        G.tips += tip;
+        S.money += c.order.price + tip;
+        S.rep = clamp(S.rep + repGain, 0, 100);
+        G.served++;
+        toast(`${c.face} 감사합니다! +${won(c.order.price)}${tip ? ` (팁 ${won(tip)})` : ''}`, 'good');
+        beep(880, 0.08); setTimeout(() => beep(1320, 0.12), 80);
+        G.slots[i] = null;
+    } else {
+        G.wrong++;
+        S.rep = clamp(S.rep - 3, 0, 100);
+        c.patience -= c.maxPatience * 0.3;
+        toast(`${c.face} 이거 제가 시킨 거 아닌데요… 평판 -3`, 'bad');
+        beep(180, 0.2, 'sawtooth');
+        const slot = $('slot-' + i);
+        slot.classList.add('bad');
+        setTimeout(() => slot.classList.remove('bad'), 400);
+    }
+    G.cup = {};
+    drawCustomer(i);
+    renderCup();
+    renderStats();
+}
+
+function togglePause() {
+    if (!G || G.over) return;
+    G.paused = !G.paused;
+    $('pauseBtn').textContent = G.paused ? '▶️ 계속하기' : '⏸️ 일시정지';
+    if (G.paused) toast('일시정지 — P를 눌러 계속');
+}
+
+$('ings').addEventListener('click', e => {
+    const b = e.target.closest('[data-ing]');
+    if (b && !b.disabled) addIng(b.dataset.ing);
+});
+$('counter').addEventListener('click', e => {
+    const s = e.target.closest('[data-slot]');
+    if (s) serve(Number(s.dataset.slot));
+});
+$('trashBtn').addEventListener('click', trashCup);
+$('pauseBtn').addEventListener('click', togglePause);
+
+document.addEventListener('keydown', e => {
+    if (!G || G.over || e.ctrlKey || e.metaKey || e.altKey) return;
+    const key = e.key.toUpperCase();
+    if (/^[1-8]$/.test(key)) {
+        const k = G.ingKeys[Number(key) - 1];
+        if (k) addIng(k);
+    } else if (SLOT_KEYS.includes(key)) {
+        const i = SLOT_KEYS.indexOf(key);
+        if (i < G.slots.length) serve(i);
+    } else if (key === 'X' || e.key === 'Backspace') {
+        e.preventDefault();
+        trashCup();
+    } else if (key === 'P' || e.key === 'Escape') {
+        togglePause();
+    } else return;
+});
+
+// ===== 마감 =====
+function endDay() {
+    G.over = true;
+    const leftover = G.slots.filter(Boolean).length;
+    const wage = S.alba ? ALBA_WAGE : 0;
+    const r = rent();
+    S.money -= r + wage;
+    const repDelta = Math.round(S.rep - G.repStart);
+    const used = Object.keys(S.stock).reduce((sum, k) => {
+        const p = PACKS[k];
+        return sum + Math.max(0, G.stockStart[k] - S.stock[k]) * (p.cost / p.qty);
+    }, 0);
+    const profit = G.revenue + G.tips - r - wage - used;
+
+    const rows = [
+        ['☕ 음료 매출', G.revenue, 'plus'],
+        ['💝 팁', G.tips, 'plus'],
+        ['🏠 임대료', -r, 'minus'],
+    ];
+    if (wage) rows.push(['🧑‍🍳 알바 일당', -wage, 'minus']);
+    rows.push(['📦 사용한 재료 원가', -Math.round(used), 'minus']);
+
+    let msg = `손님 ${G.served}명 서빙 · 놓친 손님 ${G.missed}명 · 잘못 서빙 ${G.wrong}회` +
+        (G.walked ? `<br>자리가 없어 돌아간 손님 ${G.walked}명 (좌석 확장을 고려해보세요)` : '') +
+        (leftover ? `<br>마감 시간이라 손님 ${leftover}명은 그냥 돌아갔어요.` : '') +
+        `<br>평판 ${repDelta >= 0 ? '+' : ''}${repDelta} → ${stars(S.rep)}`;
+
+    let title = `🌙 ${S.day}일차 마감`;
+    let buttons = `<button class="primary" id="nextBtn">다음 날 준비하기 →</button>`;
+    if (S.money < 0) {
+        title = '💸 파산했어요…';
+        msg += `<br><br><b>자금이 바닥났습니다.</b> ${S.day}일 동안 카페를 운영했어요.`;
+        buttons = `<button class="primary" id="restartBtn">새 카페 차리기</button>`;
+    } else if (!S.won && S.money >= GOAL) {
+        S.won = true;
+        title = '🎉 목표 달성!';
+        msg += `<br><br><b>${S.day}일 만에 100만 원을 모았어요!</b> 동네 최고의 카페가 되었습니다. 계속 운영할 수도 있어요.`;
+    }
+
+    $('modal').innerHTML = `
+        <h3>${title}</h3>
+        <table class="report">
+            ${rows.map(([n, v, c]) => `<tr><td>${n}</td><td class="${c}">${v >= 0 ? '+' : ''}${won(v)}</td></tr>`).join('')}
+            <tr class="total"><td>오늘 순이익</td><td class="${profit >= 0 ? 'plus' : 'minus'}">${profit >= 0 ? '+' : ''}${won(profit)}</td></tr>
+            <tr><td>현재 자금</td><td>${won(S.money)}</td></tr>
+        </table>
+        <p class="msg">${msg}</p>
+        <div class="row">${buttons}</div>`;
+    $('modalBg').hidden = false;
+    renderStats();
+    beep(523, 0.15, 'triangle'); setTimeout(() => beep(392, 0.25, 'triangle'), 150);
+
+    const next = $('nextBtn'), restart = $('restartBtn');
+    if (next) {
+        next.addEventListener('click', () => {
+            S.day++; S.flyer = false;
+            save(); closeDay();
+        });
+        next.focus();
+    }
+    if (restart) {
+        restart.addEventListener('click', () => { S = newState(); save(); closeDay(); });
+        restart.focus();
+    }
+    // 파산이 아니면 마감 직후 상태를 저장 (새로고침해도 이어하기)
+    if (S.money >= 0) {
+        const snapshot = { ...S, day: S.day + 1, flyer: false, weather: rollWeather() };
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot)); } catch (e) { /* 무시 */ }
+        S.weather = snapshot.weather;
+    } else {
+        try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 무시 */ }
+    }
+}
+
+function closeDay() {
+    $('modalBg').hidden = true;
+    $('play').hidden = true;
+    $('prep').hidden = false;
+    G = null;
+    renderPrep();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+window.addEventListener('resize', () => {
+    if (G && !G.over) $('counter').style.gridTemplateColumns = window.innerWidth <= 560 ? '' : `repeat(${G.slots.length}, 1fr)`;
+});
+
+renderPrep();
+</script>
+</body>
+</html>
