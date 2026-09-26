@@ -223,6 +223,16 @@ function assertParticipant(room, pid) {
 function assertController(room, pid) {
   if (!isController(room, pid)) throw new Error('관전자는 조작할 수 없습니다.');
 }
+function roomConnectionCount(room) {
+  const teamCount = (room.teams || []).reduce((sum, team) => sum + team.length, 0);
+  const spectatorCount = (room.spectators || []).length;
+  const guestCount = (room.guests || []).length;
+  const legacyPlayerCount = room.teams ? 0 : (room.players || []).filter(Boolean).length;
+  return teamCount + spectatorCount + guestCount + legacyPlayerCount;
+}
+function isEmptyRoom(room) {
+  return roomConnectionCount(room) === 0;
+}
 function removeConnection(room, targetId) {
   let removed = false;
   if (room.teams) {
@@ -372,6 +382,15 @@ const server = http.createServer(async (req, res) => {
       const removed = removeConnection(room, String(body.targetId));
       if (!removed) return json(res, 404, { ok: false, error: '해당 접속자를 찾을 수 없습니다.' });
       return json(res, 200, { ok: true, room: dashboardRoom(room) });
+    }
+    if (url.pathname === '/api/dashboard/delete-empty-room' && req.method === 'POST') {
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').toUpperCase();
+      const room = rooms.get(roomId);
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      if (!isEmptyRoom(room)) return json(res, 400, { ok: false, error: '접속자가 있는 방은 삭제할 수 없습니다. 먼저 접속종료를 해주세요.' });
+      rooms.delete(roomId);
+      return json(res, 200, { ok: true, deletedRoomId: roomId, rooms: rooms.size });
     }
     if (url.pathname === '/api/room/create' && req.method === 'POST') {
       const body = await readBody(req);

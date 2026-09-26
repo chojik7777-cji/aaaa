@@ -63,7 +63,10 @@
     .conn { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; font-size: 13px; }
     .conn small { color: #718096; }
     .kick-btn { background: #e53e3e; color: white; border-radius: 9px; padding: 7px 10px; font-size: 12px; flex: 0 0 auto; }
-    .kick-btn:disabled { opacity: .55; cursor: wait; }
+    .delete-room-btn { background: #744210; color: white; border-radius: 9px; padding: 7px 10px; font-size: 12px; margin-left: 8px; }
+    .kick-btn:disabled, .delete-room-btn:disabled { opacity: .55; cursor: wait; }
+    .room-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .room-empty-note { color: #744210; font-size: 12px; font-weight: 800; }
     .log { margin: 12px 0 0; padding: 0; list-style: none; color: #4a5568; font-size: 13px; }
     .log li { border-top: 1px solid #edf2f7; padding: 6px 0; }
     .empty { background: rgba(255,255,255,.95); border-radius: 18px; padding: 28px; text-align: center; color: #4a5568; }
@@ -143,12 +146,16 @@
     function roomCard(room) {
       const red = room.pieces?.[0] || {done:0,total:0,waiting:0,onBoard:0};
       const blue = room.pieces?.[1] || {done:0,total:0,waiting:0,onBoard:0};
+      const connectedCount = (room.teamCounts || []).reduce((a, b) => a + b, 0) + (room.spectatorCount || 0) + (room.guestCount || 0);
+      const isEmptyRoom = connectedCount === 0;
       const logs = (room.lastLog || []).map((m) => `<li>${esc(m)}</li>`).join('') || '<li>기록 없음</li>';
       const pending = room.pending && room.pending.length ? room.pending.join(', ') : '없음';
       const updated = room.ageSeconds < 20 ? `<span class="badge live">최근 ${room.ageSeconds}초 전</span>` : `<span class="badge stale">${room.ageSeconds}초 전</span>`;
+      const roomActions = `<span>${updated}</span>${isEmptyRoom ? `<button class="delete-room-btn" data-room="${esc(room.roomId)}">빈 방 삭제</button>` : ''}`;
       return `
         <article class="room">
-          <h2><span class="code">${esc(room.roomId)}</span>${updated}</h2>
+          <h2><span class="code">${esc(room.roomId)}</span><span class="room-actions">${roomActions}</span></h2>
+          ${isEmptyRoom ? '<div class="room-empty-note">접속자 0명인 빈 방입니다. 필요하면 삭제할 수 있습니다.</div>' : ''}
           <div class="phase">${room.winnerName ? `🎉 ${esc(room.winnerName)}팀 승리` : `${esc(room.currentTeamName)}팀 · ${esc(phaseClass(room))}`}</div>
           <div class="teams">
             <section class="team red ${room.currentTeam === 0 && !room.winnerName ? 'current' : ''}">
@@ -208,7 +215,28 @@
         if (btn) btn.disabled = false;
       }
     }
+    async function deleteEmptyRoom(roomId, btn) {
+      if (!confirm(`접속자 0명인 빈 방 ${roomId}을(를) 삭제할까요?`)) return;
+      try {
+        if (btn) btn.disabled = true;
+        const res = await fetch('/api/dashboard/delete-empty-room', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId })
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || '빈 방 삭제 실패');
+        await loadDashboard();
+      } catch (err) {
+        alert(err.message);
+        if (btn) btn.disabled = false;
+      }
+    }
     document.addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('.delete-room-btn');
+      if (deleteBtn) {
+        deleteEmptyRoom(deleteBtn.dataset.room, deleteBtn);
+        return;
+      }
       const btn = e.target.closest('.kick-btn');
       if (!btn) return;
       kickConnection(btn.dataset.room, btn.dataset.target, btn);
