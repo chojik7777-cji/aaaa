@@ -125,7 +125,17 @@
         .recipe-list { padding: 0 14px 12px; font-size: 13px; line-height: 1.9; color: #4a5568; }
 
         .modal-bg { position: fixed; inset: 0; background: rgba(26,32,44,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
-        .modal { background: white; border-radius: 18px; padding: 24px; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+        .modal { background: white; border-radius: 18px; padding: 24px; max-width: 440px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+        .modal h4 { font-size: 15px; color: #4a5568; margin: 16px 0 6px; }
+        .stock-report { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+        .stock-report th { font-size: 12px; color: #718096; font-weight: 600; padding: 4px; border-bottom: 2px solid #e2e8f0; text-align: right; }
+        .stock-report td { padding: 5px 4px; border-bottom: 1px solid #edf2f7; text-align: right; }
+        .stock-report th:first-child, .stock-report td:first-child { text-align: left; }
+        .stock-report .left { font-weight: 700; }
+        .stock-report .out { color: #c53030; }
+        .stock-report .low { color: #c05621; }
+        .stock-report .waste { color: #c53030; }
+        .stock-note { font-size: 12px; color: #718096; margin-top: 6px; line-height: 1.5; }
         .modal h3 { font-size: 20px; text-align: center; margin-bottom: 14px; }
         .report { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
         .report td { padding: 6px 4px; border-bottom: 1px solid #edf2f7; }
@@ -1546,7 +1556,7 @@ function startDay() {
         cup: {}, brewing: null,
         nextSpawn: 1.5, albaTimer: 6, autoTimer: 0.6, autoTarget: null, autoWarned: new Set(),
         revenue: 0, tips: 0, served: 0, missed: 0, wrong: 0, walked: 0,
-        repStart: S.rep, stockStart: { ...S.stock },
+        repStart: S.rep, stockStart: { ...S.stock }, wasted: {},
     };
     Scene.reset();
     $('prep').hidden = true;
@@ -1856,9 +1866,15 @@ function addIng(k) {
     updateIngCounts();
 }
 
+// 버려지는 컵의 재료를 재고 리포트용으로 기록
+function wasteCup() {
+    for (const [k, n] of Object.entries(G.cup)) if (INGS[k].stock) G.wasted[k] = (G.wasted[k] || 0) + n;
+}
+
 function trashCup() {
     if (!G || G.paused || G.over) return;
     if (!Object.keys(G.cup).length) return;
+    wasteCup();
     G.cup = {};
     renderCup();
     Sound.play('trash');
@@ -1911,6 +1927,7 @@ function serve(i) {
         const slot = $('slot-' + i);
         slot.classList.add('bad');
         setTimeout(() => slot.classList.remove('bad'), 400);
+        wasteCup();
     }
     G.cup = {};
     drawCustomer(i);
@@ -1975,6 +1992,9 @@ function endDay() {
     G.over = true;
     const leftover = G.slots.filter(Boolean).length;
     Scene.closing();
+    // 마감 때 컵에 남은 재료와 추출 중이던 샷은 버린 것으로 처리
+    wasteCup();
+    if (G.brewing) G.wasted.shot = (G.wasted.shot || 0) + 1;
     const wage = S.alba ? ALBA_WAGE : 0;
     const r = rent();
     S.money -= r + wage;
@@ -2017,6 +2037,7 @@ function endDay() {
             <tr class="total"><td>오늘 순이익</td><td class="${profit >= 0 ? 'plus' : 'minus'}">${profit >= 0 ? '+' : ''}${won(profit)}</td></tr>
             <tr><td>현재 자금</td><td>${won(S.money)}</td></tr>
         </table>
+        ${stockReport()}
         <p class="msg">${msg}</p>
         <div class="row">${buttons}</div>`;
     $('modalBg').hidden = false;
@@ -2043,6 +2064,37 @@ function endDay() {
     } else {
         try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 무시 */ }
     }
+}
+
+// 마감 리포트: 재료별 시작 재고 → 판매에 사용 / 버림 → 남은 재고
+function stockReport() {
+    const keys = Object.keys(PACKS).filter(k => ingAvailable(k) || G.stockStart[k] || S.stock[k]);
+    let warn = [];
+    const rows = keys.map(k => {
+        const start = G.stockStart[k], end = S.stock[k];
+        const wasted = G.wasted[k] || 0;
+        const sold = Math.max(0, start - end - wasted);
+        const change = end - start;
+        let cls = '', mark = '';
+        if (end === 0) { cls = 'out'; mark = ' ⛔'; warn.push(INGS[k].name + ' 품절'); }
+        else if (end < sold + wasted || end <= 2) { cls = 'low'; mark = ' ⚠️'; warn.push(INGS[k].name + ' 부족 예상'); }
+        return `<tr>
+            <td>${INGS[k].icon} ${INGS[k].name}</td>
+            <td>${start}</td>
+            <td>${sold ? '-' + sold : 0}</td>
+            <td class="${wasted ? 'waste' : ''}">${wasted ? '-' + wasted : 0}</td>
+            <td class="left ${cls}">${end}${mark}</td>
+            <td class="${change < 0 ? 'minus' : ''}">${change > 0 ? '+' : ''}${change}</td>
+        </tr>`;
+    }).join('');
+    return `<h4>📦 오늘의 재고 변동</h4>
+        <table class="stock-report">
+            <tr><th>재료</th><th>시작</th><th>판매</th><th>버림</th><th>남음</th><th>변동</th></tr>
+            ${rows}
+        </table>
+        <p class="stock-note">${warn.length
+            ? '⚠️ ' + warn.join(', ') + ' — 내일 영업 전에 재료를 사 두세요. (⚠️ 남은 양이 오늘 쓴 양보다 적거나 2개 이하)'
+            : '재고가 넉넉해요. 👍'}</p>`;
 }
 
 function closeDay() {
