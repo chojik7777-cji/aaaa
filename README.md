@@ -8,6 +8,7 @@ Vercel 배포 URL: https://aaaa-phi-lovat.vercel.app/
 - 오목 게임: `/omok.html`
 - 윷놀이: `/yut.html`
 - 윷놀이 접속자 현황: `/yut-dashboard.html`
+- 카페 운영 게임: `/cafe.html` (혼자 하는 정적 게임, 진행 상황은 브라우저에 자동 저장)
 
 ## 맥미니 온라인 오목 서버
 
