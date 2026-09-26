@@ -363,7 +363,7 @@ const rent = () => 15000 + 5000 * S.up.seats;
 // ===== 사운드: 배경음악 + 효과음 (Web Audio로 직접 합성, 음원 파일 없음) =====
 const Sound = (() => {
     const PREF_KEY = 'cafe-game-audio-v1';
-    const MUSIC_VOL = 0.55;
+    const MUSIC_VOL = 0.8;
     const pref = { music: true, sfx: true };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
@@ -379,8 +379,17 @@ const Sound = (() => {
             const comp = ctx.createDynamicsCompressor();
             master.connect(comp); comp.connect(ctx.destination);
             musicBus = ctx.createGain(); musicBus.gain.value = MUSIC_VOL;
-            const warm = ctx.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 2800; // 로파이 느낌
+            const warm = ctx.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 6000;
             musicBus.connect(warm); warm.connect(master);
+            // 카페 공간감을 위한 잔향
+            const rev = ctx.createConvolver(), wet = ctx.createGain();
+            const irLen = Math.floor(ctx.sampleRate * 2.2), ir = ctx.createBuffer(2, irLen, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) {
+                const d = ir.getChannelData(ch);
+                for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3);
+            }
+            rev.buffer = ir; wet.gain.value = 0.22;
+            musicBus.connect(rev); rev.connect(wet); wet.connect(master);
             sfxBus = ctx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(master);
             noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
             const d = noiseBuf.getChannelData(0);
@@ -495,47 +504,115 @@ const Sound = (() => {
         (ING_SFX[k] || ['click']).forEach(n => play(n));
     }
 
-    // --- 배경음악: 로파이 재즈 루프 (8마디 코드 진행) ---
-    const CHORDS = [ // [베이스, 코드 구성음...] (MIDI)
-        [38, 53, 57, 60, 64], // Dm9
+    // --- 배경음악: 보사노바 (나일론 기타 + 베이스 + 셰이커/림 + 플루트) ---
+    // 16마디 진행 (F장조): [베이스, 기타 보이싱...] (MIDI)
+    const CHORDS = [
+        [41, 57, 64, 67, 72], // Fmaj9
+        [41, 57, 64, 67, 72], // Fmaj9
         [43, 53, 59, 64, 69], // G13
-        [36, 52, 55, 59, 62], // Cmaj9
-        [45, 55, 60, 64, 71], // Am9
-        [41, 57, 60, 64, 67], // Fmaj9
-        [40, 56, 62, 65, 68], // E7(b9)
-        [45, 55, 60, 64, 67], // Am7
-        [43, 53, 59, 62, 65], // G7
+        [43, 53, 59, 64, 69], // G13
+        [43, 53, 58, 62, 69], // Gm9
+        [42, 52, 58, 60, 63], // Gb7(#11)
+        [41, 57, 64, 67, 72], // Fmaj9
+        [42, 52, 58, 60, 63], // Gb7(#11)
+        [45, 55, 60, 64, 69], // Am7
+        [38, 54, 60, 63, 69], // D7(b9)
+        [43, 53, 58, 62, 69], // Gm9
+        [36, 52, 58, 62, 69], // C13
+        [41, 57, 64, 67, 72], // Fmaj9
+        [38, 54, 60, 63, 69], // D7(b9)
+        [43, 53, 58, 62, 69], // Gm7
+        [36, 52, 58, 61, 67], // C7(b9)
     ];
-    const MELODY = [67, 69, 72, 74, 76, 79, 81, 84];
-    const BPM = 76, STEP = 60 / BPM / 4;
-    let step = 0, nextTime = 0, melIdx = 3;
+    const SCALE = [65, 67, 69, 70, 72, 74, 76, 77, 79, 81, 82, 84];
+    const BPM = 132, STEP = 60 / BPM / 2;           // 8분음표 단위
+    const CLAVE = [0, 3, 6, 10, 13];                  // 2마디(16칸) 보사노바 기타 리듬
+    let step = 0, nextTime = 0, played = 0;
+    const mel = { prev: 72, until: 0 };
 
-    function ep(m, t, dur, vol) { // 일렉트릭 피아노
-        tone(mtof(m), t, dur, { vol, attack: 0.01, dest: musicBus });
-        tone(mtof(m) * 2, t, dur * 0.4, { type: 'triangle', vol: vol * 0.18, attack: 0.01, dest: musicBus });
-    }
-    function playStep(s, time) {
-        const bar = Math.floor(s / 16), pos = s % 16;
-        const t = time + (pos % 4 === 2 ? STEP * 0.3 : 0); // 스윙
-        const ch = CHORDS[bar], nextRoot = CHORDS[(bar + 1) % CHORDS.length][0];
-        if (pos === 0) ch.slice(1).forEach((m, i) => ep(m, t + i * 0.014, STEP * 15, 0.035));
-        if (pos === 10 && Math.random() < 0.5) ch.slice(2, 4).forEach((m, i) => ep(m, t + i * 0.012, STEP * 5, 0.022));
-        // 베이스
-        if (pos === 0) tone(mtof(ch[0]), t, STEP * 6, { type: 'triangle', vol: 0.14, filter: 500, attack: 0.01, dest: musicBus });
-        if (pos === 8) tone(mtof(ch[0] + 7), t, STEP * 4, { type: 'triangle', vol: 0.11, filter: 500, attack: 0.01, dest: musicBus });
-        if (pos === 14 && Math.random() < 0.6) tone(mtof(nextRoot + (Math.random() < 0.5 ? -1 : 2)), t, STEP * 1.5, { type: 'triangle', vol: 0.09, filter: 500, dest: musicBus });
-        // 드럼
-        if (pos === 0 || pos === 10) tone(110, t, 0.22, { vol: 0.28, glide: 42, dest: musicBus });
-        if (pos === 4 || pos === 12) { noise(t, 0.14, { freq: 1800, q: 0.8, vol: 0.05, dest: musicBus }); tone(190, t, 0.07, { vol: 0.025, dest: musicBus }); }
-        if (pos % 2 === 0) noise(t, 0.035, { type: 'highpass', freq: 7000, vol: pos % 4 === 0 ? 0.035 : 0.022, dest: musicBus });
-        // 비브라폰 멜로디
-        if (pos % 2 === 0 && Math.random() < 0.2) {
-            melIdx = Math.max(0, Math.min(MELODY.length - 1, melIdx + [-2, -1, 1, 2][Math.floor(Math.random() * 4)]));
-            tone(mtof(MELODY[melIdx]), t, 0.9, { vol: 0.04, dest: musicBus });
-            tone(mtof(MELODY[melIdx]) * 4, t, 0.2, { vol: 0.006, dest: musicBus });
+    // 카르플러스-스트롱 현 합성 (음높이별로 한 번만 계산해서 재사용)
+    const ksCache = {};
+    function ksBuf(m, damp) {
+        const key = m + ':' + damp;
+        if (ksCache[key]) return ksCache[key];
+        const sr = ctx.sampleRate, len = Math.floor(sr * 1.8), N = Math.max(2, Math.round(sr / mtof(m)));
+        const buf = ctx.createBuffer(1, len, sr), out = buf.getChannelData(0), ring = new Float32Array(N);
+        let prev = 0;
+        for (let i = 0; i < N; i++) { prev = prev * 0.6 + (Math.random() * 2 - 1) * 0.4; ring[i] = prev; } // 부드러운 초기값 → 나일론 느낌
+        for (let i = 0, idx = 0; i < len; i++) {
+            const nxt = idx + 1 === N ? 0 : idx + 1, a = ring[idx];
+            out[i] = a * 1.6;
+            ring[idx] = damp * 0.5 * (a + ring[nxt]);
+            idx = nxt;
         }
-        // LP 잡음
-        if (Math.random() < 0.1) noise(t + Math.random() * STEP, 0.01, { freq: 3000, q: 4, vol: 0.02, dest: musicBus });
+        return (ksCache[key] = buf);
+    }
+    function pluck(m, t, dur, vol, { damp = 0.9965, lp = 3000 } = {}) {
+        const src = ctx.createBufferSource(); src.buffer = ksBuf(m, damp);
+        const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vol, t);
+        g.gain.setValueAtTime(vol, t + dur);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.12);
+        src.connect(f); f.connect(g); g.connect(musicBus);
+        src.start(t); src.stop(t + dur + 0.15);
+    }
+    function strum(notes, t, dur, vol) {
+        notes.forEach((m, i) => pluck(m, t + i * 0.013 + rnd(0, 0.004), dur, vol * rnd(0.85, 1)));
+    }
+    function flute(m, t, dur, vol) {
+        const f = mtof(m);
+        const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        o2.type = 'triangle'; o2.frequency.value = f * 2; g2.gain.value = 0.12;
+        const vib = ctx.createOscillator(), vg = ctx.createGain();
+        vib.frequency.value = 5.2;
+        vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(f * 0.007, t + Math.min(0.35, dur));
+        vib.connect(vg); vg.connect(o.frequency); vg.connect(o2.frequency);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.06);
+        g.gain.setValueAtTime(vol * 0.85, t + dur);
+        g.gain.linearRampToValueAtTime(0, t + dur + 0.18);
+        o.connect(g); o2.connect(g2); g2.connect(g); g.connect(musicBus);
+        [o, o2, vib].forEach(x => { x.start(t); x.stop(t + dur + 0.2); });
+        noise(t, 0.08, { freq: f * 2, q: 1.5, vol: vol * 0.35, dest: musicBus }); // 숨소리
+    }
+
+    function playMelody(s, t, ch) {
+        const bar = Math.floor(s / 8), pos = s % 8;
+        if (bar % 4 === 3 || played < mel.until) return;           // 4마디마다 한 마디 쉼 (프레이즈 호흡)
+        if (Math.random() < 0.3) { mel.until = played + 1; return; } // 가끔 쉼표
+        const chordTones = ch.slice(1).map(m => m + 12).filter(m => m >= 64 && m <= 86);
+        const pool = (pos % 2 === 0 ? chordTones : chordTones.concat(SCALE)).filter(m => Math.abs(m - mel.prev) <= 5 && m !== mel.prev);
+        const note = pool.length ? pool[Math.floor(Math.random() * pool.length)] : chordTones[0];
+        const len = [1, 2, 2, 3, 4][Math.floor(Math.random() * 5)];
+        flute(note, t, STEP * len * 0.95, 0.05);
+        mel.prev = note; mel.until = played + len;
+    }
+
+    function playStep(s, time) {
+        const bar = Math.floor(s / 8), pos = s % 8, pos16 = s % 16;
+        const t = time + rnd(-0.004, 0.004);
+        const ch = CHORDS[bar];
+        // 나일론 기타 컴핑 (첫 박은 길게, 나머지는 짧게 끊어서)
+        if (CLAVE.includes(pos16)) strum(ch.slice(1), t, pos === 0 ? STEP * 2.2 : STEP * 1.1, pos === 0 ? 0.075 : 0.06);
+        // 엄지 베이스: 쿵-따 쿵-따 (근음·5음)
+        if (pos === 0) pluck(ch[0], t, STEP * 2.6, 0.2, { damp: 0.994, lp: 700 });
+        if (pos === 3) pluck(ch[0], t, STEP * 0.9, 0.12, { damp: 0.994, lp: 700 });
+        if (pos === 4) pluck(ch[0] + 7, t, STEP * 2.6, 0.17, { damp: 0.994, lp: 700 });
+        if (pos === 7) pluck(ch[0] + 7, t, STEP * 0.9, 0.11, { damp: 0.994, lp: 700 });
+        // 부드러운 킥
+        if (pos === 0 || pos === 4) tone(80, t, 0.18, { vol: 0.1, glide: 48, dest: musicBus });
+        // 셰이커 (16분음표, 뒷박 강조)
+        noise(t, 0.045, { type: 'highpass', freq: 6500, vol: pos % 2 ? 0.03 : 0.018, attack: 0.012, dest: musicBus });
+        noise(t + STEP / 2, 0.04, { type: 'highpass', freq: 7000, vol: 0.014, attack: 0.01, dest: musicBus });
+        // 림 클릭 (클라베)
+        if (CLAVE.includes(pos16)) {
+            tone(1750, t, 0.03, { type: 'triangle', vol: 0.025, dest: musicBus });
+            noise(t, 0.02, { freq: 2600, q: 3, vol: 0.02, dest: musicBus });
+        }
+        // 플루트 즉흥 멜로디 (첫 4마디는 반주만)
+        if (played >= 32) playMelody(s, t, ch);
     }
     function schedule() {
         if (!ctx) return;
@@ -543,12 +620,13 @@ const Sound = (() => {
         while (nextTime < ctx.currentTime + 0.3) {
             try { playStep(step, nextTime); } catch (e) { /* 무시 */ }
             nextTime += STEP;
-            step = (step + 1) % (16 * CHORDS.length);
+            step = (step + 1) % (8 * CHORDS.length);
+            played++;
         }
     }
     function startMusic() {
         if (musicTimer || !ctx) return;
-        step = 0; nextTime = ctx.currentTime + 0.1;
+        step = 0; played = 0; mel.until = 0; nextTime = ctx.currentTime + 0.1;
         musicBus.gain.cancelScheduledValues(ctx.currentTime);
         musicBus.gain.setValueAtTime(MUSIC_VOL, ctx.currentTime);
         musicTimer = setInterval(schedule, 60);
