@@ -134,6 +134,18 @@
         .chart-x span { flex: 1; text-align: center; }
         .grade { font-size: 44px; text-align: center; margin: 6px 0; }
         .verse { text-align: center; font-size: 13px; color: #6b46c1; background: #faf5ff; border-radius: 12px; padding: 10px; margin-top: 12px; line-height: 1.6; }
+        .selbar {
+            position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 15;
+            display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap;
+            background: rgba(45,55,72,0.96); color: white; border-radius: 16px; padding: 10px 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35); width: max-content; max-width: calc(100vw - 24px);
+            font-size: 14px; animation: pop 0.15s ease-out;
+        }
+        .selbar b { font-size: 15px; }
+        .selbar .who-s { color: #cbd5e0; font-size: 12px; }
+        .selbar button { padding: 8px 12px; font-weight: 600; }
+        .selbar button.x { background: transparent; color: #cbd5e0; border-color: #4a5568; }
+        body.has-selbar { padding-bottom: 96px; }
         .footer { margin-top: 18px; font-size: 13px; text-align: center; color: #a0aec0; letter-spacing: 0.3px; }
 
         @media (max-width: 560px) {
@@ -195,6 +207,7 @@
 </div>
 
 <div class="toast-wrap" id="toasts"></div>
+<div class="selbar" id="selBar" hidden></div>
 <div class="modal-bg" id="modalBg" hidden><div class="modal" id="modal"></div></div>
 
 <script>
@@ -368,8 +381,8 @@ function toast(msg, cls = '', ms = 2200) {
     setTimeout(() => el.remove(), ms);
     while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
 }
-function openModal(html) { $('modal').innerHTML = html; $('modalBg').hidden = false; }
-function closeModal() { $('modalBg').hidden = true; }
+function openModal(html) { $('modal').innerHTML = html; $('modalBg').hidden = false; if (typeof renderSelBar === 'function') renderSelBar(); }
+function closeModal() { $('modalBg').hidden = true; if (typeof renderSelBar === 'function') renderSelBar(); }
 // 받침 유무에 따른 조사
 function josa(word, withBatchim, without) {
     const code = word.charCodeAt(word.length - 1) - 0xac00;
@@ -1205,6 +1218,36 @@ function startWeek() {
     if (S.energy < 25) toast('😮‍💨 선생님이 많이 지쳤어요. 이번 주 행동이 줄어요. 기도와 쉼이 필요해요.', 'bad', 3200);
 }
 
+// 행동을 지금 할 수 없는 이유 (없으면 빈 문자열)
+function whyBlocked(k) {
+    const a = ACTIONS[k];
+    if (S.ap < a.ap) return '행동 부족';
+    if (a.cost > S.budget) return '예산 부족';
+    if (k !== 'rest' && S.energy + a.energy < 0) return '체력 부족';
+    if (k === 'retreat' && !(S.week >= 4 && S.week < RETREAT_WEEK)) return '4~7주차에만';
+    if (k === 'retreat' && S.retreatPrep >= 100) return '준비 완료';
+    if (k === 'snack' && S.snack) return '준비 완료';
+    if (k === 'invite' && S.invite >= 2) return '충분해요';
+    if (k === 'lesson' && S.lesson >= 100) return '준비 완료';
+    if (k === 'praise' && S.worship >= 100) return '준비 완료';
+    if (k === 'rest' && S.energy >= 100) return '체력 가득';
+    return '';
+}
+
+// 아이를 선택하면 화면 아래에 뜨는 바: 위로 스크롤하지 않고 바로 카톡·밥 약속
+function renderSelBar() {
+    const bar = $('selBar'), st = byId(selected);
+    const show = !!st && !$('weekday').hidden && $('modalBg').hidden;
+    bar.hidden = !show;
+    document.body.classList.toggle('has-selbar', show);
+    if (!show) return;
+    const btn = k => {
+        const why = whyBlocked(k), a = ACTIONS[k];
+        return `<button data-sel-act="${k}" ${why ? 'disabled' : ''} title="${why}">${a.icon} ${k === 'kakao' ? '카톡' : '밥 약속'}${why ? ' (' + why + ')' : ''}</button>`;
+    };
+    bar.innerHTML = `<span><b>${st.name}</b> <span class="who-s">${st.grade} · 친밀도 ${st.bond}</span></span>${btn('kakao')}${btn('meal')}<button class="x" data-sel-act="clear" aria-label="선택 해제">✕</button>`;
+}
+
 function renderWeek() {
     renderStats();
     $('weekTitle').textContent = `📅 ${S.week}주차 평일 — 이번 주에 무엇을 할까요?`;
@@ -1213,17 +1256,7 @@ function renderWeek() {
     $('eventBox').innerHTML = ev.text;
     $('eventBox').classList.toggle('calm', !!ev.calm);
     $('actions').innerHTML = Object.entries(ACTIONS).map(([k, a]) => {
-        let why = '';
-        if (S.ap < a.ap) why = '행동 부족';
-        else if (a.cost > S.budget) why = '예산 부족';
-        else if (k !== 'rest' && S.energy + a.energy < 0) why = '체력 부족';
-        else if (k === 'retreat' && !(S.week >= 4 && S.week < RETREAT_WEEK)) why = '4~7주차에만';
-        else if (k === 'retreat' && S.retreatPrep >= 100) why = '준비 완료';
-        else if (k === 'snack' && S.snack) why = '준비 완료';
-        else if (k === 'invite' && S.invite >= 2) why = '충분해요';
-        else if (k === 'lesson' && S.lesson >= 100) why = '준비 완료';
-        else if (k === 'praise' && S.worship >= 100) why = '준비 완료';
-        else if (k === 'rest' && S.energy >= 100) why = '체력 가득';
+        const why = whyBlocked(k);
         const cost = [`행동 ${a.ap}`, a.energy < 0 ? `체력 ${a.energy}` : `체력 +${a.energy}`, a.cost ? won(a.cost) : ''].filter(Boolean).join(' · ');
         return `<button class="act" data-act="${k}" ${why ? 'disabled' : ''}>
             <span class="t">${a.icon} ${a.name}</span><span class="d">${a.desc}</span><span class="c">${why ? '⛔ ' + why : cost}</span></button>`;
@@ -1253,6 +1286,7 @@ function renderStudents() {
             <div class="tags">${tags.join(' · ')}</div>
         </button>`;
     }).join('');
+    renderSelBar();
 }
 
 const REPLIES_GOOD = ['넵 쌤 ㅎㅎ 감사해요!', '쌤 저 이번 주 꼭 갈게요!! 🙌', 'ㅋㅋㅋ 쌤 주일에 봬요', '헐 쌤 기억해 주셨어요?? 감동 ㅠㅠ', '오늘 진짜 힘들었는데 힘나요!', '쌤 최고 👍'];
@@ -1280,9 +1314,10 @@ function doAction(key) {
             setTimeout(() => toast(`🎂 ${st.name}: "헐 쌤 제 생일 어떻게 아셨어요?? 🥹 감사해요!!"`, 'chat', 3200), 450);
         } else if (st.issue && !st.issue.known) {
             st.issue.known = true;
-            const first = ISSUES[st.issue.type].line.split(/(?<=[.?!…])\s/)[0];
+            const is = ISSUES[st.issue.type]; // 알림이 뜨기 전에 고민이 풀려도 안전하도록 미리 저장
+            const first = is.line.split(/(?<=[.?!…])\s/)[0];
             setTimeout(() => toast(`${st.name}: "${first}"`, 'chat', 3600), 450);
-            setTimeout(() => toast(`${ISSUES[st.issue.type].icon} ${josa(st.name, '이', '가')} ${ISSUES[st.issue.type].name}을(를) 겪고 있어요. 만나서 이야기를 들어주세요.`, '', 3400), 1400);
+            setTimeout(() => toast(`${is.icon} ${josa(st.name, '이', '가')} ${is.name}을(를) 겪고 있어요. 만나서 이야기를 들어주세요.`, '', 3400), 1400);
         } else {
             setTimeout(() => toast(`${st.name}: "${pick(st.bond >= 35 ? REPLIES_GOOD : REPLIES_MEH)}"`, 'chat'), 450);
         }
@@ -1403,6 +1438,7 @@ async function goSunday() {
     }
     SUN = { speed: 1, attendees, newOnes, retreat, q: null };
     $('weekday').hidden = true; $('sunday').hidden = false;
+    renderSelBar();
     $('skipBtn').disabled = false;
     $('scene').scrollIntoView({ behavior: 'smooth', block: 'start' });
     Sound.play('bell');
@@ -1600,12 +1636,26 @@ function showEnding() {
 
 // ===== 이벤트 연결 =====
 $('actions').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && !b.disabled) doAction(b.dataset.act); });
+// 스크롤(드래그)하다가 손가락이 떨어진 곳의 아이가 선택되지 않도록, 움직임 없이 누른 경우만 선택으로 인정
+const tap = { x: 0, y: 0, sy: 0, moved: false };
+$('students').addEventListener('pointerdown', e => { tap.x = e.clientX; tap.y = e.clientY; tap.sy = window.scrollY; tap.moved = false; });
+$('students').addEventListener('pointermove', e => { if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 8) tap.moved = true; });
+$('students').addEventListener('pointercancel', () => { tap.moved = true; });
+// 포인터 이벤트가 불완전한 모바일 인앱 브라우저 대비: 터치 이벤트로도 움직임 감지
+$('students').addEventListener('touchstart', e => { const t0 = e.touches[0]; tap.x = t0.clientX; tap.y = t0.clientY; tap.sy = window.scrollY; tap.moved = false; }, { passive: true });
+$('students').addEventListener('touchmove', e => { const t0 = e.touches[0]; if (Math.hypot(t0.clientX - tap.x, t0.clientY - tap.y) > 8) tap.moved = true; }, { passive: true });
 $('students').addEventListener('click', e => {
     const b = e.target.closest('[data-stu]'); if (!b) return;
+    if (e.detail !== 0 && (tap.moved || Math.abs(window.scrollY - tap.sy) > 4)) { tap.moved = false; return; } // detail 0 = 키보드
     const id = Number(b.dataset.stu);
     selected = selected === id ? null : id;
     Sound.play('click');
     renderStudents();
+});
+$('selBar').addEventListener('click', e => {
+    const b = e.target.closest('[data-sel-act]'); if (!b || b.disabled) return;
+    if (b.dataset.selAct === 'clear') { selected = null; Sound.play('click'); renderStudents(); return; }
+    doAction(b.dataset.selAct);
 });
 $('sundayBtn').addEventListener('click', () => {
     if (S.ap > 0 && !confirm(`아직 행동이 ${S.ap}번 남았어요. 그래도 주일로 넘어갈까요?`)) return;
