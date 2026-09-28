@@ -19,7 +19,11 @@
             padding: 24px 20px; max-width: 760px; width: 100%;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-        h1 { font-size: 26px; text-align: center; margin-bottom: 4px; }
+        h1 { font-size: 26px; text-align: center; margin-bottom: 4px; display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .rename { font-size: 13px; padding: 4px 8px; border-radius: 8px; color: #718096; }
+        .name-input { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; }
+        .name-input:focus { outline: none; border-color: #667eea; }
+        .name-hint { font-size: 12px; color: #a0aec0; margin-top: 6px; text-align: right; }
         .sub { text-align: center; font-size: 13px; color: #718096; margin-bottom: 14px; line-height: 1.5; }
         h2 { font-size: 16px; color: #4a5568; margin: 18px 0 8px; }
         button {
@@ -158,7 +162,7 @@
 </head>
 <body>
 <div class="card">
-    <h1>⛪ 우리교회 중고등부</h1>
+    <h1><span>⛪ <span id="deptName">우리교회 중고등부</span></span><button class="rename" id="renameBtn" title="부서 이름 바꾸기" aria-label="부서 이름 바꾸기">✏️ 이름 바꾸기</button></h1>
     <p class="sub">중고등부 선생님이 되어 한 학기(12주) 동안 아이들을 돌보고 예배를 세워가 보세요.<br>한 명 한 명의 이름을 부르고, 고민을 들어주고, 함께 예배하는 교회학교 운영 게임</p>
 
     <div class="stats">
@@ -387,6 +391,22 @@ function closeModal() { $('modalBg').hidden = true; if (typeof renderSelBar === 
 function josa(word, withBatchim, without) {
     const code = word.charCodeAt(word.length - 1) - 0xac00;
     return word + (code >= 0 && code % 28 ? withBatchim : without);
+}
+
+// ===== 부서 이름 (사용자가 바꿀 수 있음, 새 학기를 시작해도 유지) =====
+const NAME_KEY = 'church-game-name-v1';
+const DEFAULT_NAME = '우리교회 중고등부';
+const NAME_MAX = 16;
+let deptName = DEFAULT_NAME;
+try { deptName = (localStorage.getItem(NAME_KEY) || '').trim().slice(0, NAME_MAX) || DEFAULT_NAME; } catch (e) { /* 기본값 */ }
+function applyDeptName() {
+    $('deptName').textContent = deptName;
+    document.title = deptName + ' · 교회학교 운영 게임';
+}
+function setDeptName(name) {
+    deptName = (name || '').trim().slice(0, NAME_MAX) || DEFAULT_NAME;
+    try { if (deptName === DEFAULT_NAME) localStorage.removeItem(NAME_KEY); else localStorage.setItem(NAME_KEY, deptName); } catch (e) { /* 무시 */ }
+    applyDeptName();
 }
 
 // ===== 상태 =====
@@ -966,7 +986,10 @@ const Scene = (() => {
         wrapText(screenText, 109, 60, 146, 13, phase === 'praise' ? 'bold 11px sans-serif' : '10px sans-serif');
         // 부서 현판
         c.fillStyle = '#6b4a33'; rr(518, 24, 128, 44, 6); c.fill();
-        c.fillStyle = '#fdf6e3'; c.font = 'bold 13px sans-serif'; c.fillText('우리교회 중고등부', 582, 39);
+        c.fillStyle = '#fdf6e3';
+        let fs = 13; c.font = `bold ${fs}px sans-serif`;
+        while (fs > 8 && c.measureText(deptName).width > 118) { fs--; c.font = `bold ${fs}px sans-serif`; }
+        c.fillText(deptName, 582, 39);
         c.fillStyle = '#fbd38d'; c.font = '9px sans-serif'; c.fillText('“너는 내 것이라” 사 43:1', 582, 56);
         // 문
         const dw = 44 * (1 - doorOpen * 0.7);
@@ -1634,7 +1657,37 @@ function showEnding() {
     $('again').addEventListener('click', () => { closeModal(); S = newState(); save(); startWeek(); });
 }
 
+// '(으)로' 조사: 받침 없거나 ㄹ 받침이면 '로'
+function euro(word) {
+    const code = word.charCodeAt(word.length - 1) - 0xac00;
+    if (code < 0 || code > 11171) return '(으)로';
+    const jong = code % 28;
+    return jong === 0 || jong === 8 ? '로' : '으로';
+}
+function showRename() {
+    openModal(`<h3>✏️ 부서 이름 바꾸기</h3>
+        <p class="msg" style="margin:0 0 10px">우리 교회·부서 이름으로 바꿔 보세요. (예: 사랑의교회 청소년부)</p>
+        <input class="name-input" id="nameInput" maxlength="${NAME_MAX}" aria-label="부서 이름">
+        <div class="name-hint"><span id="nameCount"></span> / ${NAME_MAX}자</div>
+        <div class="row">
+            <button class="primary" id="nameSave">저장</button>
+            <button id="nameDefault">기본값으로</button>
+            <button id="nameCancel">취소</button>
+        </div>`);
+    const input = $('nameInput');
+    input.value = deptName;
+    const count = () => { $('nameCount').textContent = input.value.length; };
+    count();
+    input.addEventListener('input', count);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') $('nameSave').click(); if (e.key === 'Escape') $('nameCancel').click(); });
+    $('nameSave').addEventListener('click', () => { setDeptName(input.value); Sound.play('good'); closeModal(); toast(`⛪ 부서 이름을 "${deptName}"${euro(deptName)} 바꿨어요`, 'good'); });
+    $('nameDefault').addEventListener('click', () => { input.value = DEFAULT_NAME; count(); input.focus(); });
+    $('nameCancel').addEventListener('click', closeModal);
+    input.focus(); input.select();
+}
+
 // ===== 이벤트 연결 =====
+$('renameBtn').addEventListener('click', showRename);
 $('actions').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && !b.disabled) doAction(b.dataset.act); });
 // 스크롤(드래그)하다가 손가락이 떨어진 곳의 아이가 선택되지 않도록, 움직임 없이 누른 경우만 선택으로 인정
 const tap = { x: 0, y: 0, sy: 0, moved: false };
@@ -1671,7 +1724,7 @@ $('sfxBtn').addEventListener('click', () => Sound.toggleSfx());
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => Sound.init()));
 document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key.toUpperCase() === 'M') Sound.toggleMusic();
+    if (e.key.toUpperCase() === 'M' && !(e.target instanceof HTMLInputElement)) Sound.toggleMusic();
 });
 
 let lastFrame = performance.now();
@@ -1683,6 +1736,7 @@ function frame(now) {
 }
 
 Sound.renderButtons();
+applyDeptName();
 if (S.over) { renderStats(); Scene.setWeekday(''); showEnding(); } else startWeek();
 requestAnimationFrame(frame);
 </script>
