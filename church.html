@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>교회학교 운영 게임</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body {
+            font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex;
+            justify-content: center; align-items: flex-start; padding: 16px;
+            color: #2d3748;
+        }
+        .card {
+            background: white; border-radius: 20px;
+            padding: 24px 20px; max-width: 760px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { font-size: 26px; text-align: center; margin-bottom: 4px; }
+        .sub { text-align: center; font-size: 13px; color: #718096; margin-bottom: 14px; line-height: 1.5; }
+        h2 { font-size: 16px; color: #4a5568; margin: 18px 0 8px; }
+        button {
+            font-family: inherit; font-size: 14px; cursor: pointer;
+            padding: 8px 12px; border-radius: 10px; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; transition: all 0.15s;
+        }
+        button:hover:not(:disabled) { background: #667eea; color: white; border-color: #667eea; }
+        button:disabled { opacity: 0.4; cursor: default; }
+        button:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
+        .primary { background: #667eea; color: white; border-color: #667eea; font-weight: 600; }
+        .primary:hover:not(:disabled) { background: #5a67d8; }
+
+        .stats {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+            background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat { text-align: center; }
+        .stat .k { font-size: 12px; color: #718096; }
+        .stat .v { font-size: 16px; font-weight: 700; color: #2d3748; white-space: nowrap; }
+        .meter { height: 5px; background: #edf2f7; border-radius: 3px; overflow: hidden; margin: 4px auto 0; max-width: 110px; }
+        .meter div { height: 100%; border-radius: 3px; }
+
+        .audio-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+        .audio-row button { padding: 5px 10px; font-size: 13px; }
+        .audio-row button.off { opacity: 0.55; }
+        #scene {
+            display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
+            border-radius: 14px; background: #efe6da;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 18px rgba(0,0,0,0.12);
+        }
+
+        .phase-title { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .phase-title b { font-size: 17px; }
+        .ap { display: flex; gap: 4px; align-items: center; font-size: 13px; color: #718096; }
+        .ap span { width: 14px; height: 14px; border-radius: 50%; background: #667eea; display: inline-block; }
+        .ap span.used { background: #e2e8f0; }
+        .event {
+            margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #fefcbf; color: #744210;
+            font-size: 14px; line-height: 1.6;
+        }
+        .event.calm { background: #ebf8ff; color: #2a4365; }
+
+        .actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; }
+        .act {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: 10px;
+        }
+        .act .t { font-weight: 700; font-size: 14px; }
+        .act .d { font-size: 12px; color: #718096; line-height: 1.4; }
+        .act .c { font-size: 11px; color: #a0aec0; }
+        .act:hover:not(:disabled) .d, .act:hover:not(:disabled) .c { color: #e2e8f0; }
+        .prep { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #4a5568; margin-top: 8px; }
+        .prep span { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 3px 10px; }
+
+        .students { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+        .stu {
+            border: 2px solid #e2e8f0; border-radius: 12px; padding: 8px 10px; cursor: pointer; background: white;
+            display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-align: left; color: #2d3748;
+        }
+        .stu:hover { border-color: #a3bffa; background: white; color: #2d3748; }
+        .stu.sel { border-color: #667eea; background: #f0f4ff; box-shadow: 0 0 0 3px rgba(102,126,234,0.2); }
+        .stu .top { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+        .stu .nm { font-weight: 700; font-size: 14px; white-space: nowrap; }
+        .stu .top { flex-wrap: wrap; }
+        .stu .gr { color: #718096; font-size: 11px; }
+        .stu .tags { min-height: 16px; color: #718096; }
+        .bar { display: flex; align-items: center; gap: 6px; }
+        .bar i { font-style: normal; width: 34px; color: #718096; font-size: 11px; }
+        .bar div { flex: 1; height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
+        .bar div b { display: block; height: 100%; border-radius: 3px; }
+        .start-row { display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+        .start-row .primary { padding: 12px 28px; font-size: 16px; }
+
+        .phases { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+        .phases span { padding: 5px 12px; border-radius: 999px; background: #edf2f7; color: #a0aec0; font-size: 13px; font-weight: 600; }
+        .phases span.on { background: #764ba2; color: white; }
+        .phases span.done { background: #e9d8fd; color: #6b46c1; }
+        .sunday-note { text-align: center; font-size: 14px; color: #4a5568; margin-top: 10px; min-height: 22px; }
+
+        .toast-wrap { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 20; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
+        .toast { background: rgba(45,55,72,0.94); color: white; padding: 8px 14px; border-radius: 16px; font-size: 14px; animation: pop 0.2s ease-out; text-align: center; line-height: 1.45; }
+        .toast.good { background: rgba(47,133,90,0.95); }
+        .toast.bad { background: rgba(197,48,48,0.95); }
+        .toast.chat { background: #fee500; color: #3c1e1e; }
+        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .modal-bg { position: fixed; inset: 0; background: rgba(26,32,44,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+        .modal { background: white; border-radius: 18px; padding: 22px; max-width: 480px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+        .modal h3 { font-size: 19px; text-align: center; margin-bottom: 12px; }
+        .modal .who { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
+        .modal .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; background: #f0f4ff; flex: none; }
+        .modal .say { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px 14px 14px 14px; padding: 10px 12px; font-size: 14px; line-height: 1.6; }
+        .modal .say b { display: block; font-size: 12px; color: #718096; margin-bottom: 2px; }
+        .choices { display: flex; flex-direction: column; gap: 8px; }
+        .choices button { text-align: left; line-height: 1.5; padding: 10px 12px; }
+        .feedback { margin-top: 12px; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+        .feedback.g2 { background: #f0fff4; color: #22543d; }
+        .feedback.g1 { background: #fffaf0; color: #744210; }
+        .feedback.g0 { background: #fff5f5; color: #742a2a; }
+        .modal .row { display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+        .report { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+        .report td { padding: 6px 4px; border-bottom: 1px solid #edf2f7; }
+        .report td:last-child { text-align: right; font-weight: 600; }
+        .plus { color: #2f855a; } .minus { color: #c53030; }
+        .msg { text-align: center; font-size: 14px; color: #4a5568; margin: 12px 0 0; line-height: 1.65; }
+        .chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; margin: 10px 0 2px; padding: 0 4px; border-bottom: 1px solid #e2e8f0; }
+        .chart div { flex: 1; background: linear-gradient(#a3bffa, #667eea); border-radius: 4px 4px 0 0; position: relative; min-height: 2px; }
+        .chart div.retreat { background: linear-gradient(#9ae6b4, #38a169); }
+        .chart div span { position: absolute; top: -16px; left: 0; right: 0; text-align: center; font-size: 10px; color: #4a5568; }
+        .chart-x { display: flex; gap: 4px; padding: 0 4px; font-size: 10px; color: #a0aec0; }
+        .chart-x span { flex: 1; text-align: center; }
+        .grade { font-size: 44px; text-align: center; margin: 6px 0; }
+        .verse { text-align: center; font-size: 13px; color: #6b46c1; background: #faf5ff; border-radius: 12px; padding: 10px; margin-top: 12px; line-height: 1.6; }
+        .footer { margin-top: 18px; font-size: 13px; text-align: center; color: #a0aec0; letter-spacing: 0.3px; }
+
+        @media (max-width: 560px) {
+            .card { padding: 18px 12px; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .students { grid-template-columns: repeat(2, 1fr); }
+            .actions { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>⛪ 우리교회 중고등부</h1>
+    <p class="sub">중고등부 선생님이 되어 한 학기(12주) 동안 아이들을 돌보고 예배를 세워가 보세요.<br>한 명 한 명의 이름을 부르고, 고민을 들어주고, 함께 예배하는 교회학교 운영 게임</p>
+
+    <div class="stats">
+        <div class="stat"><div class="k">주차</div><div class="v" id="sWeek"></div></div>
+        <div class="stat"><div class="k">선생님 체력</div><div class="v" id="sEnergy"></div><div class="meter"><div id="mEnergy"></div></div></div>
+        <div class="stat"><div class="k">부서 예산</div><div class="v" id="sBudget"></div></div>
+        <div class="stat"><div class="k">부서 분위기</div><div class="v" id="sAtmos"></div><div class="meter"><div id="mAtmos"></div></div></div>
+    </div>
+
+    <div class="audio-row">
+        <button id="musicBtn" title="단축키: M">🎵 음악</button>
+        <button id="sfxBtn">🔊 효과음</button>
+    </div>
+    <canvas id="scene" width="720" height="330" aria-label="교육관 예배실 모습"></canvas>
+
+    <!-- 평일 -->
+    <section id="weekday">
+        <div class="phase-title">
+            <b id="weekTitle"></b>
+            <div class="ap" id="apDots"></div>
+        </div>
+        <div class="event" id="eventBox"></div>
+
+        <h2>🗓️ 이번 주 할 일</h2>
+        <div class="actions" id="actions"></div>
+        <div class="prep" id="prep"></div>
+
+        <h2 id="stuTitle">👥 우리 반 아이들</h2>
+        <p class="sub" style="text-align:left;margin-bottom:8px">💬 카톡·🍜 밥 약속은 아래에서 아이를 먼저 눌러 선택하세요. 고민은 카톡으로 알게 되고, 만나서 이야기하면 풀 수 있어요.</p>
+        <div class="students" id="students"></div>
+
+        <div class="start-row">
+            <button class="primary" id="sundayBtn">⛪ 주일 예배 드리러 가기</button>
+            <button id="resetBtn">처음부터 다시</button>
+        </div>
+    </section>
+
+    <!-- 주일 -->
+    <section id="sunday" hidden>
+        <div class="phases" id="phases"></div>
+        <p class="sunday-note" id="sundayNote"></p>
+        <div class="start-row"><button id="skipBtn">⏩ 빨리 감기</button></div>
+    </section>
+
+    <p class="footer">made by jeongik</p>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+<div class="modal-bg" id="modalBg" hidden><div class="modal" id="modal"></div></div>
+
+<script>
+'use strict';
+
+// ===== 게임 데이터 =====
+const TOTAL_WEEKS = 12;
+const SAVE_KEY = 'church-game-save-v1';
+const WEEKLY_BUDGET = 20000;
+const RETREAT_WEEK = 8, INVITE_WEEK = 10, MEETING_WEEK = 4, EXAM_WEEKS = [6, 7];
+
+const ACTIONS = {
+    kakao:   { name: '카톡 안부', icon: '💬', ap: 1, energy: -3, cost: 0, target: true, desc: '선택한 아이와 친밀도 +8 · 숨은 고민을 알게 돼요' },
+    meal:    { name: '만나서 밥 사주기', icon: '🍜', ap: 2, energy: -10, cost: 15000, target: true, desc: '친밀도 크게 ↑ · 고민이 있으면 상담해요' },
+    lesson:  { name: '공과 준비', icon: '📖', ap: 1, energy: -8, cost: 0, desc: '주일 공과 준비도 +45' },
+    praise:  { name: '찬양팀 연습', icon: '🎸', ap: 1, energy: -6, cost: 0, desc: '예배 준비도 +45 · 찬양팀 친밀도 ↑' },
+    snack:   { name: '간식 준비', icon: '🍩', ap: 1, energy: -2, cost: 20000, desc: '주일 출석·분위기 ↑' },
+    invite:  { name: '새친구 초대 준비', icon: '💌', ap: 1, energy: -5, cost: 10000, desc: '주일에 새친구가 올 확률 ↑' },
+    retreat: { name: '수련회 준비', icon: '🏕️', ap: 1, energy: -8, cost: 0, desc: '수련회 준비도 +25 (4~7주차)' },
+    rest:    { name: '기도와 쉼', icon: '🙏', ap: 1, energy: 25, cost: 0, desc: '체력 +25 · 지치면 아무것도 못 해요' },
+};
+
+const SURNAMES = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '송', '전'];
+const GIVEN = ['민준', '서윤', '도윤', '서연', '하준', '지우', '시우', '하윤', '주원', '지유', '예준', '수아', '지호', '채원', '준서', '지민',
+               '은우', '다은', '건우', '예린', '현우', '소율', '우진', '하은', '선우', '윤서', '유찬', '가은', '태윤', '나연', '승민', '예서'];
+const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3'];
+const TRAITS = [
+    { key: 'praise', name: '찬양팀', icon: '🎹' },
+    { key: 'lively', name: '분위기 메이커', icon: '😆' },
+    { key: 'quiet', name: '조용한 아이', icon: '🤫' },
+    { key: 'model', name: '모범생', icon: '📘' },
+    { key: 'busy', name: '학원이 바쁜', icon: '⏰' },
+    { key: 'gamer', name: '게이머', icon: '🎮' },
+];
+
+const ISSUES = {
+    exam:   { name: '시험 스트레스', icon: '📚', penalty: 0.2,
+              line: '선생님… 요즘 공부해도 성적이 안 올라요. 이번 시험 망치면 진짜 끝이에요. 교회 올 시간에 공부해야 할 것 같아요.',
+              choices: [
+                  { t: '"많이 불안했구나. 그동안 정말 애썼네." 먼저 마음을 알아주고, 시험 전날 같이 기도하자고 약속한다.', g: 2, fb: '아이가 눈물을 글썽이며 "들어줘서 고마워요"라고 해요. 마음의 짐이 한결 가벼워졌어요.' },
+                  { t: '공부 계획 세우는 법을 알려주고, 교회는 시험 끝나고 와도 괜찮다고 말한다.', g: 1, fb: '도움은 됐지만, 아이는 여전히 혼자 버티는 느낌이에요.' },
+                  { t: '"믿음이 있으면 성적은 하나님이 책임져 주셔. 교회 빠지면 안 돼."', g: 0, fb: '아이가 입을 닫았어요. 부담만 더 커진 것 같아요.' },
+              ] },
+    friend: { name: '친구 관계 고민', icon: '💔', penalty: 0.15,
+              line: '반에서 친하던 애들이 갑자기 저만 빼고 단톡방을 새로 만들었어요… 학교 가기 싫어요.',
+              choices: [
+                  { t: '"그 얘기 꺼내기 쉽지 않았을 텐데 말해줘서 고마워." 충분히 들어준 뒤, 필요하면 담임 선생님께 도움을 요청하자고 한다.', g: 2, fb: '아이가 "선생님한테는 말할 수 있어서 다행이에요"라고 해요. 혼자가 아니라는 걸 느꼈어요.' },
+                  { t: '"그런 애들은 신경 쓰지 마, 교회 친구들이 있잖아."', g: 1, fb: '위로는 됐지만 아이의 속상함을 충분히 들어주진 못했어요.' },
+                  { t: '"너도 뭔가 잘못한 게 있지 않을까? 먼저 사과해 봐."', g: 0, fb: '아이가 상처받은 표정이에요. "역시 아무도 제 편이 아니네요…"' },
+              ] },
+    career: { name: '진로 고민', icon: '🧭', penalty: 0.08,
+              line: '다들 꿈이 있는데 저는 하고 싶은 게 하나도 없어요. 저만 뒤처지는 것 같아요.',
+              choices: [
+                  { t: '"지금 모르는 게 당연해." 아이가 좋아하는 것·잘하는 것을 같이 적어보고, 하나님이 주신 은사를 함께 찾아보자고 한다.', g: 2, fb: '아이가 "저도 잘하는 게 있네요?" 하며 웃어요. 조금 설레는 눈빛이에요.' },
+                  { t: '요즘 전망 좋은 직업 몇 가지를 추천해 준다.', g: 1, fb: '정보는 얻었지만 아이의 마음까지 닿진 않았어요.' },
+                  { t: '"그 나이면 벌써 정했어야지. 정신 차려야 해."', g: 0, fb: '아이가 더 위축됐어요.' },
+              ] },
+    family: { name: '가정 문제', icon: '🏠', penalty: 0.2,
+              line: '요즘 집에서 부모님이 자주 싸우세요… 집에 들어가기가 싫어요. 이런 말 해도 되는지 모르겠어요.',
+              choices: [
+                  { t: '"말해줘서 정말 고마워. 네 잘못이 아니야." 조용히 들어주고 함께 기도한 뒤, 힘들면 언제든 연락하라고 한다. (필요하면 교역자와 상의)', g: 2, fb: '아이가 한참 이야기를 쏟아냈어요. "선생님이 있어서 다행이에요."' },
+                  { t: '"부모님도 힘드실 거야. 네가 더 잘해 드려."', g: 1, fb: '틀린 말은 아니지만 아이는 더 무거운 짐을 진 느낌이에요.' },
+                  { t: '"집안일은 선생님이 끼어들 일이 아닌 것 같아."', g: 0, fb: '아이가 "괜히 말했네요"라며 자리를 떴어요.' },
+              ] },
+    slump:  { name: '신앙 슬럼프', icon: '🌧️', penalty: 0.2,
+              line: '기도해도 아무 느낌이 없어요. 하나님이 진짜 계신지도 모르겠고… 교회 오는 게 그냥 습관 같아요.',
+              choices: [
+                  { t: '"그런 질문을 하는 건 믿음이 자라는 과정이야. 선생님도 그랬어." 자신의 경험을 나누고 같이 말씀을 한 구절씩 읽어보자고 한다.', g: 2, fb: '아이가 "선생님도요?" 하며 놀라요. 솔직해도 된다는 안도감이 생겼어요.' },
+                  { t: '신앙 서적 한 권을 선물한다.', g: 1, fb: '고마워하지만 대화는 금방 끝났어요.' },
+                  { t: '"그런 생각하면 안 돼. 의심은 죄야."', g: 0, fb: '아이가 더 이상 속마음을 이야기하지 않을 것 같아요.' },
+              ] },
+    phone:  { name: '게임·폰 과몰입', icon: '📱', penalty: 0.12,
+              line: '솔직히 주일 아침엔 새벽까지 게임하다 못 일어나요. 끊고 싶은데 잘 안 돼요.',
+              choices: [
+                  { t: '"끊고 싶다는 마음이 벌써 멋진 거야." 토요일 밤 몇 시까지 할지 함께 정하고, 주일 아침에 모닝콜을 해주겠다고 한다.', g: 2, fb: '아이가 "진짜 전화해 주실 거죠?" 하며 웃어요. 함께 해볼 힘이 생겼어요.' },
+                  { t: '게임 시간 관리 앱을 깔아보라고 권한다.', g: 1, fb: '좋은 방법이지만 혼자 하기엔 쉽지 않아 보여요.' },
+                  { t: '"게임은 시간 낭비야. 당장 지워."', g: 0, fb: '아이가 반발심만 생겼어요.' },
+              ] },
+};
+
+// 분반공과 시간에 아이들이 던지는 질문
+const QUESTIONS = [
+    { q: '기도했는데도 시험을 망쳤어요. 하나님은 왜 안 들어주세요?',
+      c: [
+          { t: '먼저 속상한 마음에 공감하고, 기도는 원하는 걸 받아내는 자판기가 아니라 하나님과 나누는 대화라는 걸 함께 이야기한다.', g: 2, fb: '아이들이 고개를 끄덕여요. "대화라고 생각하니까 기도가 좀 달라 보여요."' },
+          { t: '"더 열심히 기도했어야지."라고 말한다.', g: 0, fb: '분위기가 싸늘해졌어요. 질문한 아이가 괜히 물어봤다는 표정이에요.' },
+          { t: '다음 시험은 잘 볼 거라고 격려하고 넘어간다.', g: 1, fb: '따뜻했지만 질문에 대한 답은 흐지부지됐어요.' },
+      ] },
+    { q: '교회 오는 게 솔직히 의무처럼 느껴져요.',
+      c: [
+          { t: '"솔직하게 말해줘서 고마워." 다 같이 교회가 좋았던 순간과 힘든 순간을 나눠본다.', g: 2, fb: '생각보다 많은 아이들이 공감하며 이야기를 꺼냈어요. 오히려 마음이 열렸어요.' },
+          { t: '"주일성수는 성도의 의무야."라고 설명한다.', g: 0, fb: '맞는 말이지만 아이들 표정이 굳었어요.' },
+          { t: '이번 달엔 재미있는 활동을 많이 하자고 약속한다.', g: 1, fb: '아이들이 기대하지만, 속마음 이야기까지는 가지 못했어요.' },
+      ] },
+    { q: '학교 친구가 교회 다닌다고 놀려요.',
+      c: [
+          { t: '놀림받은 마음을 먼저 위로하고, 말보다 삶으로 보여주는 크리스천이 되는 방법을 함께 고민한다.', g: 2, fb: '아이들이 서로의 경험을 나누며 "나만 그런 게 아니었구나" 하고 힘을 얻었어요.' },
+          { t: '"그 친구한테 전도해 봐!"라고 한다.', g: 1, fb: '용기를 주려 했지만 아이는 부담스러워 보여요.' },
+          { t: '"그런 애랑은 놀지 마."라고 한다.', g: 0, fb: '아이들이 어떻게 해야 할지 더 헷갈려 해요.' },
+      ] },
+    { q: '성경은 너무 옛날 이야기 아니에요? 지금이랑 무슨 상관이에요?',
+      c: [
+          { t: '오늘 본문 속 인물의 고민을 요즘 학교생활에 빗대어 같이 찾아본다.', g: 2, fb: '"다윗도 우리처럼 억울했네?" 아이들이 본문에 푹 빠졌어요.' },
+          { t: '성경의 역사적 신뢰성을 길게 설명한다.', g: 1, fb: '유익했지만 몇몇 아이들은 졸기 시작했어요.' },
+          { t: '"그냥 믿는 거야."라고 한다.', g: 0, fb: '질문한 아이가 더 이상 묻지 않아요.' },
+      ] },
+    { q: '착하게만 살면 되지, 꼭 예수님을 믿어야 해요?',
+      c: [
+          { t: '좋은 질문이라고 칭찬하고, 착하게 사는 것과 은혜로 사는 것의 차이를 아이들 말로 풀어본다.', g: 2, fb: '아이들 사이에 진지한 토론이 이어졌어요. 생각이 깊어지는 시간이었어요.' },
+          { t: '"그런 질문은 하면 안 돼."라고 막는다.', g: 0, fb: '아이들이 교회에서는 솔직하면 안 된다고 느꼈어요.' },
+          { t: '요한복음 14장 6절을 읽어주고 마무리한다.', g: 1, fb: '말씀은 전했지만 아이들 마음속 물음표는 남아 있어요.' },
+      ] },
+    { q: 'SNS 보면 다들 행복해 보이는데 나만 초라한 것 같아요.',
+      c: [
+          { t: 'SNS는 하이라이트만 보여준다는 걸 이야기하고, 하나님이 보시는 나의 가치를 서로 한마디씩 말해준다.', g: 2, fb: '서로 칭찬을 주고받다가 몇몇 아이가 울컥했어요. 따뜻한 시간이었어요.' },
+          { t: '"SNS를 끊어!"라고 한다.', g: 0, fb: '아이들이 현실성 없는 얘기라며 웃고 넘겨요.' },
+          { t: '"너도 충분히 멋져."라고 위로한다.', g: 1, fb: '고마워하지만 금방 잊힐 것 같아요.' },
+      ] },
+    { q: '부모님이랑 자꾸 싸워요. "부모를 공경하라"는 게 너무 어려워요.',
+      c: [
+          { t: '어려운 마음을 인정해 주고, 이번 주에 부모님께 해볼 수 있는 작은 공경 한 가지를 각자 정해본다.', g: 2, fb: '"설거지 한 번 해볼게요!" 아이들이 구체적인 다짐을 했어요.' },
+          { t: '"부모님 말씀은 무조건 들어야 해."라고 한다.', g: 0, fb: '아이들이 답답해하며 한숨을 쉬어요.' },
+          { t: '선생님의 사춘기 시절 이야기를 들려준다.', g: 1, fb: '재미있어했지만 적용까지는 이어지지 않았어요.' },
+      ] },
+    { q: '기도할 때 무슨 말을 해야 할지 모르겠어요.',
+      c: [
+          { t: '"오늘 있었던 일을 친구에게 말하듯 해봐." 짝 기도로 서로를 위해 한 문장씩 기도해 본다.', g: 2, fb: '처음엔 쑥스러워했지만 끝나고 나니 아이들 얼굴이 환해졌어요.' },
+          { t: '기도문을 나눠주고 외우게 한다.', g: 1, fb: '도움은 됐지만 조금 딱딱했어요.' },
+          { t: '"기도 많이 하면 늘어."라고 한다.', g: 0, fb: '아이는 여전히 막막해 보여요.' },
+      ] },
+    { q: '저를 괴롭힌 애를 용서해야 해요? 너무 억울해요.',
+      c: [
+          { t: '억울한 마음을 충분히 들어주고, 용서는 잘못을 없던 일로 하는 게 아니라 내 마음을 자유롭게 하는 과정이라고 나눈다.', g: 2, fb: '아이가 "당장은 어렵지만 기도해 볼게요"라고 해요.' },
+          { t: '"예수님이 용서하라고 하셨으니 지금 용서해."', g: 0, fb: '아이가 억울함을 삼키며 입을 닫았어요.' },
+          { t: '"그 애가 사과하면 그때 용서하자."', g: 1, fb: '현실적이지만 말씀과 연결되진 못했어요.' },
+      ] },
+    { q: '저는 잘하는 게 하나도 없는 것 같아요.',
+      c: [
+          { t: '롤링페이퍼처럼 서로의 장점을 한 가지씩 적어준다.', g: 2, fb: '종이 가득 칭찬을 받은 아이가 환하게 웃어요. 반 분위기도 최고예요!' },
+          { t: '"공부 열심히 하면 돼."라고 한다.', g: 0, fb: '아이가 더 작아졌어요.' },
+          { t: '달란트 비유를 읽고 설명한다.', g: 1, fb: '좋은 말씀이었지만 조금 추상적이었어요.' },
+      ] },
+];
+
+const VERSES = [
+    '“너는 청년의 때에 너의 창조주를 기억하라” (전 12:1)',
+    '“누구든지 너를 연소하다고 업신여기지 못하게 하고” (딤전 4:12)',
+    '“내가 너를 지명하여 불렀나니 너는 내 것이라” (사 43:1)',
+    '“수고하고 무거운 짐 진 자들아 다 내게로 오라” (마 11:28)',
+    '“아무것도 염려하지 말고 다만 모든 일에 기도와 간구로” (빌 4:6)',
+    '“너희 염려를 다 주께 맡기라 이는 그가 너희를 돌보심이라” (벧전 5:7)',
+    '“항상 기뻐하라 쉬지 말고 기도하라 범사에 감사하라” (살전 5:16-18)',
+    '“여호와는 나의 목자시니 내게 부족함이 없으리로다” (시 23:1)',
+    '“서로 사랑하라 내가 너희를 사랑한 것 같이” (요 15:12)',
+    '“내게 능력 주시는 자 안에서 내가 모든 것을 할 수 있느니라” (빌 4:13)',
+    '“너는 마음을 다하여 여호와를 신뢰하고” (잠 3:5)',
+    '“사랑은 오래 참고 사랑은 온유하며” (고전 13:4)',
+];
+
+// ===== 유틸 =====
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const rnd = (a, b) => a + Math.random() * (b - a);
+const won = n => (n < 0 ? '-' : '') + Math.abs(Math.round(n)).toLocaleString('ko-KR') + '원';
+function toast(msg, cls = '', ms = 2200) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + cls;
+    el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(() => el.remove(), ms);
+    while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+}
+function openModal(html) { $('modal').innerHTML = html; $('modalBg').hidden = false; }
+function closeModal() { $('modalBg').hidden = true; }
+// 받침 유무에 따른 조사
+function josa(word, withBatchim, without) {
+    const code = word.charCodeAt(word.length - 1) - 0xac00;
+    return word + (code >= 0 && code % 28 ? withBatchim : without);
+}
+
+// ===== 상태 =====
+let nextStudentId = 1;
+function makeLook() {
+    const tops = ['tee', 'stripe', 'hoodie', 'jacket', 'check', 'sweater', 'shirt', 'dress'];
+    const top = pick(tops);
+    const shirt = pick(SHIRTS_P);
+    let shirt2 = pick(ACCENTS_P); if (shirt2 === shirt) shirt2 = '#ffffff';
+    return {
+        skin: pick(SKINS_P), hair: pick(HAIRS_P), style: Math.floor(Math.random() * 4),
+        top, shirt, shirt2, short: top === 'tee' || top === 'dress',
+        pants: pick(PANTS_P), shoes: pick(SHOES_P),
+        scarf: null, bag: Math.random() < 0.3 ? pick(['#8d5a3b', '#343a40', '#c9ada7', '#e76f51', '#1d3557']) : null,
+        h: rnd(0.9, 1.05),
+    };
+}
+function makeStudent(opts = {}) {
+    const trait = opts.trait || pick(TRAITS).key;
+    return {
+        id: nextStudentId++,
+        name: opts.name || pick(GIVEN),
+        grade: opts.grade || pick(GRADES),
+        trait,
+        bond: opts.bond ?? Math.round(rnd(20, 55)),
+        faith: opts.faith ?? Math.round(rnd(15, 50)),
+        issue: null,              // { type, weeks, known }
+        birthday: Math.floor(rnd(1, TOTAL_WEEKS + 1)),
+        absent: 0, attended: 0, isNew: !!opts.isNew,
+        look: makeLook(),
+    };
+}
+function uniqueName(existing) {
+    for (let i = 0; i < 50; i++) { const n = pick(GIVEN); if (!existing.has(n)) return n; }
+    return pick(GIVEN) + pick(['A', 'B']);
+}
+function newState() {
+    nextStudentId = 1;
+    const students = [];
+    const names = new Set();
+    const traits = ['praise', 'praise', 'lively', 'quiet', 'model', 'busy', 'gamer', 'lively', 'quiet', 'model'];
+    for (let i = 0; i < 10; i++) {
+        const name = uniqueName(names); names.add(name);
+        students.push(makeStudent({ name, trait: traits[i], grade: GRADES[i % GRADES.length] }));
+    }
+    // 처음부터 고민을 가진 아이 2명 (숨겨져 있음)
+    const issueKeys = Object.keys(ISSUES).filter(k => k !== 'exam');
+    for (const s of students.slice().sort(() => Math.random() - 0.5).slice(0, 2)) s.issue = { type: pick(issueKeys), weeks: 4, known: false };
+    return {
+        week: 1, energy: 80, budget: 120000, atmos: 50,
+        ap: 5, apMax: 5, lesson: 0, worship: 0, snack: false, invite: 0, retreatPrep: 0,
+        focus: null, meetingDone: false,
+        students, history: [], newFriends: 0, nextId: nextStudentId,
+        weekStarted: false, over: false,
+    };
+}
+function load() {
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (raw) {
+            const s = JSON.parse(raw);
+            if (s && Array.isArray(s.students)) { nextStudentId = s.nextId || 100; return Object.assign(newState(), s, { students: s.students }); }
+        }
+    } catch (e) { /* 저장소 사용 불가 */ }
+    return newState();
+}
+function save() {
+    S.nextId = nextStudentId;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ }
+}
+
+// 사람 그리기용 팔레트 (카페 게임과 동일)
+const SKINS_P = ['#f6d2b8', '#eab58f', '#c98e64', '#8d5a3b', '#f3c9a0'];
+const HAIRS_P = ['#2d2320', '#5a3825', '#a0522d', '#d8b36a', '#1b1b1b', '#9e9e9e', '#7a2e3a'];
+const SHIRTS_P = ['#e76f51', '#2a9d8f', '#457b9d', '#f4a261', '#8e7dbe', '#e9c46a', '#6c757d', '#d62828', '#43aa8b', '#f28482',
+                '#ffafcc', '#a2d2ff', '#cdb4db', '#b5e48c', '#ffd6a5', '#fdffb6', '#9bf6ff', '#bdb2ff', '#f1faee', '#e5e5e5',
+                '#6a994e', '#bc4749', '#386641', '#7f5539', '#b08968', '#023e8a', '#ff7b00', '#ff006e', '#8338ec', '#264653',
+                '#fb8500', '#219ebc', '#d4a373', '#588157', '#9d0208', '#f7b267', '#22223b', '#c9ada7'];
+const ACCENTS_P = ['#ffffff', '#f8f1e5', '#222222', '#ffd166', '#90e0ef', '#f4acb7', '#b5e48c', '#e63946', '#1d3557', '#ff9f1c', '#8ecae6', '#6d597a'];
+const PANTS_P = ['#264653', '#3d405b', '#5c4033', '#343a40', '#6d597a', '#1d3557', '#3a5a8c', '#4f6d9a', '#6f8fb8',
+               '#b59f7b', '#8d7b68', '#2b2b2b', '#6b705c', '#dcd3c3', '#7f4f24', '#495057'];
+const SHOES_P = ['#222222', '#f8f9fa', '#8b5e3c', '#e63946', '#1d3557', '#adb5bd', '#5c4033'];
+const TOPS_P = ['tee', 'stripe', 'hoodie', 'jacket', 'check', 'sweater', 'shirt', 'dress'];
+
+let S;          // 게임 상태 (아래에서 load)
+let selected = null; // 선택한 아이 id
+let SUN = null; // 주일 진행 상태
+
+// ===== 사운드: 잔잔한 예배 피아노 배경음악 + 효과음 (Web Audio 합성, 음원 파일 없음) =====
+const Sound = (() => {
+    const PREF_KEY = 'church-game-audio-v1';
+    const MUSIC_VOL = 0.7;
+    const pref = { music: true, sfx: true };
+    try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
+    const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
+
+    let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
+    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+
+    function init() {
+        if (!ctx) {
+            try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+            master = ctx.createGain(); master.gain.value = 0.9;
+            const comp = ctx.createDynamicsCompressor();
+            master.connect(comp); comp.connect(ctx.destination);
+            musicBus = ctx.createGain(); musicBus.gain.value = MUSIC_VOL;
+            const warm = ctx.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 5000;
+            musicBus.connect(warm); warm.connect(master);
+            // 예배실 잔향
+            const rev = ctx.createConvolver(), wet = ctx.createGain();
+            const irLen = Math.floor(ctx.sampleRate * 2.8), ir = ctx.createBuffer(2, irLen, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) {
+                const d = ir.getChannelData(ch);
+                for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3);
+            }
+            rev.buffer = ir; wet.gain.value = 0.3;
+            musicBus.connect(rev); rev.connect(wet); wet.connect(master);
+            sfxBus = ctx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(master);
+            sfxBus.connect(rev);
+            noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+            const d = noiseBuf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        }
+        if (ctx.state === 'suspended') ctx.resume();
+        if (pref.music) startMusic();
+    }
+
+    function tone(freq, t, dur, o = {}) {
+        const { type = 'sine', vol = 0.15, attack = 0.005, glide = 0, dest = sfxBus, filter = 0 } = o;
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        if (glide) osc.frequency.exponentialRampToValueAtTime(glide, t + attack + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + attack + dur);
+        let out = osc;
+        if (filter) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filter; osc.connect(f); out = f; }
+        out.connect(g); g.connect(dest);
+        osc.start(t); osc.stop(t + attack + dur + 0.03);
+    }
+    function noise(t, dur, o = {}) {
+        const { type = 'bandpass', freq = 1000, q = 1, vol = 0.15, attack = 0.005, hold = 0, sweep = 0, dest = sfxBus } = o;
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q;
+        f.frequency.setValueAtTime(freq, t);
+        if (sweep) f.frequency.exponentialRampToValueAtTime(sweep, t + attack + hold + dur);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        if (hold) g.gain.setValueAtTime(vol, t + attack + hold);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + attack + hold + dur);
+        src.connect(f); f.connect(g); g.connect(dest);
+        src.start(t, Math.random() * 1.5); src.stop(t + attack + hold + dur + 0.03);
+    }
+    // 기타 현 (카르플러스-스트롱)
+    const ksCache = {};
+    function ksBuf(m) {
+        if (ksCache[m]) return ksCache[m];
+        const sr = ctx.sampleRate, len = Math.floor(sr * 1.6), N = Math.max(2, Math.round(sr / mtof(m)));
+        const buf = ctx.createBuffer(1, len, sr), out = buf.getChannelData(0), ring = new Float32Array(N);
+        let prev = 0;
+        for (let i = 0; i < N; i++) { prev = prev * 0.5 + (Math.random() * 2 - 1) * 0.5; ring[i] = prev; }
+        for (let i = 0, idx = 0; i < len; i++) {
+            const nxt = idx + 1 === N ? 0 : idx + 1, a = ring[idx];
+            out[i] = a * 1.5; ring[idx] = 0.996 * 0.5 * (a + ring[nxt]); idx = nxt;
+        }
+        return (ksCache[m] = buf);
+    }
+    function pluck(m, t, vol) {
+        const src = ctx.createBufferSource(); src.buffer = ksBuf(m);
+        const g = ctx.createGain(); g.gain.value = vol;
+        src.connect(g); g.connect(sfxBus); src.start(t); src.stop(t + 1.6);
+    }
+
+    const SFX = {
+        click: t => tone(880, t, 0.06, { vol: 0.06 }),
+        pop: t => { tone(988, t, 0.07, { vol: 0.08 }); tone(1480, t + 0.07, 0.1, { vol: 0.08 }); },     // 카톡 알림
+        send: t => tone(660, t, 0.08, { vol: 0.06, glide: 990 }),
+        page: t => { noise(t, 0.18, { freq: 3000, q: 0.6, vol: 0.08, sweep: 6000 }); noise(t + 0.22, 0.15, { freq: 2600, q: 0.6, vol: 0.06, sweep: 5000 }); },
+        strum: t => [50, 57, 62, 66, 69, 74].forEach((m, i) => pluck(m, t + i * 0.025, 0.12)),
+        snack: t => { noise(t, 0.08, { freq: 2000, q: 2, vol: 0.08 }); tone(1320, t + 0.1, 0.2, { vol: 0.05 }); },
+        letter: t => { tone(1175, t, 0.15, { vol: 0.06, type: 'triangle' }); tone(1568, t + 0.12, 0.25, { vol: 0.06, type: 'triangle' }); },
+        tent: t => { noise(t, 0.3, { type: 'lowpass', freq: 600, vol: 0.12 }); tone(523, t + 0.2, 0.3, { vol: 0.05, type: 'triangle' }); },
+        pray: t => [62, 66, 69, 74].forEach((m, i) => tone(mtof(m), t + i * 0.12, 1.6, { vol: 0.045, attack: 0.3 })),
+        meal: t => { tone(784, t, 0.12, { vol: 0.06 }); tone(988, t + 0.1, 0.12, { vol: 0.06 }); tone(1175, t + 0.2, 0.3, { vol: 0.06 }); },
+        bell: t => { // 주일 종소리
+            [[392, 0], [330, 0.7], [294, 1.4]].forEach(([f, d]) => {
+                tone(f, t + d, 2.2, { vol: 0.1 }); tone(f * 2.4, t + d, 1.2, { vol: 0.03 }); tone(f * 3.9, t + d, 0.6, { vol: 0.015 });
+            });
+        },
+        good: t => [659, 784, 988, 1319].forEach((f, i) => tone(f, t + i * 0.08, 0.35, { type: 'triangle', vol: 0.06 })),
+        ok: t => { tone(659, t, 0.2, { type: 'triangle', vol: 0.06 }); tone(784, t + 0.12, 0.3, { type: 'triangle', vol: 0.06 }); },
+        bad: t => { tone(330, t, 0.25, { type: 'triangle', vol: 0.06, glide: 247 }); },
+        newfriend: t => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, t + i * 0.07, 0.4, { type: 'triangle', vol: 0.06 })),
+        tired: t => tone(392, t, 0.5, { vol: 0.06, glide: 262 }),
+        step: t => noise(t, 0.04, { type: 'lowpass', freq: 500, vol: 0.05 }),
+    };
+    function play(name) {
+        if (!ctx || !pref.sfx || !SFX[name]) return;
+        try { SFX[name](ctx.currentTime + 0.01); } catch (e) { /* 소리 없이 진행 */ }
+    }
+
+    // --- 배경음악: 잔잔한 예배 피아노 (D장조, 8마디) ---
+    const CHORDS = [ // [베이스, 코드음...]
+        [38, 62, 66, 69, 74], // D
+        [37, 61, 64, 69, 73], // A/C#
+        [35, 62, 66, 69, 71], // Bm7
+        [43, 59, 62, 66, 71], // Gmaj7
+        [40, 59, 62, 64, 67], // Em7
+        [45, 61, 64, 67, 69], // A7
+        [43, 59, 62, 67, 71], // G
+        [45, 61, 64, 69, 73], // A
+    ];
+    const MEL = [74, 76, 78, 81, 83, 86];
+    const ARP = [0, 1, 2, 3, 2, 1, 2, 3];
+    const BPM = 68, STEP = 60 / BPM / 2;
+    let step = 0, nextTime = 0, melIdx = 2, intensity = 1;
+
+    function piano(m, t, dur, vol) {
+        tone(mtof(m), t, dur, { vol, attack: 0.008, dest: musicBus });
+        tone(mtof(m) * 2, t, dur * 0.35, { type: 'triangle', vol: vol * 0.15, attack: 0.008, dest: musicBus });
+    }
+    function pad(notes, t, dur) {
+        for (const m of notes) {
+            for (const det of [-4, 4]) {
+                const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+                o.type = 'sawtooth'; o.frequency.value = mtof(m - 12); o.detune.value = det;
+                f.type = 'lowpass'; f.frequency.value = 700;
+                g.gain.setValueAtTime(0.0001, t);
+                g.gain.linearRampToValueAtTime(0.006 * intensity, t + 0.8);
+                g.gain.linearRampToValueAtTime(0.0001, t + dur);
+                o.connect(f); f.connect(g); g.connect(musicBus);
+                o.start(t); o.stop(t + dur + 0.05);
+            }
+        }
+    }
+    function playStep(s, t) {
+        const bar = Math.floor(s / 8) % CHORDS.length, pos = s % 8;
+        const ch = CHORDS[bar], notes = ch.slice(1);
+        if (pos === 0) {
+            tone(mtof(ch[0]), t, STEP * 7, { type: 'triangle', vol: 0.12, filter: 600, attack: 0.02, dest: musicBus });
+            pad(notes.slice(0, 3), t, STEP * 8.5);
+        }
+        piano(notes[ARP[pos]], t, 1.4, pos === 0 ? 0.05 : 0.035);
+        if (intensity > 1 && pos % 2 === 0) noise(t, 0.05, { type: 'highpass', freq: 6000, vol: 0.015, dest: musicBus }); // 찬양 시간엔 셰이커
+        if ((pos === 0 || pos === 4) && Math.random() < 0.35) {
+            melIdx = clamp(melIdx + pick([-2, -1, 1, 2]), 0, MEL.length - 1);
+            tone(mtof(MEL[melIdx]), t, 1.2, { vol: 0.035, dest: musicBus });
+            tone(mtof(MEL[melIdx]) * 3, t, 0.3, { vol: 0.006, dest: musicBus });
+        }
+    }
+    function schedule() {
+        if (!ctx) return;
+        if (nextTime < ctx.currentTime) nextTime = ctx.currentTime + 0.05;
+        while (nextTime < ctx.currentTime + 0.3) {
+            try { playStep(step, nextTime); } catch (e) { /* 무시 */ }
+            nextTime += STEP;
+            step = (step + 1) % (8 * CHORDS.length);
+        }
+    }
+    function startMusic() {
+        if (musicTimer || !ctx) return;
+        step = 0; nextTime = ctx.currentTime + 0.1;
+        musicBus.gain.cancelScheduledValues(ctx.currentTime);
+        musicBus.gain.setValueAtTime(MUSIC_VOL, ctx.currentTime);
+        musicTimer = setInterval(schedule, 60);
+    }
+    function stopMusic() {
+        clearInterval(musicTimer); musicTimer = null;
+        if (ctx) musicBus.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
+    }
+    // 찬양 시간엔 음악을 조금 크고 풍성하게
+    function setIntensity(k) {
+        intensity = k;
+        if (ctx && musicTimer) musicBus.gain.setTargetAtTime(MUSIC_VOL * (k > 1 ? 1.35 : k < 1 ? 0.45 : 1), ctx.currentTime, 0.4);
+    }
+
+    function renderButtons() {
+        $('musicBtn').textContent = pref.music ? '🎵 음악 켜짐' : '🎵 음악 꺼짐';
+        $('sfxBtn').textContent = pref.sfx ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
+        $('musicBtn').classList.toggle('off', !pref.music);
+        $('sfxBtn').classList.toggle('off', !pref.sfx);
+    }
+    function toggleMusic() {
+        pref.music = !pref.music; savePref();
+        if (pref.music) { init(); startMusic(); } else stopMusic();
+        renderButtons();
+    }
+    function toggleSfx() { pref.sfx = !pref.sfx; savePref(); init(); renderButtons(); play('click'); }
+
+    return { init, play, setIntensity, toggleMusic, toggleSfx, renderButtons };
+})();
+
+// ===== 교육관 예배실 장면 (캔버스 애니메이션) =====
+const Scene = (() => {
+    const W = 720, H = 330, WALL = 150, STAGE_TOP = 128, STAGE_FRONT = 160;
+    const DOOR = { x: 680, y: 152 };
+    const ROWS = [206, 250, 294];
+    const COLS = Array.from({ length: 10 }, (_, i) => 108 + i * 56);
+    const SEATS = ROWS.flatMap(y => COLS.map(x => ({ x, y })));
+    const STAGE_SPOTS = [{ x: 232, y: STAGE_TOP }, { x: 444, y: STAGE_TOP }]; // 건반, 기타
+    const SPOTS = {
+        lesson: { x: 360, y: STAGE_TOP, icon: '📖' }, praise: { x: 232, y: STAGE_TOP, icon: '🎹' },
+        snack: { x: 70, y: 196, icon: '🍩' }, kakao: { x: 628, y: 176, icon: '💬' }, meal: { x: 640, y: 170, icon: '🍜' },
+        invite: { x: 600, y: 172, icon: '💌' }, retreat: { x: 150, y: 176, icon: '🏕️' }, rest: { x: 360, y: 180, icon: '🙏' },
+        idle: { x: 120, y: 178, icon: '' },
+    };
+
+    const cvs = $('scene'), c = cvs.getContext('2d');
+    const lerp = (a, b, k) => a + (b - a) * k;
+    function fit() {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (cvs.width !== W * dpr) { cvs.width = W * dpr; cvs.height = H * dpr; }
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function rr(x, y, w, h, r) { c.beginPath(); if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); }
+    function ell(x, y, rx, ry) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); }
+    function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+    function shade(hex, amt) {
+        const f = v => Math.max(0, Math.min(255, Math.round(amt >= 0 ? v + (255 - v) * amt : v * (1 + amt))));
+        return `rgb(${hexToRgb(hex).map(f).join(',')})`;
+    }
+    function volGrad(x0, x1, hex) {
+        const g = c.createLinearGradient(x0, 0, x1, 0);
+        g.addColorStop(0, shade(hex, 0.28)); g.addColorStop(0.4, shade(hex, 0.05)); g.addColorStop(1, shade(hex, -0.32));
+        return g;
+    }
+
+    let t = 0, phase = 'weekday', people = [], particles = [], banner = '', screenText = '', doorOpen = 0;
+    const teacher = {
+        x: SPOTS.idle.x, y: SPOTS.idle.y, tx: SPOTS.idle.x, ty: SPOTS.idle.y, phase: 0, moving: false, bubble: null,
+        look: { skin: '#f3c9a0', hair: '#2d2320', style: 0, top: 'jacket', shirt: '#5c6b82', shirt2: '#ffffff', short: false,
+                pants: '#343a40', shoes: '#5c4033', scarf: null, bag: null, h: 1.06 },
+        lanyard: true,
+    };
+
+    // ---------- 사람 그리기 (카페 게임과 같은 옷 표현) ----------
+    function drawLegs(L, seated, sw) {
+        const shoe = (x, y, w) => {
+            c.fillStyle = L.shoes || '#222'; rr(x, y, w, 4, 2); c.fill();
+            c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + 1, y + 0.5, w - 3, 1);
+        };
+        if (seated) {
+            c.fillStyle = volGrad(-6, 14, L.pants); rr(-6, -18, 20, 7, 3); c.fill();
+            c.fillStyle = volGrad(9, 15, L.pants); rr(9, -16, 6, 16, 3); c.fill();
+            shoe(8, -3, 10);
+            return;
+        }
+        for (const [x, off] of [[-9, sw * 3], [1, -sw * 3]]) {
+            c.fillStyle = volGrad(x + off, x + off + 8, L.pants);
+            rr(x + off, -24, 8, 24, 3); c.fill();
+            if (/^#(3a5a8c|4f6d9a|6f8fb8)$/.test(L.pants)) { // 청바지 박음선
+                c.strokeStyle = 'rgba(255,210,120,0.35)'; c.beginPath(); c.moveTo(x + off + 5, -22); c.lineTo(x + off + 5, -5); c.stroke();
+            }
+        }
+        shoe(-10 + sw * 3, -4, 10); shoe(0 - sw * 3, -4, 10);
+    }
+    function drawArm(L, x, y, back) {
+        const len = 24, sleeve = L.short ? 10 : len;
+        if (L.short) { c.fillStyle = volGrad(x + 0.5, x + 6.5, L.skin); rr(x + 0.5, y + 6, 6, len - 6, 3); c.fill(); }
+        c.fillStyle = volGrad(x, x + 7, L.shirt); rr(x, y, 7, sleeve, 3); c.fill();
+        if (L.top === 'stripe') { c.fillStyle = L.shirt2; for (let yy = y + 4; yy < y + sleeve - 1; yy += 7) c.fillRect(x, yy, 7, 2.5); }
+        if (!L.short && (L.top === 'sweater' || L.top === 'hoodie')) { c.fillStyle = shade(L.shirt, -0.2); c.fillRect(x, y + len - 5, 7, 4); }
+        if (!L.short && L.top === 'jacket') { c.fillStyle = L.shirt2; c.fillRect(x, y + len - 3, 7, 2); }
+        if (back) { c.fillStyle = 'rgba(0,0,0,0.13)'; rr(x, y, 7, len, 3); c.fill(); }
+        c.fillStyle = L.skin; ell(x + 3.5, y + len + 1, 4, 4); c.fill();
+        c.fillStyle = 'rgba(0,0,0,0.12)'; ell(x + 4.5, y + len + 2, 2.5, 2.5); c.fill();
+    }
+    function drawTorso(L, dy, apron, seated) {
+        const top = L.top || 'tee', y0 = -60 + dy, x0 = -14, w = 28, h = 38;
+        if (top === 'dress') { // 치마
+            c.fillStyle = volGrad(-18, 18, L.shirt);
+            c.beginPath();
+            if (seated) { c.moveTo(-12, y0 + 30); c.lineTo(12, y0 + 30); c.lineTo(18, y0 + 44); c.lineTo(-10, y0 + 44); }
+            else { c.moveTo(-13, y0 + 30); c.lineTo(13, y0 + 30); c.lineTo(17, y0 + 50); c.lineTo(-17, y0 + 50); }
+            c.closePath(); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.12)';
+            for (const fx of [-6, 2, 9]) { c.beginPath(); c.moveTo(fx, y0 + 32); c.lineTo(fx + 1.5, y0 + (seated ? 44 : 50)); c.lineTo(fx + 3, y0 + 32); c.fill(); }
+        }
+        if (top === 'hoodie') { c.fillStyle = shade(L.shirt, -0.22); ell(0, y0 + 1, 12, 6); c.fill(); }
+        c.save();
+        rr(x0, y0, w, h, 9);
+        c.fillStyle = volGrad(x0, x0 + w, L.shirt); c.fill();
+        c.clip();
+        switch (top) {
+            case 'stripe':
+                c.fillStyle = L.shirt2;
+                for (let y = y0 + 5; y < y0 + h; y += 7) c.fillRect(x0 - 1, y, w + 2, 3);
+                break;
+            case 'check':
+                c.globalAlpha = 0.35; c.fillStyle = L.shirt2;
+                for (let x = x0 + 3; x < x0 + w; x += 8) c.fillRect(x, y0, 3, h);
+                for (let y = y0 + 3; y < y0 + h; y += 8) c.fillRect(x0, y, w, 3);
+                c.globalAlpha = 1;
+                c.fillStyle = shade(L.shirt, -0.3); for (let i = 0; i < 3; i++) { ell(0, y0 + 9 + i * 8, 1.1, 1.1); c.fill(); }
+                break;
+            case 'jacket':
+                c.fillStyle = volGrad(-5, 5, L.shirt2); c.fillRect(-5, y0, 10, h);
+                c.fillStyle = shade(L.shirt, -0.15);
+                c.beginPath(); c.moveTo(-5, y0); c.lineTo(-1, y0 + 14); c.lineTo(-7, y0 + 8); c.fill();
+                c.beginPath(); c.moveTo(5, y0); c.lineTo(1, y0 + 14); c.lineTo(7, y0 + 8); c.fill();
+                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.moveTo(-11, y0 + 28); c.lineTo(-6, y0 + 28); c.moveTo(6, y0 + 28); c.lineTo(11, y0 + 28); c.stroke();
+                break;
+            case 'hoodie':
+                c.fillStyle = shade(L.shirt, -0.15); rr(-9, y0 + 22, 18, 10, 3); c.fill();
+                c.strokeStyle = L.shirt2; c.lineWidth = 1.2;
+                c.beginPath(); c.moveTo(-3, y0 + 3); c.lineTo(-3.5, y0 + 13); c.moveTo(3, y0 + 3); c.lineTo(3.5, y0 + 13); c.stroke();
+                c.lineWidth = 1;
+                break;
+            case 'sweater':
+                c.fillStyle = L.shirt2; c.beginPath(); c.moveTo(-6, y0); c.lineTo(0, y0 + 10); c.lineTo(6, y0); c.fill();
+                c.fillStyle = shade(L.shirt, -0.2); c.fillRect(x0, y0 + h - 6, w, 6);
+                c.strokeStyle = 'rgba(0,0,0,0.12)';
+                for (let x = x0 + 2; x < x0 + w; x += 3) { c.beginPath(); c.moveTo(x, y0 + h - 6); c.lineTo(x, y0 + h); c.stroke(); }
+                c.strokeStyle = 'rgba(255,255,255,0.18)';
+                for (let y = y0 + 14; y < y0 + h - 8; y += 6) { c.beginPath(); c.moveTo(-10, y); c.lineTo(-6, y + 3); c.lineTo(-2, y); c.moveTo(2, y); c.lineTo(6, y + 3); c.lineTo(10, y); c.stroke(); }
+                break;
+            case 'shirt':
+                c.strokeStyle = shade(L.shirt, -0.25); c.beginPath(); c.moveTo(0, y0 + 4); c.lineTo(0, y0 + h); c.stroke();
+                c.fillStyle = shade(L.shirt, -0.35); for (let i = 0; i < 4; i++) { ell(1.8, y0 + 10 + i * 7, 0.9, 0.9); c.fill(); }
+                c.fillStyle = L.shirt2 === '#222222' ? '#ffffff' : L.shirt2;
+                c.beginPath(); c.moveTo(-7, y0); c.lineTo(0, y0 + 5); c.lineTo(-2, y0 + 9); c.lineTo(-8, y0 + 3); c.fill();
+                c.beginPath(); c.moveTo(7, y0); c.lineTo(0, y0 + 5); c.lineTo(2, y0 + 9); c.lineTo(8, y0 + 3); c.fill();
+                break;
+            case 'dress':
+                c.fillStyle = L.shirt2; c.fillRect(x0, y0 + 26, w, 4);
+                c.fillStyle = shade(L.shirt, 0.35); ell(0, y0 + 1, 7, 3); c.fill();
+                break;
+            default: // tee: 가슴 프린트
+                c.fillStyle = L.shirt2; ell(3, y0 + 15, 4.5, 4.5); c.fill();
+                c.fillStyle = shade(L.shirt, -0.2); ell(0, y0 + 1, 7, 3); c.fill();
+        }
+        // 위는 밝고 아래는 그늘진 음영, 목 그림자
+        const g = c.createLinearGradient(0, y0, 0, y0 + h);
+        g.addColorStop(0, 'rgba(255,255,255,0.14)'); g.addColorStop(0.45, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.18)');
+        c.fillStyle = g; c.fillRect(x0, y0, w, h);
+        c.fillStyle = 'rgba(0,0,0,0.13)'; ell(0, y0, 8, 3); c.fill();
+        c.restore();
+        rr(x0, y0, w, h, 9); c.strokeStyle = 'rgba(0,0,0,0.16)'; c.stroke();
+        if (apron) {
+            c.fillStyle = volGrad(-10, 10, apron); rr(-10, y0 + 10, 20, 30, 4); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.15)'; rr(-6, y0 + 24, 12, 7, 2); c.fill();
+            c.strokeStyle = apron; c.lineWidth = 2; c.beginPath(); c.moveTo(-6, y0 + 10); c.lineTo(-4, y0); c.moveTo(6, y0 + 10); c.lineTo(4, y0); c.stroke(); c.lineWidth = 1;
+        }
+        if (L.bag) {
+            c.strokeStyle = L.bag; c.lineWidth = 2; c.beginPath(); c.moveTo(-11, y0 + 2); c.lineTo(11, y0 + 26); c.stroke(); c.lineWidth = 1;
+            c.fillStyle = volGrad(9, 20, L.bag); rr(9, y0 + 24, 11, 10, 2); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.2)'; c.fillRect(9, y0 + 27, 11, 1.5);
+        }
+        if (L.scarf) {
+            c.fillStyle = volGrad(-12, 12, L.scarf); rr(-12, y0 - 3, 24, 7, 3); c.fill();
+            c.fillStyle = volGrad(4, 10, L.scarf); rr(4, y0 + 2, 6, 15, 2); c.fill();
+            c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(4, y0 + 13, 6, 1.5);
+        }
+    }
+    function drawFront(p, walking) {
+        const L = p.look, s = L.h;
+        const sw = walking ? Math.sin(p.phase) : 0, bob = walking ? Math.abs(Math.sin(p.phase)) * 1.5 : 0;
+        c.save(); c.translate(p.x, p.y); c.globalAlpha = p.alpha ?? 1; c.scale(s, s);
+        c.fillStyle = 'rgba(0,0,0,0.15)'; ell(0, 0, 15, 4); c.fill();
+        const dy = -bob;
+        drawLegs(L, false, sw);
+        const armSwing = walking ? sw * 4 : 0;
+        drawArm(L, -19, -56 + dy + armSwing, true);
+        drawTorso(L, dy, null, false);
+        if (p.lanyard) { // 선생님 명찰
+            c.strokeStyle = '#e53e3e'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-6, -60 + dy); c.lineTo(0, -44 + dy); c.lineTo(6, -60 + dy); c.stroke(); c.lineWidth = 1;
+            c.fillStyle = '#fff'; rr(-5, -44 + dy, 10, 8, 1.5); c.fill(); c.fillStyle = '#667eea'; c.fillRect(-4, -42 + dy, 8, 2);
+        }
+        if (p.book) { c.save(); c.translate(15, -32 + dy); c.fillStyle = '#3b2f5c'; rr(-6, -8, 12, 15, 1.5); c.fill(); c.fillStyle = '#d4af37'; c.fillRect(-1, -5, 2, 8); c.fillRect(-3, -3, 6, 2); c.restore(); }
+        drawArm(L, 12, -56 + dy - armSwing, false);
+        drawHead(L, -72 + dy, p.mood || 'happy');
+        c.restore();
+    }
+    function drawHead(L, hy, mood) {
+        c.fillStyle = L.skin; ell(0, hy, 13, 13); c.fill();
+        const hg = c.createRadialGradient(-5, hy - 5, 1, 0, hy, 14);
+        hg.addColorStop(0, 'rgba(255,255,255,0.3)'); hg.addColorStop(0.55, 'rgba(255,255,255,0)'); hg.addColorStop(1, 'rgba(0,0,0,0.14)');
+        c.fillStyle = hg; ell(0, hy, 13, 13); c.fill();
+        c.fillStyle = L.hair;
+        if (L.style === 1) { c.beginPath(); c.arc(0, hy - 2, 14.5, Math.PI, 0); c.fill(); rr(-15, hy - 3, 6, 22, 3); c.fill(); rr(9, hy - 3, 6, 22, 3); c.fill(); }
+        else if (L.style === 2) { c.beginPath(); c.arc(0, hy - 2, 14, Math.PI, 0); c.fill(); ell(0, hy - 16, 6, 6); c.fill(); }
+        else if (L.style === 3) { c.beginPath(); c.arc(0, hy - 2, 14, Math.PI * 1.05, Math.PI * 1.95); c.fill(); c.fillRect(-13, hy - 6, 26, 4); }
+        else { c.beginPath(); c.arc(0, hy - 2, 14, Math.PI, 0); c.fill(); }
+        c.fillStyle = 'rgba(255,120,120,0.25)'; ell(-8, hy + 4, 3, 2); c.fill(); ell(8, hy + 4, 3, 2); c.fill();
+        c.fillStyle = '#222'; ell(-4.5, hy + 1, 1.6, 1.8); c.fill(); ell(4.5, hy + 1, 1.6, 1.8); c.fill();
+        c.strokeStyle = '#222'; c.lineWidth = 1.3; c.beginPath();
+        if (mood === 'sad') c.arc(0, hy + 10, 4, 1.2 * Math.PI, 1.8 * Math.PI);
+        else c.arc(0, hy + 4, 4, 0.15 * Math.PI, 0.85 * Math.PI);
+        c.stroke(); c.lineWidth = 1;
+    }
+    // 뒷모습으로 의자에 앉은 아이 (강단을 바라봄)
+    function drawBack(p) {
+        const L = p.look, s = L.h * 0.95;
+        const sway = phase === 'praise' ? Math.sin(t * 2.2 + p.seed) * 2 : 0;
+        c.save(); c.translate(p.x + sway, p.y); c.globalAlpha = p.alpha ?? 1; c.scale(s, s);
+        c.fillStyle = 'rgba(0,0,0,0.12)'; ell(0, 0, 16, 4); c.fill();
+        // 몸 (뒷모습)
+        c.fillStyle = volGrad(-14, 14, L.shirt); rr(-14, -64, 28, 36, 9); c.fill();
+        if (L.top === 'stripe') { c.save(); rr(-14, -64, 28, 36, 9); c.clip(); c.fillStyle = L.shirt2; for (let y = -60; y < -28; y += 7) c.fillRect(-15, y, 30, 3); c.restore(); }
+        if (L.top === 'hoodie') { c.fillStyle = shade(L.shirt, -0.18); rr(-9, -66, 18, 14, 6); c.fill(); }
+        const g = c.createLinearGradient(0, -64, 0, -28); g.addColorStop(0, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0.18)');
+        c.fillStyle = g; rr(-14, -64, 28, 36, 9); c.fill();
+        // 팔 (찬양 시간에 손 들기)
+        if (phase === 'praise' && p.handsUp) {
+            c.fillStyle = volGrad(-22, -14, L.shirt); c.save(); c.translate(-13, -60); c.rotate(-0.35); rr(-4, -26, 7, 26, 3); c.fill(); c.fillStyle = L.skin; ell(0, -28, 4, 4); c.fill(); c.restore();
+            c.fillStyle = volGrad(14, 22, L.shirt); c.save(); c.translate(13, -60); c.rotate(0.35); rr(-3, -26, 7, 26, 3); c.fill(); c.fillStyle = L.skin; ell(0, -28, 4, 4); c.fill(); c.restore();
+        } else {
+            c.fillStyle = volGrad(-20, -13, L.shirt); rr(-19, -60, 7, 22, 3); c.fill();
+            c.fillStyle = volGrad(13, 20, L.shirt); rr(12, -60, 7, 22, 3); c.fill();
+        }
+        // 머리 (뒤통수)
+        const hy = -76;
+        c.fillStyle = L.skin; ell(-12.5, hy + 2, 2.5, 4); c.fill(); ell(12.5, hy + 2, 2.5, 4); c.fill();
+        if (L.style === 3) { c.fillStyle = L.skin; ell(0, hy, 13, 13); c.fill(); c.fillStyle = L.hair; c.beginPath(); c.arc(0, hy + 1, 13, 0.05 * Math.PI, 0.95 * Math.PI); c.fill(); }
+        else {
+            c.fillStyle = L.hair; ell(0, hy, 13.5, 13.5); c.fill();
+            if (L.style === 1) { rr(-12, hy, 24, 20, 6); c.fill(); }
+            if (L.style === 2) { ell(0, hy - 13, 6, 6); c.fill(); }
+            c.fillStyle = 'rgba(255,255,255,0.12)'; ell(-4, hy - 6, 6, 4); c.fill();
+        }
+        // 의자 등받이
+        const wood = '#8b5e3c';
+        c.fillStyle = shade(wood, -0.25); c.fillRect(-13, -20, 3, 20); c.fillRect(10, -20, 3, 20);
+        c.fillStyle = volGrad(-15, 15, wood); rr(-15, -42, 30, 20, 4); c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.15)'; c.fillRect(-13, -40, 26, 2);
+        c.restore();
+    }
+    function drawEmptyChair(x, y) {
+        const wood = '#8b5e3c';
+        c.save(); c.translate(x, y); c.scale(0.95, 0.95);
+        c.fillStyle = 'rgba(0,0,0,0.1)'; ell(0, 0, 15, 3.5); c.fill();
+        c.fillStyle = shade(wood, -0.25); c.fillRect(-13, -20, 3, 20); c.fillRect(10, -20, 3, 20);
+        c.fillStyle = shade(wood, -0.1); c.fillRect(-14, -24, 28, 5);
+        c.fillStyle = volGrad(-15, 15, wood); rr(-15, -42, 30, 20, 4); c.fill();
+        c.restore();
+    }
+
+    // ---------- 배경 ----------
+    function drawRoom() {
+        const retreat = phase === 'retreat';
+        // 벽
+        const wg = c.createLinearGradient(0, 0, 0, WALL);
+        wg.addColorStop(0, retreat ? '#2b3055' : '#f5ede1'); wg.addColorStop(1, retreat ? '#3b3f6b' : '#eadcc8');
+        c.fillStyle = wg; c.fillRect(0, 0, W, WALL);
+        if (!retreat) { c.fillStyle = '#b08968'; c.fillRect(0, WALL - 30, W, 30); c.fillStyle = '#9c7656'; c.fillRect(0, WALL - 32, W, 4); }
+        // 바닥
+        const fg = c.createLinearGradient(0, WALL, 0, H);
+        fg.addColorStop(0, retreat ? '#3d5a3a' : '#c9a37c'); fg.addColorStop(1, retreat ? '#2f4a2c' : '#b58a62');
+        c.fillStyle = fg; c.fillRect(0, WALL, W, H - WALL);
+        if (!retreat) {
+            c.strokeStyle = 'rgba(90,55,30,0.15)';
+            for (let y = WALL + 14; y < H; y += 16) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+            c.fillStyle = 'rgba(120,40,60,0.35)'; c.fillRect(340, WALL, 40, H - WALL); // 가운데 통로 카펫
+        }
+        if (retreat) { drawRetreatSky(); return; }
+        // 창문
+        for (const wx of [218, 438]) {
+            const sky = c.createLinearGradient(0, 24, 0, 96); sky.addColorStop(0, '#9fd3f0'); sky.addColorStop(1, '#e0f2fe');
+            c.fillStyle = '#7d5234'; rr(wx - 4, 20, 72, 80, 6); c.fill();
+            c.fillStyle = sky; rr(wx, 24, 64, 72, 30); c.fill();
+            c.strokeStyle = '#7d5234'; c.lineWidth = 3; c.beginPath(); c.moveTo(wx + 32, 24); c.lineTo(wx + 32, 96); c.moveTo(wx, 62); c.lineTo(wx + 64, 62); c.stroke(); c.lineWidth = 1;
+            c.fillStyle = 'rgba(255,255,255,0.25)'; c.beginPath(); c.moveTo(wx + 6, 90); c.lineTo(wx + 26, 34); c.lineTo(wx + 34, 34); c.lineTo(wx + 14, 90); c.fill();
+        }
+        // 십자가 + 빛
+        const glow = c.createRadialGradient(360, 60, 5, 360, 60, 70);
+        glow.addColorStop(0, 'rgba(255,236,170,0.55)'); glow.addColorStop(1, 'rgba(255,236,170,0)');
+        c.fillStyle = glow; c.fillRect(290, 0, 140, 130);
+        c.fillStyle = volGrad(354, 366, '#8b5e3c'); c.fillRect(354, 18, 12, 88);
+        c.fillStyle = volGrad(334, 386, '#8b5e3c'); c.fillRect(334, 40, 52, 11);
+        // 스크린
+        c.fillStyle = '#333'; c.fillRect(24, 14, 170, 4);
+        c.fillStyle = '#fdfdfd'; rr(30, 18, 158, 86, 3); c.fill();
+        c.strokeStyle = '#cbd5e0'; c.stroke();
+        c.fillStyle = '#4a5568'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        wrapText(screenText, 109, 60, 146, 13, phase === 'praise' ? 'bold 11px sans-serif' : '10px sans-serif');
+        // 부서 현판
+        c.fillStyle = '#6b4a33'; rr(518, 24, 128, 44, 6); c.fill();
+        c.fillStyle = '#fdf6e3'; c.font = 'bold 13px sans-serif'; c.fillText('우리교회 중고등부', 582, 39);
+        c.fillStyle = '#fbd38d'; c.font = '9px sans-serif'; c.fillText('“너는 내 것이라” 사 43:1', 582, 56);
+        // 문
+        const dw = 44 * (1 - doorOpen * 0.7);
+        c.fillStyle = '#4a3326'; c.fillRect(656, 58, 52, WALL - 58);
+        c.fillStyle = '#2b1d15'; c.fillRect(660, 62, 44, WALL - 62);
+        c.fillStyle = '#8b5e3c'; c.fillRect(660, 62, dw, WALL - 62);
+        c.fillStyle = 'rgba(190,225,245,0.8)'; c.fillRect(660 + dw * 0.2, 72, dw * 0.6, 26);
+        c.fillStyle = '#d9b36c'; ell(660 + dw - 6, 108, 2.5, 2.5); c.fill();
+        // 강단
+        c.fillStyle = '#7d5234'; c.fillRect(160, STAGE_TOP, 400, 6);
+        c.fillStyle = volGrad(160, 560, '#9c6b45'); c.fillRect(160, STAGE_TOP + 6, 400, STAGE_FRONT - STAGE_TOP - 6);
+        c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(160, STAGE_FRONT - 4, 400, 4);
+        // 드럼
+        c.fillStyle = '#c53030'; ell(505, STAGE_TOP - 14, 14, 14); c.fill(); c.fillStyle = '#fff5f5'; ell(505, STAGE_TOP - 14, 9, 9); c.fill();
+        c.fillStyle = '#e2e8f0'; ell(485, STAGE_TOP - 34, 10, 3); c.fill(); ell(528, STAGE_TOP - 38, 11, 3); c.fill();
+        c.strokeStyle = '#718096'; c.beginPath(); c.moveTo(485, STAGE_TOP - 34); c.lineTo(485, STAGE_TOP); c.moveTo(528, STAGE_TOP - 38); c.lineTo(528, STAGE_TOP); c.stroke();
+        // 건반
+        c.fillStyle = '#2d3748'; c.fillRect(212, STAGE_TOP - 30, 44, 7);
+        c.fillStyle = '#fff'; c.fillRect(214, STAGE_TOP - 29, 40, 3);
+        c.strokeStyle = '#2d3748'; c.beginPath(); c.moveTo(218, STAGE_TOP - 23); c.lineTo(214, STAGE_TOP); c.moveTo(250, STAGE_TOP - 23); c.lineTo(254, STAGE_TOP); c.stroke();
+        // 마이크 스탠드
+        for (const mx of [300, 420]) { c.strokeStyle = '#4a5568'; c.beginPath(); c.moveTo(mx, STAGE_TOP); c.lineTo(mx, STAGE_TOP - 44); c.stroke(); c.fillStyle = '#2d3748'; ell(mx, STAGE_TOP - 46, 3, 4); c.fill(); }
+        // 간식 테이블
+        c.fillStyle = '#6f4e37'; c.fillRect(38, 176, 64, 5); c.fillRect(42, 181, 4, 20); c.fillRect(94, 181, 4, 20);
+        if (S && S.snack) { c.font = '14px sans-serif'; c.fillText('🍩🧃🍪', 70, 168); }
+    }
+    function drawPulpit() {
+        c.fillStyle = volGrad(342, 378, '#6f4e37');
+        c.beginPath(); c.moveTo(340, STAGE_TOP - 40); c.lineTo(380, STAGE_TOP - 40); c.lineTo(376, STAGE_TOP); c.lineTo(344, STAGE_TOP); c.fill();
+        c.fillStyle = '#5b3a29'; c.fillRect(336, STAGE_TOP - 44, 48, 6);
+        c.fillStyle = '#d4af37'; c.fillRect(358, STAGE_TOP - 30, 4, 16); c.fillRect(353, STAGE_TOP - 25, 14, 4);
+    }
+    function drawRetreatSky() {
+        c.fillStyle = 'rgba(255,255,255,0.8)';
+        for (let i = 0; i < 40; i++) { const x = (i * 97) % W, y = (i * 53) % 110 + 6; c.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t + i)); ell(x, y, 1.2, 1.2); c.fill(); }
+        c.globalAlpha = 1;
+        c.fillStyle = '#fdf6d8'; ell(600, 40, 16, 16); c.fill();
+        // 산과 텐트
+        c.fillStyle = '#1f2d4a'; c.beginPath(); c.moveTo(0, WALL); c.lineTo(120, 70); c.lineTo(260, WALL); c.lineTo(380, 60); c.lineTo(540, WALL); c.lineTo(640, 90); c.lineTo(W, WALL); c.fill();
+        for (const [x, col] of [[90, '#e76f51'], [620, '#2a9d8f']]) { c.fillStyle = col; c.beginPath(); c.moveTo(x - 34, WALL + 20); c.lineTo(x, WALL - 30); c.lineTo(x + 34, WALL + 20); c.fill(); c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.moveTo(x - 8, WALL + 20); c.lineTo(x, WALL - 4); c.lineTo(x + 8, WALL + 20); c.fill(); }
+        // 모닥불
+        c.fillStyle = '#5c4033'; c.fillRect(340, 170, 40, 6);
+        for (let i = 0; i < 3; i++) {
+            const f = 1 + Math.sin(t * 12 + i) * 0.15;
+            c.fillStyle = ['#ff6b00', '#ffb703', '#fff3b0'][i];
+            c.beginPath(); c.moveTo(346 + i * 4, 172); c.quadraticCurveTo(360, 172 - 40 * f / (i + 1) - 10, 374 - i * 4, 172); c.fill();
+        }
+        const fg = c.createRadialGradient(360, 165, 5, 360, 165, 160);
+        fg.addColorStop(0, 'rgba(255,170,60,0.35)'); fg.addColorStop(1, 'rgba(255,170,60,0)');
+        c.fillStyle = fg; c.fillRect(200, 60, 320, 270);
+        c.fillStyle = '#fdf6e3'; c.font = 'bold 15px sans-serif'; c.textAlign = 'center'; c.fillText('🏕️ 여름수련회 · 은혜의 밤', 360, 22);
+    }
+    function wrapText(text, x, y, maxW, lh, font) {
+        if (!text) return;
+        c.font = font;
+        const words = text.split(' '), lines = [];
+        let line = '';
+        for (const w of words) { const test = line ? line + ' ' + w : w; if (c.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test; }
+        if (line) lines.push(line);
+        const y0 = y - (lines.length - 1) * lh / 2;
+        lines.slice(0, 5).forEach((l, i) => c.fillText(l, x, y0 + i * lh));
+    }
+
+    // ---------- 상태 변경 ----------
+    function setWeekday(text) {
+        phase = 'weekday'; people = []; particles = []; banner = '';
+        screenText = text || '';
+        teacher.x = teacher.tx = SPOTS.idle.x; teacher.y = teacher.ty = SPOTS.idle.y; teacher.bubble = null; teacher.book = false;
+    }
+    function teacherDo(kind) {
+        const sp = SPOTS[kind] || SPOTS.idle;
+        teacher.tx = sp.x; teacher.ty = sp.y;
+        teacher.book = kind === 'lesson';
+        teacher.bubble = sp.icon ? { text: sp.icon, until: t + 2.2 } : null;
+    }
+    function sundayStart(list, text) {
+        phase = 'enter'; people = []; particles = []; screenText = text;
+        teacher.x = teacher.tx = SPOTS.lesson.x; teacher.y = teacher.ty = STAGE_TOP + 44; teacher.book = true; teacher.bubble = null;
+        const free = SEATS.map((_, i) => i).sort(() => Math.random() - 0.5);
+        let stage = 0;
+        list.forEach((st, i) => {
+            let target;
+            if (st.trait === 'praise' && stage < STAGE_SPOTS.length) target = { ...STAGE_SPOTS[stage++], onStage: true };
+            else target = SEATS[free.pop() ?? 0];
+            people.push({
+                id: st.id, name: st.name, look: st.look, isNew: st.isNew, seed: Math.random() * 6,
+                x: DOOR.x, y: DOOR.y, alpha: 0, phase: 0, handsUp: Math.random() < 0.35,
+                delay: i * 0.45 + Math.random() * 0.3, state: 'wait', onStage: !!target.onStage,
+                path: target.onStage ? [[DOOR.x, 170], [target.x, 170], [target.x, target.y]] : [[DOOR.x, target.y + 16], [target.x, target.y + 16], [target.x, target.y]],
+                sx: target.x, sy: target.y, bubble: null,
+            });
+        });
+    }
+    function setPhase(p, text) {
+        phase = p;
+        if (text !== undefined) screenText = text;
+        if (p === 'word') { teacher.tx = SPOTS.lesson.x; teacher.ty = STAGE_TOP; teacher.bubble = { text: '📖', until: t + 3 }; }
+        if (p === 'group') { teacher.tx = 360; teacher.ty = STAGE_FRONT + 22; people.forEach(q => { if (Math.random() < 0.5) q.bubble = { text: pick(['💬', '🤔', '😊', '🙋', '💭']), until: t + rnd(1, 3.5) }; }); }
+        if (p === 'snack') { teacher.tx = SPOTS.snack.x + 30; teacher.ty = SPOTS.snack.y; people.forEach(q => { if (S.snack && Math.random() < 0.7) q.bubble = { text: pick(['🍩', '🍪', '🧃', '😋']), until: t + rnd(1.5, 3) }; }); }
+        if (p === 'retreat') { people.forEach(q => { q.bubble = Math.random() < 0.5 ? { text: pick(['🔥', '🙏', '✨', '🎶']), until: t + 3 } : null; }); }
+        if (p === 'leave') {
+            people.forEach((q, i) => {
+                q.state = 'leave'; q.delay = i * 0.25;
+                q.path = q.onStage ? [[q.x, 170], [DOOR.x, 170], [DOOR.x, DOOR.y]] : [[q.x, q.y + 16], [DOOR.x, q.y + 16], [DOOR.x, DOOR.y]];
+            });
+            teacher.tx = SPOTS.idle.x; teacher.ty = SPOTS.idle.y; teacher.book = false;
+        }
+    }
+    function emote(id, text, dur = 2) { const q = people.find(p => p.id === id); if (q) q.bubble = { text, until: t + dur }; }
+
+    // ---------- 업데이트 ----------
+    function update(dt) {
+        t += dt;
+        // 선생님
+        const dx = teacher.tx - teacher.x, dy = teacher.ty - teacher.y, dist = Math.hypot(dx, dy);
+        if (dist > 1) { const st = Math.min(dist, 200 * dt); teacher.x += dx / dist * st; teacher.y += dy / dist * st; teacher.phase += dt * 14; teacher.moving = true; }
+        else { teacher.x = teacher.tx; teacher.y = teacher.ty; teacher.moving = false; }
+        // 아이들
+        for (const p of people) {
+            if (p.delay > 0) { p.delay -= dt; continue; }
+            if (p.state === 'wait') p.state = 'enter';
+            if (p.path.length) {
+                const [tx, ty] = p.path[0], ddx = tx - p.x, ddy = ty - p.y, d = Math.hypot(ddx, ddy), st = 150 * dt;
+                if (d <= st) { p.x = tx; p.y = ty; p.path.shift(); if (!p.path.length && p.state === 'enter') p.state = 'seated'; }
+                else { p.x += ddx / d * st; p.y += ddy / d * st; }
+                p.phase += dt * 12;
+            }
+            const nearDoor = Math.hypot(p.x - DOOR.x, p.y - DOOR.y);
+            p.alpha = p.state === 'wait' ? 0 : Math.min(1, nearDoor / 14);
+        }
+        people = people.filter(p => !(p.state === 'leave' && !p.path.length));
+        doorOpen += ((people.some(p => p.state !== 'wait' && Math.hypot(p.x - DOOR.x, p.y - DOOR.y) < 40) ? 1 : 0) - doorOpen) * Math.min(1, dt * 10);
+        // 찬양 음표
+        if (phase === 'praise' && Math.random() < dt * 8) {
+            particles.push({ x: rnd(100, 620), y: rnd(180, 300), vy: -30, life: 1.6, max: 1.6, text: pick(['♪', '♫', '♬']) });
+        }
+        if (phase === 'retreat' && Math.random() < dt * 20) particles.push({ x: 360 + rnd(-10, 10), y: 160, vy: -rnd(30, 60), life: 1, max: 1, spark: true });
+        for (const q of particles) { q.y += q.vy * dt; q.life -= dt; }
+        particles = particles.filter(q => q.life > 0);
+    }
+    const seatedCount = () => people.filter(p => p.state === 'seated').length;
+    const allGone = () => people.length === 0;
+
+    // ---------- 그리기 ----------
+    function draw() {
+        fit();
+        c.clearRect(0, 0, W, H);
+        drawRoom();
+        const list = [];
+        if (phase !== 'retreat') {
+            for (const s of SEATS) if (!people.some(p => p.state === 'seated' && !p.onStage && p.sx === s.x && p.sy === s.y)) list.push({ y: s.y, f: () => drawEmptyChair(s.x, s.y) });
+            list.push({ y: STAGE_TOP + 0.5, f: drawPulpit });
+        }
+        for (const p of people) {
+            if (p.state === 'wait') continue;
+            const sitting = p.state === 'seated' && !p.onStage;
+            list.push({ y: p.y, f: () => sitting ? drawBack(p) : drawFront(p, p.path.length > 0) });
+        }
+        list.push({ y: teacher.y + (teacher.y === STAGE_TOP ? 0 : 0.1), f: () => drawFront(teacher, teacher.moving) });
+        list.sort((a, b) => a.y - b.y).forEach(o => o.f());
+        // 말풍선·이름표
+        c.textAlign = 'center'; c.textBaseline = 'bottom';
+        for (const p of people) {
+            if (p.state === 'wait' || p.alpha < 0.5) continue;
+            const top = p.y - (p.state === 'seated' && !p.onStage ? 96 : 92) * p.look.h;
+            if (p.bubble && t < p.bubble.until) { c.font = '16px sans-serif'; c.fillText(p.bubble.text, p.x + 10, top + 4); }
+            if (p.isNew) { c.font = 'bold 9px sans-serif'; c.fillStyle = '#e53e3e'; c.fillText('새친구', p.x, top + 16); }
+            if (p.state !== 'seated') { c.font = '9px sans-serif'; c.fillStyle = '#2d3748'; c.fillText(p.name, p.x, top + (p.isNew ? 6 : 16)); }
+        }
+        if (teacher.bubble && t < teacher.bubble.until) {
+            c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,0.15)';
+            const bx = teacher.x + 8, by = teacher.y - 118;
+            rr(bx, by, 30, 26, 8); c.fill(); c.stroke();
+            c.font = '16px sans-serif'; c.textBaseline = 'middle'; c.fillText(teacher.bubble.text, bx + 15, by + 14);
+        }
+        for (const q of particles) {
+            const a = Math.max(0, q.life / q.max);
+            if (q.spark) { c.fillStyle = `rgba(255,200,80,${a})`; ell(q.x, q.y, 1.6, 1.6); c.fill(); }
+            else { c.fillStyle = `rgba(107,70,193,${a})`; c.font = 'bold 14px sans-serif'; c.textBaseline = 'middle'; c.fillText(q.text, q.x, q.y); }
+        }
+        if (banner) {
+            c.fillStyle = 'rgba(45,55,72,0.8)'; rr(W / 2 - 110, H - 34, 220, 26, 13); c.fill();
+            c.fillStyle = '#fff'; c.font = 'bold 13px sans-serif'; c.textBaseline = 'middle'; c.fillText(banner, W / 2, H - 21);
+        }
+    }
+    function setBanner(b) { banner = b; }
+
+    return { setWeekday, teacherDo, sundayStart, setPhase, setBanner, emote, update, draw, seatedCount, allGone };
+})();
+
+// ===== 게임 진행 =====
+S = load();
+
+const TRAIT = k => TRAITS.find(x => x.key === k) || TRAITS[0];
+const focusMul = key => (S.focus === key ? 1.25 : 1);
+const isExam = () => EXAM_WEEKS.includes(S.week);
+const byId = id => S.students.find(s => s.id === id);
+
+function renderStats() {
+    $('sWeek').textContent = `${Math.min(S.week, TOTAL_WEEKS)} / ${TOTAL_WEEKS}주`;
+    $('sEnergy').textContent = Math.round(S.energy);
+    $('mEnergy').style.width = clamp(S.energy, 0, 100) + '%';
+    $('mEnergy').style.background = S.energy > 50 ? '#48bb78' : S.energy > 25 ? '#ed8936' : '#e53e3e';
+    $('sBudget').textContent = won(S.budget);
+    $('sAtmos').textContent = atmosLabel(S.atmos);
+    $('mAtmos').style.width = clamp(S.atmos, 0, 100) + '%';
+    $('mAtmos').style.background = '#9f7aea';
+}
+function atmosLabel(a) { return a >= 80 ? '🔥 뜨거움' : a >= 60 ? '😊 따뜻함' : a >= 40 ? '🙂 보통' : a >= 20 ? '😐 썰렁함' : '🥶 냉랭함'; }
+
+function weekEvent() {
+    const w = S.week;
+    if (w === 1) return { text: '🌱 <b>새 학기 시작!</b> 아이들 이름을 불러주며 한 명 한 명에게 관심을 가져보세요. 카톡으로 안부를 물으면 숨은 고민을 알게 될 수도 있어요.' };
+    if (w === MEETING_WEEK) return { text: '👩‍🏫 <b>교사 회의</b>가 있는 주예요. 이번 학기 부서가 집중할 방향을 정해요.' };
+    if (EXAM_WEEKS.includes(w)) return { text: '📝 <b>중간고사 기간</b>이에요. 출석이 줄어들 수 있어요. 응원 카톡은 효과가 1.5배! 시험 전날 기도해 주는 선생님이 되어 주세요.' };
+    if (w === RETREAT_WEEK) return { text: `🏕️ <b>이번 주일은 여름수련회!</b> 준비도 ${S.retreatPrep}% · 참가비 지원 50,000원이 예산에서 나가요. 친밀도가 높고 준비를 잘할수록 많이 참석해요.` };
+    if (w === RETREAT_WEEK - 1 || w === RETREAT_WEEK - 2) return { text: `🏕️ 수련회가 ${RETREAT_WEEK - w}주 남았어요. 수련회 준비를 해두면 더 많은 아이들이 함께하고 은혜도 커져요. (현재 준비도 ${S.retreatPrep}%)` };
+    if (w === INVITE_WEEK) return { text: '💌 <b>새친구 초청 주일</b>이에요! 이번 주 새친구 초대 준비 효과가 2배예요.' };
+    if (w === TOTAL_WEEKS) return { text: '🎄 <b>학기 마지막 주일</b>이에요. 한 학기 동안 함께한 아이들과 마무리를 잘 해봐요.' };
+    const bday = S.students.filter(s => s.birthday === w);
+    if (bday.length) return { text: `🎂 이번 주는 <b>${bday.map(s => s.name).join(', ')}</b>의 생일이에요! 축하 카톡을 보내면 아주 좋아할 거예요.` };
+    return { text: '☕ 평범한 한 주예요. 아이들의 안부를 묻고, 주일 예배를 잘 준비해 보세요.', calm: true };
+}
+
+function startWeek() {
+    if (!S.weekStarted) {
+        S.weekStarted = true;
+        if (S.week > 1) {
+            S.budget += WEEKLY_BUDGET;
+            S.energy = clamp(S.energy + 15, 0, 100);
+            // 새로운 고민이 생기거나 사라짐
+            const keys = Object.keys(ISSUES).filter(k => k !== 'exam');
+            for (const s of S.students) {
+                if (s.issue) { s.issue.weeks--; if (s.issue.weeks <= 0) s.issue = null; }
+                else if (S.week === EXAM_WEEKS[0] && Math.random() < 0.45) s.issue = { type: 'exam', weeks: 2, known: false };
+                else if (Math.random() < 0.1) s.issue = { type: pick(keys), weeks: Math.floor(rnd(3, 6)), known: false };
+            }
+        }
+        S.ap = S.apMax = S.energy < 25 ? 3 : 5;
+        save();
+    }
+    selected = null;
+    SUN = null;
+    $('weekday').hidden = false; $('sunday').hidden = true;
+    Scene.setWeekday(VERSES[(S.week - 1) % VERSES.length]);
+    Sound.setIntensity(1);
+    renderWeek();
+    if (S.week === MEETING_WEEK && !S.meetingDone) setTimeout(showMeeting, 300);
+    if (S.energy < 25) toast('😮‍💨 선생님이 많이 지쳤어요. 이번 주 행동이 줄어요. 기도와 쉼이 필요해요.', 'bad', 3200);
+}
+
+function renderWeek() {
+    renderStats();
+    $('weekTitle').textContent = `📅 ${S.week}주차 평일 — 이번 주에 무엇을 할까요?`;
+    $('apDots').innerHTML = '남은 행동 ' + Array.from({ length: S.apMax }, (_, i) => `<span class="${i < S.ap ? '' : 'used'}"></span>`).join('');
+    const ev = weekEvent();
+    $('eventBox').innerHTML = ev.text;
+    $('eventBox').classList.toggle('calm', !!ev.calm);
+    $('actions').innerHTML = Object.entries(ACTIONS).map(([k, a]) => {
+        let why = '';
+        if (S.ap < a.ap) why = '행동 부족';
+        else if (a.cost > S.budget) why = '예산 부족';
+        else if (k !== 'rest' && S.energy + a.energy < 0) why = '체력 부족';
+        else if (k === 'retreat' && !(S.week >= 4 && S.week < RETREAT_WEEK)) why = '4~7주차에만';
+        else if (k === 'retreat' && S.retreatPrep >= 100) why = '준비 완료';
+        else if (k === 'snack' && S.snack) why = '준비 완료';
+        else if (k === 'invite' && S.invite >= 2) why = '충분해요';
+        else if (k === 'lesson' && S.lesson >= 100) why = '준비 완료';
+        else if (k === 'praise' && S.worship >= 100) why = '준비 완료';
+        else if (k === 'rest' && S.energy >= 100) why = '체력 가득';
+        const cost = [`행동 ${a.ap}`, a.energy < 0 ? `체력 ${a.energy}` : `체력 +${a.energy}`, a.cost ? won(a.cost) : ''].filter(Boolean).join(' · ');
+        return `<button class="act" data-act="${k}" ${why ? 'disabled' : ''}>
+            <span class="t">${a.icon} ${a.name}</span><span class="d">${a.desc}</span><span class="c">${why ? '⛔ ' + why : cost}</span></button>`;
+    }).join('');
+    const chips = [`📖 공과 준비 ${S.lesson}%`, `🎸 예배 준비 ${S.worship}%`, S.snack ? '🍩 간식 준비됨' : '🍩 간식 없음'];
+    if (S.invite) chips.push(`💌 새친구 초대 ${S.invite}`);
+    if (S.week <= RETREAT_WEEK) chips.push(`🏕️ 수련회 준비 ${S.retreatPrep}%`);
+    if (S.focus) chips.push({ attend: '🎯 출석 중심', word: '🎯 말씀 중심', relation: '🎯 관계 중심' }[S.focus]);
+    $('prep').innerHTML = chips.map(x => `<span>${x}</span>`).join('');
+    renderStudents();
+}
+
+function renderStudents() {
+    const last = S.history[S.history.length - 1];
+    $('stuTitle').textContent = `👥 우리 반 아이들 (${S.students.length}명${last ? ` · 지난 주 출석 ${last.att}명` : ''})`;
+    $('students').innerHTML = S.students.map(s => {
+        const tr = TRAIT(s.trait);
+        const tags = [];
+        if (s.isNew) tags.push('🆕 새친구');
+        if (s.birthday === S.week) tags.push('🎂 생일');
+        if (s.issue && s.issue.known) tags.push(ISSUES[s.issue.type].icon + ' ' + ISSUES[s.issue.type].name);
+        if (s.absent >= 2) tags.push(`⚠️ ${s.absent}주 결석`);
+        return `<button class="stu ${selected === s.id ? 'sel' : ''}" data-stu="${s.id}">
+            <div class="top"><span class="nm">${s.name}</span><span class="gr">${s.grade} · ${tr.icon} ${tr.name}</span></div>
+            <div class="bar"><i>친밀도</i><div><b style="width:${s.bond}%;background:#f687b3"></b></div></div>
+            <div class="bar"><i>믿음</i><div><b style="width:${s.faith}%;background:#9f7aea"></b></div></div>
+            <div class="tags">${tags.join(' · ')}</div>
+        </button>`;
+    }).join('');
+}
+
+const REPLIES_GOOD = ['넵 쌤 ㅎㅎ 감사해요!', '쌤 저 이번 주 꼭 갈게요!! 🙌', 'ㅋㅋㅋ 쌤 주일에 봬요', '헐 쌤 기억해 주셨어요?? 감동 ㅠㅠ', '오늘 진짜 힘들었는데 힘나요!', '쌤 최고 👍'];
+const REPLIES_MEH = ['네…', '넹', 'ㅇㅇ 감사합니다', '읽음 (답장 없음)', '네 쌤'];
+
+function doAction(key) {
+    const a = ACTIONS[key];
+    if (S.ap < a.ap || a.cost > S.budget) return;
+    let st = null;
+    if (a.target) {
+        st = byId(selected);
+        if (!st) { toast('먼저 아래에서 아이를 한 명 선택해 주세요 👇'); $('students').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    }
+    S.ap -= a.ap;
+    S.energy = clamp(S.energy + a.energy, 0, 100);
+    S.budget -= a.cost;
+    Scene.teacherDo(key);
+
+    if (key === 'kakao') {
+        let gain = 8 * focusMul('relation') * (isExam() ? 1.5 : 1);
+        Sound.play('send');
+        setTimeout(() => Sound.play('pop'), 450);
+        if (st.birthday === S.week && !st.bdayDone) {
+            st.bdayDone = true; gain += 15;
+            setTimeout(() => toast(`🎂 ${st.name}: "헐 쌤 제 생일 어떻게 아셨어요?? 🥹 감사해요!!"`, 'chat', 3200), 450);
+        } else if (st.issue && !st.issue.known) {
+            st.issue.known = true;
+            const first = ISSUES[st.issue.type].line.split(/(?<=[.?!…])\s/)[0];
+            setTimeout(() => toast(`${st.name}: "${first}"`, 'chat', 3600), 450);
+            setTimeout(() => toast(`${ISSUES[st.issue.type].icon} ${josa(st.name, '이', '가')} ${ISSUES[st.issue.type].name}을(를) 겪고 있어요. 만나서 이야기를 들어주세요.`, '', 3400), 1400);
+        } else {
+            setTimeout(() => toast(`${st.name}: "${pick(st.bond >= 35 ? REPLIES_GOOD : REPLIES_MEH)}"`, 'chat'), 450);
+        }
+        st.bond = clamp(st.bond + gain, 0, 100);
+    } else if (key === 'meal') {
+        Sound.play('meal');
+        st.bond = clamp(st.bond + 18 * focusMul('relation'), 0, 100);
+        st.faith = clamp(st.faith + 3, 0, 100);
+        if (st.issue) { st.issue.known = true; save(); renderWeek(); counsel(st); return; }
+        toast(`🍜 ${josa(st.name, '과', '와')} 떡볶이를 먹으며 수다를 떨었어요. 부쩍 가까워졌어요!`, 'good');
+    } else if (key === 'lesson') {
+        Sound.play('page');
+        S.lesson = clamp(S.lesson + Math.round(45 * focusMul('word')), 0, 100);
+        toast(`📖 공과를 준비했어요. (준비도 ${S.lesson}%)`);
+    } else if (key === 'praise') {
+        Sound.play('strum');
+        S.worship = clamp(S.worship + 45, 0, 100);
+        S.students.filter(s => s.trait === 'praise').forEach(s => { s.bond = clamp(s.bond + 4, 0, 100); });
+        toast(`🎸 찬양팀과 연습했어요. (예배 준비도 ${S.worship}%)`);
+    } else if (key === 'snack') {
+        Sound.play('snack'); S.snack = true;
+        toast('🍩 주일 간식을 준비했어요. 아이들이 좋아하겠죠?');
+    } else if (key === 'invite') {
+        Sound.play('letter'); S.invite = Math.min(2, S.invite + 1);
+        toast('💌 새친구 초대장과 작은 선물을 준비했어요. 아이들 손에 쥐여 줬어요!');
+    } else if (key === 'retreat') {
+        Sound.play('tent'); S.retreatPrep = clamp(S.retreatPrep + 25, 0, 100);
+        toast(`🏕️ 수련회를 준비했어요. (준비도 ${S.retreatPrep}%)`);
+    } else if (key === 'rest') {
+        Sound.play('pray');
+        toast('🙏 조용히 기도하며 쉼을 얻었어요. 아이들 이름을 하나씩 불러가며 기도했어요.', 'good');
+    }
+    save();
+    renderWeek();
+}
+
+// 밥 먹으며 고민 상담
+function counsel(st) {
+    const is = ISSUES[st.issue.type];
+    const choices = is.choices.map((ch, i) => ({ ...ch, i })).sort(() => Math.random() - 0.5);
+    openModal(`
+        <h3>🍜 ${josa(st.name, '과', '와')} 밥 먹는 중</h3>
+        <div class="who"><div class="avatar">${is.icon}</div>
+            <div class="say"><b>${st.name} (${st.grade}) · ${is.name}</b>${is.line}</div></div>
+        <div class="choices">${choices.map((ch, k) => `<button data-ch="${k}">${ch.t}</button>`).join('')}</div>
+        <div id="cfb"></div>`);
+    $('modal').querySelectorAll('[data-ch]').forEach(b => b.addEventListener('click', () => {
+        const ch = choices[Number(b.dataset.ch)];
+        $('modal').querySelectorAll('[data-ch]').forEach(x => { x.disabled = true; });
+        b.style.outline = '2px solid #667eea';
+        if (ch.g === 2) { st.bond = clamp(st.bond + 12, 0, 100); st.faith = clamp(st.faith + 5, 0, 100); st.issue = null; Sound.play('good'); }
+        else if (ch.g === 1) { st.bond = clamp(st.bond + 5, 0, 100); st.issue.weeks -= 1; if (st.issue.weeks <= 0 || Math.random() < 0.4) st.issue = null; Sound.play('ok'); }
+        else { st.bond = clamp(st.bond - 6, 0, 100); Sound.play('bad'); }
+        const res = ch.g === 2 ? '✅ 고민이 풀렸어요! 친밀도 +12 · 믿음 +5' : ch.g === 1 ? (st.issue ? '🙂 조금 나아졌어요. 친밀도 +5' : '🙂 조금 나아졌고 고민도 풀렸어요. 친밀도 +5') : '😥 친밀도 -6 · 고민은 그대로예요';
+        $('cfb').innerHTML = `<div class="feedback g${ch.g}">${ch.fb}<br><b>${res}</b></div><div class="row"><button class="primary" id="cok">확인</button></div>`;
+        $('cok').addEventListener('click', () => { closeModal(); save(); renderWeek(); });
+        $('cok').focus();
+    }));
+}
+
+function showMeeting() {
+    const opts = [
+        ['attend', '🙌 출석 중심', '간식·새친구 초대 효과 1.5배, 교회에서 간식비 30,000원 추가 지원'],
+        ['word', '📖 말씀 중심', '공과 준비 효과 1.25배, 주일 믿음 성장 +20%'],
+        ['relation', '💞 관계 중심', '카톡·밥 약속 친밀도 효과 1.25배'],
+    ];
+    openModal(`<h3>👩‍🏫 교사 회의</h3>
+        <p class="msg" style="margin:0 0 12px">부장 선생님: "이번 학기 우리 부서는 어디에 집중하면 좋을까요?"</p>
+        <div class="choices">${opts.map(([k, n, d]) => `<button data-focus="${k}"><b>${n}</b><br><span style="font-size:12px;color:#718096">${d}</span></button>`).join('')}</div>`);
+    $('modal').querySelectorAll('[data-focus]').forEach(b => b.addEventListener('click', () => {
+        S.focus = b.dataset.focus; S.meetingDone = true;
+        if (S.focus === 'attend') S.budget += 30000;
+        Sound.play('good'); closeModal(); save(); renderWeek();
+        toast('🎯 부서 방향이 정해졌어요: ' + opts.find(o => o[0] === S.focus)[1], 'good');
+    }));
+}
+
+// ===== 주일 =====
+const wait = sec => new Promise(r => {
+    const step = () => { if (!SUN) return r(); SUN.waitLeft -= 0.05 * SUN.speed; if (SUN.waitLeft <= 0) r(); else setTimeout(step, 50); };
+    SUN.waitLeft = sec; setTimeout(step, 50);
+});
+async function waitUntil(fn, maxSec) {
+    const t0 = performance.now();
+    while (!fn() && (performance.now() - t0) / 1000 * (SUN ? SUN.speed : 1) < maxSec) await new Promise(r => setTimeout(r, 100));
+}
+function setPhases(list, cur) {
+    $('phases').innerHTML = list.map((p, i) => `<span class="${i < cur ? 'done' : i === cur ? 'on' : ''}">${p}</span>`).join('');
+}
+
+function attendProb(s, retreat) {
+    const issue = s.issue ? ISSUES[s.issue.type].penalty : 0;
+    if (retreat) return clamp(0.2 + s.bond * 0.005 + S.retreatPrep * 0.004 + (S.atmos - 50) * 0.002 - issue * 0.5, 0.05, 0.97);
+    let p = 0.35 + s.bond * 0.005 + s.faith * 0.002 + (S.atmos - 50) * 0.003 - issue;
+    if (S.snack) p += 0.06 * (S.focus === 'attend' ? 1.5 : 1);
+    if (isExam()) p -= 0.12;
+    if (s.trait === 'busy') p -= 0.08;
+    if (s.isNew && s.attended < 2) p -= 0.1;
+    return clamp(p, 0.05, 0.97);
+}
+
+async function goSunday() {
+    if (SUN) return;
+    const retreat = S.week === RETREAT_WEEK;
+    const attendees = S.students.filter(s => Math.random() < attendProb(s, retreat));
+    // 새친구
+    const newOnes = [];
+    if (!retreat) {
+        const names = new Set(S.students.map(s => s.name));
+        for (const s of attendees) {
+            if (newOnes.length >= 3 || s.bond < 45) continue;
+            const chance = 0.03 + S.invite * 0.07 * (S.focus === 'attend' ? 1.5 : 1) * (S.week === INVITE_WEEK ? 2 : 1);
+            if (Math.random() < chance) {
+                const name = uniqueName(names); names.add(name);
+                newOnes.push({ friendOf: s, st: makeStudent({ name, grade: s.grade, isNew: true, bond: 28, faith: 10 }) });
+            }
+        }
+    }
+    SUN = { speed: 1, attendees, newOnes, retreat, q: null };
+    $('weekday').hidden = true; $('sunday').hidden = false;
+    $('skipBtn').disabled = false;
+    $('scene').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    Sound.play('bell');
+    Scene.sundayStart([...attendees, ...newOnes.map(n => n.st)], retreat ? '여름수련회에 오신 것을 환영합니다!' : '환영합니다! 오늘도 함께 예배해요 🙌');
+
+    if (retreat) return runRetreat();
+
+    const PH = ['🚪 입장', '🎵 찬양', '📖 말씀', '💬 분반공과', '🍩 광고·간식', '👋 귀가'];
+    setPhases(PH, 0); Scene.setBanner('🚪 아이들이 들어오고 있어요');
+    $('sundayNote').textContent = `${S.week}주차 주일 · 아이들이 하나둘 교육관에 들어와요.`;
+    await waitUntil(() => Scene.seatedCount() >= attendees.length + newOnes.length, 14);
+    newOnes.forEach(n => { Scene.emote(n.st.id, '👋', 3); toast(`🆕 ${josa(n.friendOf.name, '이', '가')} 친구 ${josa(n.st.name, '을', '를')} 데려왔어요!`, 'good', 3000); Sound.play('newfriend'); });
+
+    setPhases(PH, 1); Scene.setBanner('🎵 찬양'); Scene.setPhase('praise', '♪ 찬양으로 예배를 엽니다 ♪ 주님을 찬양합니다');
+    Sound.setIntensity(1.5);
+    $('sundayNote').textContent = S.worship >= 60 ? '찬양팀이 준비를 잘해서 예배가 뜨거워요! 🔥' : S.worship > 0 ? '찬양으로 예배를 시작해요.' : '연습이 부족해서 찬양이 조금 어색해요…';
+    await wait(5.5);
+    Sound.setIntensity(0.8);
+
+    setPhases(PH, 2); Scene.setBanner('📖 말씀'); Scene.setPhase('word', VERSES[(S.week - 1) % VERSES.length]);
+    $('sundayNote').textContent = '말씀을 전해요: ' + VERSES[(S.week - 1) % VERSES.length];
+    await wait(4.5);
+
+    setPhases(PH, 3); Scene.setBanner('💬 분반공과'); Scene.setPhase('group', '분반공과 · 마음 나누기');
+    $('sundayNote').textContent = S.lesson >= 60 ? '준비한 공과로 이야기를 나눠요.' : '공과 준비가 부족해서 조금 막막하지만… 이야기를 시작해요.';
+    await wait(1.5);
+    SUN.q = attendees.length + newOnes.length ? await askQuestion() : { faith: 0, bond: 0, atmos: -4 };
+
+    setPhases(PH, 4); Scene.setBanner(S.snack ? '🍩 광고 & 간식 시간' : '📢 광고'); Scene.setPhase('snack', S.snack ? '광고 · 오늘은 간식이 있어요! 🍩' : '광고 · 다음 주에 또 만나요!');
+    Sound.setIntensity(1);
+    if (S.snack) Sound.play('snack');
+    $('sundayNote').textContent = S.snack ? '간식을 나눠 먹으며 수다 시간! 😋' : '광고를 전하고 예배를 마쳐요.';
+    await wait(3.5);
+
+    setPhases(PH, 5); Scene.setBanner('👋 다음 주에 만나요'); Scene.setPhase('leave', '다음 주에 또 만나요 👋');
+    await waitUntil(() => Scene.allGone(), 10);
+    finishSunday();
+}
+
+async function runRetreat() {
+    const PH = ['🚌 출발', '🎲 레크리에이션', '🔥 저녁 집회', '✨ 은혜의 밤', '🏠 귀가'];
+    const n = SUN.attendees.length;
+    setPhases(PH, 0); Scene.setBanner('🚌 수련회 출발!');
+    $('sundayNote').textContent = `${n}명이 수련회에 참가했어요!`;
+    await waitUntil(() => Scene.seatedCount() >= n, 14);
+    setPhases(PH, 1); Scene.setPhase('retreat', ''); Scene.setBanner('🎲 레크리에이션');
+    Sound.setIntensity(1.5);
+    $('sundayNote').textContent = '조별 레크리에이션으로 서로 친해지는 시간! 😆';
+    await wait(4);
+    setPhases(PH, 2); Scene.setBanner('🔥 저녁 집회');
+    $('sundayNote').textContent = '모닥불 앞에서 찬양하고 말씀을 들어요.';
+    await wait(4);
+    setPhases(PH, 3); Scene.setBanner('✨ 은혜의 밤');
+    Sound.setIntensity(1);
+    const who = SUN.attendees.filter(s => s.issue);
+    const star = who.length ? pick(who) : (n ? pick(SUN.attendees) : null);
+    if (star) toast(`✨ ${star.name}: "선생님, 오늘 하나님이 저를 사랑하신다는 게 처음으로 느껴졌어요."`, 'good', 4200);
+    $('sundayNote').textContent = '한 사람 한 사람을 위해 기도하는 밤이에요.';
+    await wait(4.5);
+    setPhases(PH, 4); Scene.setBanner('🏠 귀가'); Scene.setPhase('leave', '');
+    await waitUntil(() => Scene.allGone(), 10);
+    finishSunday();
+}
+
+function askQuestion() {
+    return new Promise(resolve => {
+        S.usedQ = S.usedQ || [];
+        let pool = QUESTIONS.map((_, i) => i).filter(i => !S.usedQ.includes(i));
+        if (!pool.length) { S.usedQ = []; pool = QUESTIONS.map((_, i) => i); }
+        const qi = pick(pool); S.usedQ.push(qi);
+        const Q = QUESTIONS[qi];
+        const everyone = [...SUN.attendees, ...SUN.newOnes.map(n => n.st)];
+        const asker = pick(everyone);
+        Scene.emote(asker.id, '🙋', 6);
+        const choices = Q.c.map(c => c).sort(() => Math.random() - 0.5);
+        const ready = S.lesson >= 40;
+        openModal(`<h3>💬 분반공과 시간</h3>
+            <div class="who"><div class="avatar">🙋</div><div class="say"><b>${asker.name} (${asker.grade})</b>${Q.q}</div></div>
+            <p class="msg" style="margin:0 0 10px;font-size:13px">어떻게 이야기를 나눌까요?${ready ? '' : ' <span class="minus">(공과 준비 부족: 좋은 대답도 효과가 절반)</span>'}</p>
+            <div class="choices">${choices.map((c, k) => `<button data-q="${k}">${c.t}</button>`).join('')}</div><div id="qfb"></div>`);
+        $('modal').querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => {
+            const c = choices[Number(b.dataset.q)];
+            $('modal').querySelectorAll('[data-q]').forEach(x => { x.disabled = true; });
+            b.style.outline = '2px solid #667eea';
+            let eff = c.g === 2 ? { faith: 4, bond: 3, atmos: 6 } : c.g === 1 ? { faith: 2, bond: 1, atmos: 2 } : { faith: 0, bond: -3, atmos: -6 };
+            if (!ready && c.g > 0) eff = { faith: eff.faith / 2, bond: eff.bond / 2, atmos: eff.atmos / 2 };
+            Sound.play(c.g === 2 ? 'good' : c.g === 1 ? 'ok' : 'bad');
+            $('qfb').innerHTML = `<div class="feedback g${c.g}">${c.fb}</div><div class="row"><button class="primary" id="qok">계속</button></div>`;
+            $('qok').focus();
+            $('qok').addEventListener('click', () => { closeModal(); resolve(eff); });
+        }));
+    });
+}
+
+function finishSunday() {
+    const retreat = SUN.retreat;
+    const came = new Set(SUN.attendees.map(s => s.id));
+    const total = S.students.length;
+    const before = { faith: avg(S.students.map(s => s.faith)), atmos: S.atmos, energy: S.energy };
+    let lines = [];
+
+    if (retreat) {
+        let prep = S.retreatPrep;
+        if (S.budget >= 50000) S.budget -= 50000; else { prep = Math.max(0, prep - 30); lines.push('💸 예산이 부족해 수련회가 조금 초라했어요.'); S.budget = Math.max(0, S.budget - 20000); }
+        for (const s of S.students) {
+            if (came.has(s.id)) {
+                s.faith = clamp(s.faith + 10 + prep / 8, 0, 100); s.bond = clamp(s.bond + 8, 0, 100);
+                s.absent = 0; s.attended++;
+                if (s.issue && Math.random() < 0.5) s.issue = null;
+            } else { s.bond = clamp(s.bond - 2, 0, 100); }
+        }
+        S.atmos = clamp(S.atmos + 8 + prep / 10, 0, 100);
+        S.energy = clamp(S.energy - 18, 0, 100);
+    } else {
+        const q = SUN.q || { faith: 0, bond: 0, atmos: 0 };
+        const grow = (1 + S.lesson / 35 + S.worship / 50 + q.faith) * (S.focus === 'word' ? 1.2 : 1);
+        for (const s of S.students) {
+            if (came.has(s.id)) {
+                s.faith = clamp(s.faith + grow, 0, 100);
+                s.bond = clamp(s.bond + 1 + (S.snack ? 1.5 : 0) + q.bond, 0, 100);
+                s.absent = 0; s.attended++;
+                if (s.isNew && s.attended >= 3) s.isNew = false;
+            } else { s.bond = clamp(s.bond - 3, 0, 100); s.absent++; }
+        }
+        for (const n of SUN.newOnes) { n.st.attended = 1; S.students.push(n.st); }
+        S.newFriends += SUN.newOnes.length;
+        const rate = SUN.attendees.length / Math.max(1, total);
+        S.atmos = clamp(S.atmos + (rate - 0.6) * 25 + S.worship / 25 + (S.snack ? 3 : 0) + q.atmos - (S.atmos - 50) * 0.1, 0, 100);
+        S.energy = clamp(S.energy - 10, 0, 100);
+    }
+    S.students.forEach(s => { s.faith = Math.round(s.faith); s.bond = Math.round(s.bond); });
+    const att = SUN.attendees.length + (retreat ? 0 : SUN.newOnes.length);
+    S.history.push({ week: S.week, att, total: S.students.length, retreat });
+    save();
+    renderStats();
+
+    const absent = S.students.filter(s => !came.has(s.id) && !SUN.newOnes.some(n => n.st === s));
+    const faithD = avg(S.students.map(s => s.faith)) - before.faith;
+    const atmosD = S.atmos - before.atmos;
+    const row = (n, v, cls = '') => `<tr><td>${n}</td><td class="${cls}">${v}</td></tr>`;
+    const sign = v => (v >= 0 ? '+' : '') + (Math.round(v * 10) / 10);
+    openModal(`<h3>${retreat ? '🏕️ 여름수련회 결과' : `⛪ ${S.week}주차 주일 결과`}</h3>
+        <table class="report">
+            ${row(retreat ? '참가 인원' : '출석', `${att}명 / ${S.students.length}명 (${Math.round(att / S.students.length * 100)}%)`)}
+            ${retreat ? '' : row('새친구', SUN.newOnes.length ? `+${SUN.newOnes.length}명 🎉` : '0명', SUN.newOnes.length ? 'plus' : '')}
+            ${row('평균 믿음', `${sign(faithD)}`, faithD >= 0 ? 'plus' : 'minus')}
+            ${row('부서 분위기', `${atmosLabel(S.atmos)} (${sign(atmosD)})`, atmosD >= 0 ? 'plus' : 'minus')}
+            ${row('선생님 체력', `${Math.round(S.energy)} (${sign(S.energy - before.energy)})`, 'minus')}
+        </table>
+        <p class="msg">${lines.join('<br>')}${absent.length ? `이번 주 못 온 아이: <b>${absent.slice(0, 8).map(s => s.name + (s.issue && s.issue.known ? ISSUES[s.issue.type].icon : '')).join(', ')}${absent.length > 8 ? ` 외 ${absent.length - 8}명` : ''}</b><br><span style="font-size:13px;color:#718096">카톡으로 안부를 물어봐 주세요. 결석이 길어질수록 친밀도가 떨어져요.</span>` : '🎉 <b>모든 아이가 함께했어요!</b>'}</p>
+        <div class="verse">${VERSES[(S.week - 1) % VERSES.length]}</div>
+        <div class="row"><button class="primary" id="nextWeek">${S.week >= TOTAL_WEEKS ? '🎓 학기 마무리 보기' : '다음 주로 →'}</button></div>`);
+    $('nextWeek').focus();
+    $('nextWeek').addEventListener('click', () => {
+        closeModal();
+        if (S.week >= TOTAL_WEEKS) { S.over = true; save(); showEnding(); return; }
+        S.week++;
+        S.lesson = 0; S.worship = 0; S.snack = false; S.invite = 0; S.weekStarted = false;
+        save();
+        startWeek();
+    });
+}
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+
+function showEnding() {
+    SUN = null;
+    const h = S.history;
+    const attRate = avg(h.map(x => x.att / Math.max(1, x.total)));
+    const faith = avg(S.students.map(s => s.faith)), bond = avg(S.students.map(s => s.bond));
+    const score = attRate * 100 * 0.4 + faith * 0.3 + bond * 0.3 + S.newFriends * 2;
+    const [icon, title, msg] =
+        score >= 82 ? ['🏆', '최고의 선생님', '"잘하였도다 착하고 충성된 종아" — 아이들이 선생님 덕분에 교회를 집처럼 느꼈어요.'] :
+        score >= 68 ? ['🌟', '사랑 많은 선생님', '아이들이 선생님을 믿고 마음을 열었어요. 다음 학기가 더 기대돼요!'] :
+        score >= 52 ? ['🌱', '자라나는 선생님', '쉽지 않은 학기였지만 씨앗은 분명히 뿌려졌어요. 자라게 하시는 분은 하나님이세요.'] :
+                      ['🙏', '다시 힘내는 선생님', '지치는 순간도 많았죠. 한 아이를 향한 작은 관심부터 다시 시작해 봐요.'];
+    const maxAtt = Math.max(1, ...h.map(x => x.total));
+    const best = S.students.slice().sort((a, b) => b.faith - a.faith).slice(0, 3);
+    openModal(`<h3>🎓 한 학기를 마쳤어요!</h3>
+        <div class="grade">${icon}</div>
+        <p class="msg" style="margin-top:0"><b style="font-size:18px">${title}</b><br>${msg}</p>
+        <div class="chart">${h.map(x => `<div class="${x.retreat ? 'retreat' : ''}" style="height:${x.att / maxAtt * 100}%"><span>${x.att}</span></div>`).join('')}</div>
+        <div class="chart-x">${h.map(x => `<span>${x.week}${x.retreat ? '🏕️' : ''}</span>`).join('')}</div>
+        <table class="report" style="margin-top:10px">
+            <tr><td>평균 출석률</td><td>${Math.round(attRate * 100)}%</td></tr>
+            <tr><td>새로 온 친구</td><td>${S.newFriends}명</td></tr>
+            <tr><td>아이들 평균 믿음</td><td>${Math.round(faith)}</td></tr>
+            <tr><td>아이들 평균 친밀도</td><td>${Math.round(bond)}</td></tr>
+            <tr><td>믿음이 가장 자란 아이들</td><td>${best.map(s => s.name).join(', ')}</td></tr>
+        </table>
+        <div class="verse">“자라게 하시는 이는 오직 하나님이시니라” (고전 3:7)</div>
+        <div class="row"><button class="primary" id="again">🔄 새 학기 시작하기</button></div>`);
+    Sound.play('good');
+    $('again').addEventListener('click', () => { closeModal(); S = newState(); save(); startWeek(); });
+}
+
+// ===== 이벤트 연결 =====
+$('actions').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && !b.disabled) doAction(b.dataset.act); });
+$('students').addEventListener('click', e => {
+    const b = e.target.closest('[data-stu]'); if (!b) return;
+    const id = Number(b.dataset.stu);
+    selected = selected === id ? null : id;
+    Sound.play('click');
+    renderStudents();
+});
+$('sundayBtn').addEventListener('click', () => {
+    if (S.ap > 0 && !confirm(`아직 행동이 ${S.ap}번 남았어요. 그래도 주일로 넘어갈까요?`)) return;
+    goSunday();
+});
+$('resetBtn').addEventListener('click', () => {
+    if (!confirm('정말 처음부터 다시 시작할까요? 진행 상황이 사라집니다.')) return;
+    S = newState(); save(); startWeek();
+});
+$('skipBtn').addEventListener('click', () => { if (SUN) { SUN.speed = 4; $('skipBtn').disabled = true; } });
+$('musicBtn').addEventListener('click', () => Sound.toggleMusic());
+$('sfxBtn').addEventListener('click', () => Sound.toggleSfx());
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => Sound.init()));
+document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key.toUpperCase() === 'M') Sound.toggleMusic();
+});
+
+let lastFrame = performance.now();
+function frame(now) {
+    const dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
+    lastFrame = now;
+    try { Scene.update(dt * (SUN ? SUN.speed : 1)); Scene.draw(); } catch (e) { console.error(e); }
+    requestAnimationFrame(frame);
+}
+
+Sound.renderButtons();
+if (S.over) { renderStats(); Scene.setWeekday(''); showEnding(); } else startWeek();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
