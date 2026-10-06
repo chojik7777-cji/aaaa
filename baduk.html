@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>바둑 게임</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body {
+            font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex;
+            justify-content: center; align-items: flex-start; padding: 16px;
+            color: #2d3748;
+        }
+        .card {
+            background: white; border-radius: 20px;
+            padding: 24px 20px; max-width: 660px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+        }
+        h1 { font-size: 28px; color: #2d3748; margin-bottom: 6px; }
+        .status { font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 12px; min-height: 22px; }
+        .status.win { color: #e53e3e; font-size: 18px; }
+        .controls { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        .controls button, .controls select {
+            padding: 9px 12px; background: #f7fafc; color: #4a5568;
+            border: 1px solid #e2e8f0; border-radius: 10px;
+            font-size: 14px; font-family: inherit; cursor: pointer; transition: all 0.2s;
+        }
+        .controls button:hover:not(:disabled) { background: #667eea; color: white; border-color: #667eea; }
+        .controls button:disabled { opacity: 0.4; cursor: default; }
+        .controls button:focus-visible, .controls select:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
+        .controls .primary { background: #667eea; color: white; border-color: #667eea; font-weight: 600; }
+        .controls .on { background: #764ba2; color: white; border-color: #764ba2; }
+
+        .scorebar {
+            display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center;
+            margin: 0 auto 12px; max-width: 600px; font-variant-numeric: tabular-nums;
+        }
+        .player {
+            display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px;
+            background: #f7fafc; border: 2px solid #e2e8f0; font-size: 14px; text-align: left;
+        }
+        .player.turn { border-color: #667eea; background: #f0f4ff; }
+        .player .dot { width: 22px; height: 22px; border-radius: 50%; flex: none; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .player .dot.b { background: radial-gradient(circle at 35% 30%, #666, #111 60%); }
+        .player .dot.w { background: radial-gradient(circle at 35% 30%, #fff, #d8d8d8 70%); }
+        .player b { display: block; font-size: 14px; }
+        .player span { font-size: 12px; color: #718096; }
+        .movenum { font-size: 12px; color: #a0aec0; white-space: nowrap; }
+
+        .board-wrap { position: relative; max-width: 600px; margin: 0 auto; }
+        canvas {
+            display: block; width: 100%; aspect-ratio: 1; border-radius: 10px; cursor: pointer;
+            touch-action: manipulation; box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+        }
+        .thinking {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            background: rgba(45,55,72,0.85); color: white; font-size: 13px; padding: 5px 12px; border-radius: 999px;
+            pointer-events: none;
+        }
+        .actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .actions button {
+            padding: 9px 14px; background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; border-radius: 10px;
+            font-size: 14px; font-family: inherit; cursor: pointer; transition: all 0.2s;
+        }
+        .actions button:hover:not(:disabled) { background: #667eea; color: white; border-color: #667eea; }
+        .actions button:disabled { opacity: 0.4; cursor: default; }
+        .actions .primary { background: #667eea; color: white; border-color: #667eea; font-weight: 600; }
+        .hint { font-size: 13px; color: #718096; margin-top: 10px; line-height: 1.6; min-height: 20px; }
+
+        .rules { margin-top: 16px; text-align: left; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7fafc; }
+        .rules summary {
+            cursor: pointer; padding: 12px 16px; font-weight: 600; color: #4a5568; font-size: 15px;
+            list-style: none; display: flex; justify-content: space-between; align-items: center;
+        }
+        .rules summary::-webkit-details-marker { display: none; }
+        .rules summary::after { content: '펼치기 ▾'; font-size: 12px; color: #667eea; font-weight: 500; }
+        .rules[open] summary::after { content: '접기 ▴'; }
+        .rules-body { padding: 0 16px 16px; color: #4a5568; font-size: 14px; line-height: 1.75; }
+        .rules-body h4 { margin: 10px 0 4px; font-size: 14px; color: #2d3748; }
+        .rules-body ul { padding-left: 18px; }
+
+        .modal-bg { position: fixed; inset: 0; background: rgba(26,32,44,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+        .modal { background: white; border-radius: 18px; padding: 22px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.35); text-align: center; }
+        .modal h3 { font-size: 20px; margin-bottom: 12px; }
+        .report { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; margin: 6px 0 10px; }
+        .report th, .report td { padding: 6px 4px; border-bottom: 1px solid #edf2f7; }
+        .report th { font-size: 13px; color: #718096; }
+        .report td:first-child { text-align: left; color: #4a5568; }
+        .report tr.total td { font-weight: 700; border-top: 2px solid #cbd5e0; border-bottom: none; font-size: 15px; }
+        .modal .row { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+        .modal button { padding: 10px 18px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f7fafc; font-family: inherit; font-size: 14px; cursor: pointer; }
+        .modal .primary { background: #667eea; color: white; border-color: #667eea; font-weight: 600; }
+        .footer { margin-top: 16px; font-size: 13px; color: #a0aec0; letter-spacing: 0.3px; }
+
+        @media (max-width: 520px) {
+            .card { padding: 18px 10px; }
+            .player { padding: 6px 8px; }
+            .player .dot { width: 18px; height: 18px; }
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>⚫ 바둑 ⚪</h1>
+    <p class="status" id="status"></p>
+
+    <div class="controls">
+        <select id="mode" aria-label="대결 방식">
+            <option value="ai">컴퓨터와 대국</option>
+            <option value="pvp">2인 대국 (한 기기)</option>
+        </select>
+        <select id="level" aria-label="난이도">
+            <option value="1">1단계 · 입문</option>
+            <option value="2" selected>2단계 · 초급</option>
+            <option value="3">3단계 · 중급</option>
+            <option value="4">4단계 · 고급</option>
+        </select>
+        <select id="side" aria-label="내 돌">
+            <option value="1">내가 흑 (먼저)</option>
+            <option value="2">내가 백 (나중)</option>
+        </select>
+        <select id="size" aria-label="판 크기">
+            <option value="9" selected>9줄 (빠른 대국)</option>
+            <option value="13">13줄</option>
+            <option value="19">19줄 (정식)</option>
+        </select>
+        <select id="komi" aria-label="덤">
+            <option value="6.5" selected>덤 6.5집</option>
+            <option value="0.5">덤 0.5집</option>
+            <option value="7.5">덤 7.5집</option>
+        </select>
+        <button class="primary" id="newBtn">새 대국</button>
+    </div>
+
+    <div class="scorebar">
+        <div class="player" id="pB"><div class="dot b"></div><div><b id="nameB">흑</b><span id="capB">따낸 돌 0</span></div></div>
+        <div class="movenum" id="moveNum">0수</div>
+        <div class="player" id="pW"><div class="dot w"></div><div><b id="nameW">백</b><span id="capW">따낸 돌 0</span></div></div>
+    </div>
+
+    <div class="board-wrap">
+        <canvas id="board" width="600" height="600" aria-label="바둑판"></canvas>
+        <div class="thinking" id="thinking" hidden>🤔 컴퓨터가 생각 중…</div>
+    </div>
+
+    <div class="actions" id="playActions">
+        <button id="passBtn">✋ 한 수 쉬기 (패스)</button>
+        <button id="undoBtn">↩️ 무르기</button>
+        <button id="estBtn">📊 형세 판단</button>
+        <button id="resignBtn">🏳️ 기권</button>
+        <button id="soundBtn">🔊 소리</button>
+    </div>
+    <div class="actions" id="scoreActions" hidden>
+        <button class="primary" id="confirmScore">✅ 계가 확정</button>
+        <button id="resumeBtn">▶️ 대국 계속하기</button>
+    </div>
+    <p class="hint" id="hint"></p>
+
+    <details class="rules">
+        <summary>📖 바둑 규칙 · 사용법</summary>
+        <div class="rules-body">
+            <h4>기본 규칙</h4>
+            <ul>
+                <li>흑부터 번갈아 선과 선이 만나는 점(교차점)에 돌을 하나씩 놓아요.</li>
+                <li>상대 돌을 빈틈없이 둘러싸 숨쉴 곳(활로)을 모두 막으면 그 돌을 <b>따낼</b> 수 있어요.</li>
+                <li>둔 즉시 내 돌이 잡히는 자리(자충수)에는 둘 수 없어요. 단, 그 수로 상대 돌을 따낸다면 둘 수 있어요.</li>
+                <li><b>패</b>: 돌 하나를 따낸 직후 상대가 바로 되따낼 수는 없어요. 다른 곳에 한 수 둔 뒤에 되따낼 수 있어요.</li>
+            </ul>
+            <h4>대국 끝내기와 계가 (한국식)</h4>
+            <ul>
+                <li>더 둘 곳이 없으면 <b>패스</b>해요. 두 사람이 연달아 패스하면 대국이 끝나요.</li>
+                <li>끝나면 컴퓨터가 <b>죽은 돌</b>을 추측해 표시해요. 틀렸다면 돌을 눌러 삶/죽음을 바꾼 뒤 <b>계가 확정</b>을 눌러요.</li>
+                <li>점수 = 내 집(둘러싼 빈 곳) + 따낸 돌 + 상대의 죽은 돌. 백은 나중에 두는 대신 <b>덤</b>을 더 받아요.</li>
+            </ul>
+            <h4>도움 기능</h4>
+            <ul>
+                <li><b>형세 판단</b>: 지금 누가 앞서는지 영역을 색으로 보여주고 대략의 차이를 알려줘요.</li>
+                <li>휴대폰에서 13줄·19줄은 실수를 막기 위해 <b>같은 자리를 두 번 눌러야</b> 돌이 놓여요.</li>
+                <li>진행 중인 대국은 자동 저장돼서 새로고침해도 이어서 둘 수 있어요.</li>
+            </ul>
+        </div>
+    </details>
+
+    <p class="footer">made by jeongik</p>
+</div>
+
+<div class="modal-bg" id="modalBg" hidden><div class="modal" id="modal"></div></div>
+
+<script>
+'use strict';
+
+// ===== 바둑 규칙 엔진 =====
+const EMPTY = 0, BLACK = 1, WHITE = 2;
+const COLS = 'ABCDEFGHJKLMNOPQRST';
+let N = 9, NB = [], DG = [];
+let MARK = new Int32Array(361), LMARK = new Int32Array(361), STAMP = 0;
+
+function setupGeometry(n) {
+    N = n; NB = []; DG = [];
+    for (let p = 0; p < N * N; p++) {
+        const x = p % N, y = (p / N) | 0, nb = [], dg = [];
+        if (x > 0) nb.push(p - 1); if (x < N - 1) nb.push(p + 1);
+        if (y > 0) nb.push(p - N); if (y < N - 1) nb.push(p + N);
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < N && ny < N) dg.push(ny * N + nx);
+        }
+        NB.push(nb); DG.push(dg);
+    }
+}
+// 돌 덩어리와 활로 수
+function group(b, p) {
+    const c = b[p]; STAMP++;
+    const st = [p]; MARK[p] = STAMP;
+    let libs = 0;
+    for (let i = 0; i < st.length; i++) {
+        const nb = NB[st[i]];
+        for (let k = 0; k < nb.length; k++) {
+            const r = nb[k], v = b[r];
+            if (v === EMPTY) { if (LMARK[r] !== STAMP) { LMARK[r] = STAMP; libs++; } }
+            else if (v === c && MARK[r] !== STAMP) { MARK[r] = STAMP; st.push(r); }
+        }
+    }
+    return { stones: st, libs };
+}
+// 착수 시도: 성공하면 { cap: 따낸 돌들, ko: 다음 패 금지점 }, 불가능하면 null (b를 직접 바꿈)
+function tryPlay(b, p, c, ko) {
+    if (b[p] !== EMPTY || p === ko) return null;
+    b[p] = c;
+    const o = 3 - c, nb = NB[p];
+    let cap = null;
+    for (let k = 0; k < nb.length; k++) {
+        const r = nb[k];
+        if (b[r] === o) {
+            const g = group(b, r);
+            if (g.libs === 0) { for (const s of g.stones) b[s] = EMPTY; cap = cap ? cap.concat(g.stones) : g.stones; }
+        }
+    }
+    const g = group(b, p);
+    if (g.libs === 0) { b[p] = EMPTY; return null; } // 자충수
+    const capArr = cap || [];
+    const newKo = capArr.length === 1 && g.stones.length === 1 && g.libs === 1 ? capArr[0] : -1;
+    return { cap: capArr, ko: newKo };
+}
+// 내 집(눈) 자리인지: 상하좌우가 모두 내 돌이고 대각선이 충분히 내 것
+function isEye(b, p, c) {
+    if (b[p] !== EMPTY) return false;
+    for (const r of NB[p]) if (b[r] !== c) return false;
+    let bad = 0;
+    for (const r of DG[p]) if (b[r] === 3 - c) bad++;
+    return DG[p].length < 4 ? bad === 0 : bad < 2;
+}
+
+// ===== 몬테카를로 (무작위 대국으로 승률 추정) =====
+function playout(b0, toMove, ko0, komi, own) {
+    const b = b0.slice();
+    let c = toMove, ko = ko0, passes = 0;
+    let empties = [];
+    for (let p = 0; p < N * N; p++) if (b[p] === EMPTY) empties.push(p);
+    const maxMoves = N * N * 2.2;
+    for (let m = 0; m < maxMoves && passes < 2; m++) {
+        let played = false;
+        for (let tries = empties.length; tries > 0; tries--) {
+            const i = (Math.random() * tries) | 0, p = empties[i];
+            empties[i] = empties[tries - 1]; empties[tries - 1] = p;
+            if (b[p] !== EMPTY || isEye(b, p, c)) continue;
+            const r = tryPlay(b, p, c, ko);
+            if (!r) continue;
+            ko = r.ko; played = true;
+            for (const s of r.cap) empties.push(s);
+            break;
+        }
+        if (played) passes = 0; else { passes++; ko = -1; }
+        c = 3 - c;
+        if (empties.length > N * N * 1.5) { empties = []; for (let p = 0; p < N * N; p++) if (b[p] === EMPTY) empties.push(p); }
+    }
+    // 면적 계산 (돌 + 둘러싼 빈칸)
+    let score = -komi;
+    for (let p = 0; p < N * N; p++) {
+        let v = b[p];
+        if (v === EMPTY) {
+            let bl = 0, wh = 0;
+            for (const r of NB[p]) { if (b[r] === BLACK) bl++; else if (b[r] === WHITE) wh++; }
+            v = bl && !wh ? BLACK : wh && !bl ? WHITE : EMPTY;
+        }
+        if (v === BLACK) { score++; if (own) own[p]++; }
+        else if (v === WHITE) { score--; if (own) own[p]--; }
+    }
+    return score;
+}
+// 소유권 추정: 각 점이 흑(+1)~백(-1) 중 어느 쪽이 될지
+function estimateOwnership(timeMs) {
+    const own = new Float32Array(N * N);
+    const t0 = performance.now();
+    let n = 0, sum = 0;
+    while (n < 40 || (performance.now() - t0 < timeMs && n < 3000)) { sum += playout(G.b, G.toMove, G.ko, G.komi, own); n++; }
+    for (let p = 0; p < N * N; p++) own[p] /= n;
+    return { own, mean: sum / n, n };
+}
+
+// ===== 컴퓨터 =====
+function territoryMap(b) {
+    // 한 가지 색으로만 둘러싸인 빈 영역
+    const res = new Int8Array(N * N), seen = new Uint8Array(N * N);
+    for (let p = 0; p < N * N; p++) {
+        if (b[p] !== EMPTY || seen[p]) continue;
+        const area = [p]; seen[p] = 1; let bl = false, wh = false;
+        for (let i = 0; i < area.length; i++) for (const r of NB[area[i]]) {
+            if (b[r] === EMPTY) { if (!seen[r]) { seen[r] = 1; area.push(r); } }
+            else if (b[r] === BLACK) bl = true; else wh = true;
+        }
+        const owner = bl && !wh ? BLACK : wh && !bl ? WHITE : EMPTY;
+        for (const q of area) res[q] = owner;
+    }
+    return res;
+}
+function heuristic(p, c, terr) {
+    const b = G.b, o = 3 - c;
+    if (isEye(b, p, c)) return -50;
+    const t = b.slice();
+    const r = tryPlay(t, p, c, G.ko);
+    if (!r) return null;
+    let s = r.cap.length * 14;
+    const g = group(t, p);
+    if (g.libs === 1 && !r.cap.length) s -= 10 * g.stones.length;
+    else if (g.libs === 2) s -= 1; else if (g.libs >= 4) s += 1.5;
+    const doneOwn = new Set(), doneOpp = new Set();
+    for (const q of NB[p]) {
+        if (b[q] === c && !doneOwn.has(q)) {
+            const og = group(b, q); og.stones.forEach(x => doneOwn.add(x));
+            if (og.libs === 1) s += 12 * og.stones.length; // 단수 탈출
+        } else if (t[q] === o && !doneOpp.has(q)) {
+            const og = group(t, q); og.stones.forEach(x => doneOpp.add(x));
+            if (og.libs === 1) s += 5 + og.stones.length * 2; // 단수 걸기
+            else if (og.libs === 2) s += 1;
+        }
+    }
+    const x = p % N, y = (p / N) | 0, line = Math.min(x, y, N - 1 - x, N - 1 - y);
+    const early = G.moves.length < N * N / 5;
+    if (line === 0) s -= early ? 5 : 1.5;
+    else if (line === 1) s -= early ? 2 : 0.3;
+    else if (early && (line === 2 || line === 3)) s += 2.5;
+    let near = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < N && ny < N && b[ny * N + nx] !== EMPTY) near++;
+    }
+    s += Math.min(near, 3) * (early ? 0.4 : 0.8);
+    if (early && N >= 13) {
+        // 포석: 아무도 없는 귀 → 변 순서로 넓은 곳을 차지
+        let far = 0;
+        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < N && ny < N && b[ny * N + nx] !== EMPTY) far++;
+        }
+        const corner = Math.min(x, N - 1 - x) <= 4 && Math.min(y, N - 1 - y) <= 4;
+        if (far === 0 && (line === 2 || line === 3)) s += corner ? 6 : 3;
+    }
+    if (terr[p] === c) s -= 6;        // 내 집 메우기
+    else if (terr[p] === o) s -= 1;   // 상대 집 깊숙이
+    return s;
+}
+function candidates(c) {
+    const terr = territoryMap(G.b), list = [];
+    for (let p = 0; p < N * N; p++) {
+        if (G.b[p] !== EMPTY) continue;
+        const h = heuristic(p, c, terr);
+        if (h !== null) list.push({ p, h });
+    }
+    return list.sort((a, b) => b.h - a.h);
+}
+const LEVELS = {
+    1: { noise: 9, random: 0.15 },
+    2: { noise: 2.5, random: 0 },
+    3: { mc: 700, top: 24 },
+    4: { mc: 1700, top: 32 },
+};
+function aiChoose() {
+    const c = G.toMove, lv = LEVELS[G.level];
+    const cands = candidates(c);
+    const oppPassed = G.passes > 0;
+    if (!cands.length) return { pass: true };
+    if (!lv.mc) {
+        if (Math.random() < lv.random) return { p: cands[(Math.random() * Math.min(cands.length, 15)) | 0].p };
+        const scored = cands.map(k => ({ p: k.p, v: k.h + (Math.random() - 0.5) * lv.noise * 2 })).sort((a, b) => b.v - a.v);
+        const best = scored[0];
+        // 끝내기: 둘 만한 곳이 없으면 패스
+        if (best.v < 0.5 && G.moves.length > N * N / 3) return { pass: true };
+        if (oppPassed && cands[0].h < 1) return { pass: true };
+        return { p: best.p };
+    }
+    // 큰 판의 포석 단계는 무작위 대국으로 판단이 어려워서 휴리스틱으로
+    if (N >= 13 && G.moves.length < N * N / 6) {
+        const scored = cands.map(k => ({ p: k.p, v: k.h + (Math.random() - 0.5) * 1.5 })).sort((a, b) => b.v - a.v);
+        return { p: scored[0].p };
+    }
+    // 평탄 몬테카를로 + UCB (휴리스틱 점수를 초반 가산점으로)
+    const top = cands.slice(0, lv.top).filter(k => k.h > -20);
+    const hMax = top.length ? top[0].h : 0, hMin = top.length ? top[top.length - 1].h : 0;
+    const arms = top.map(k => ({ p: k.p, w: 0, n: 0, prior: (k.h - hMin) / (hMax - hMin + 1e-9) }));
+    const canPass = oppPassed || G.moves.length > N * N / 3;
+    if (canPass || !arms.length) arms.push({ p: -1, w: 0, n: 0, prior: 0 });
+    const t0 = performance.now(), budget = lv.mc * (N === 9 ? 0.8 : 1);
+    let total = 0;
+    while (performance.now() - t0 < budget || total < arms.length * 4) {
+        let best = null, bv = -1;
+        for (const a of arms) {
+            const v = a.n === 0 ? 1e9 : a.w / a.n + 0.8 * Math.sqrt(Math.log(total + 1) / a.n) + 0.4 * a.prior / (a.n + 1);
+            if (v > bv) { bv = v; best = a; }
+        }
+        const b = G.b.slice();
+        let ko = -1;
+        if (best.p >= 0) { const r = tryPlay(b, best.p, c, G.ko); ko = r ? r.ko : -1; }
+        const sc = playout(b, 3 - c, ko, G.komi, null);
+        best.n++; total++;
+        if ((sc > 0) === (c === BLACK)) best.w++;
+        if (total > 20000) break;
+    }
+    const ranked = arms.filter(a => a.n > 0).sort((a, b) => b.n - a.n);
+    const best = ranked[0], rate = best.w / best.n;
+    if (rate < 0.04 && G.moves.length > N * N / 3 && total > 300) return { resign: true, rate };
+    const passArm = arms.find(a => a.p === -1);
+    if (best.p === -1) return { pass: true, rate };
+    if (passArm && passArm.n > 10 && passArm.w / passArm.n >= rate - 0.01 && oppPassed) return { pass: true, rate };
+    return { p: best.p, rate };
+}
+
+// ===== 소리 =====
+const Snd = (() => {
+    let ctx = null, on = true, noiseBuf = null;
+    try { on = localStorage.getItem('baduk-sound') !== 'off'; } catch (e) { /* 기본값 */ }
+    function init() {
+        if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+        try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 6);
+    }
+    function click(t, vol, pitch) { // 나무 바둑판에 돌 놓는 '딱' 소리
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+        const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2400 * pitch; f.Q.value = 1.2;
+        const g = ctx.createGain(); g.gain.value = vol;
+        src.connect(f); f.connect(g); g.connect(ctx.destination); src.start(t);
+        const o = ctx.createOscillator(), og = ctx.createGain();
+        o.frequency.setValueAtTime(820 * pitch, t); o.frequency.exponentialRampToValueAtTime(420 * pitch, t + 0.06);
+        og.gain.setValueAtTime(vol * 0.5, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+        o.connect(og); og.connect(ctx.destination); o.start(t); o.stop(t + 0.1);
+    }
+    function play(kind, n = 0) {
+        if (!on || !ctx) return;
+        const t = ctx.currentTime + 0.01;
+        if (kind === 'stone') click(t, 0.9, 1);
+        else if (kind === 'capture') for (let i = 0; i < Math.min(n, 6); i++) click(t + 0.08 + i * 0.05, 0.35, 1.5 + Math.random() * 0.4);
+        else if (kind === 'end') [523, 659, 784].forEach((f, i) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(0.06, t + i * 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.4); o.connect(g); g.connect(ctx.destination); o.start(t + i * 0.12); o.stop(t + i * 0.12 + 0.45); });
+    }
+    function toggle() { on = !on; try { localStorage.setItem('baduk-sound', on ? 'on' : 'off'); } catch (e) { /* 무시 */ } init(); render(); }
+    function render() { $('soundBtn').textContent = on ? '🔊 소리 켜짐' : '🔇 소리 꺼짐'; }
+    return { init, play, toggle, render };
+})();
+
+// ===== 게임 상태 =====
+const $ = id => document.getElementById(id);
+const SAVE_KEY = 'baduk-save-v1';
+let G = null;
+let estimate = null;     // 형세 판단 결과
+let pendingTap = -1;     // 휴대폰 두 번 눌러 착수
+let hover = -1;
+let aiBusy = false;
+
+function newGame(opts) {
+    setupGeometry(opts.size);
+    G = {
+        size: opts.size, mode: opts.mode, level: opts.level, human: opts.human, komi: opts.komi,
+        b: new Int8Array(N * N), toMove: BLACK, ko: -1, caps: { 1: 0, 2: 0 },
+        moves: [], history: [], passes: 0, phase: 'play', last: -1, dead: null, result: null,
+    };
+    estimate = null; pendingTap = -1;
+    hideScoreUI();
+    save(); render();
+    maybeAI();
+}
+const isAITurn = () => G.mode === 'ai' && G.phase === 'play' && G.toMove !== G.human;
+const colorName = c => (c === BLACK ? '흑' : '백');
+const coord = p => p < 0 ? '패스' : COLS[p % N] + (N - ((p / N) | 0));
+
+function snapshot() { return { b: G.b.slice(), toMove: G.toMove, ko: G.ko, caps: { ...G.caps }, passes: G.passes, last: G.last }; }
+function restore(s) { G.b = s.b; G.toMove = s.toMove; G.ko = s.ko; G.caps = s.caps; G.passes = s.passes; G.last = s.last; }
+
+function doMove(p, silent) {
+    if (G.phase !== 'play') return false;
+    if (p < 0) {
+        G.history.push(snapshot());
+        G.moves.push(-1); G.passes++; G.ko = -1; G.last = -1;
+        G.toMove = 3 - G.toMove;
+        if (!silent) toastHint(`${colorName(3 - G.toMove)}이 한 수 쉬었어요.`);
+        if (silent) return true; // 저장된 대국 복원 중
+        if (G.passes >= 2) { save(); startScoring(); return true; }
+        save(); render(); return true;
+    }
+    const snap = snapshot();
+    const r = tryPlay(G.b, p, G.toMove, G.ko);
+    if (!r) {
+        if (!silent) toastHint(p === G.ko ? '⛔ 패 자리예요. 다른 곳에 한 수 둔 뒤 되따낼 수 있어요.' : '⛔ 자충수라 둘 수 없어요.');
+        return false;
+    }
+    G.history.push(snap);
+    G.moves.push(p);
+    G.caps[G.toMove] += r.cap.length;
+    G.ko = r.ko; G.passes = 0; G.last = p;
+    G.toMove = 3 - G.toMove;
+    estimate = null; pendingTap = -1;
+    if (silent) return true; // 저장된 대국 복원 중
+    Snd.play('stone'); if (r.cap.length) Snd.play('capture', r.cap.length);
+    toastHint(r.cap.length ? `${colorName(3 - G.toMove)}이 돌 ${r.cap.length}개를 따냈어요!` : '');
+    save(); render();
+    return true;
+}
+
+function maybeAI() {
+    if (!isAITurn() || aiBusy) return;
+    aiBusy = true;
+    $('thinking').hidden = false;
+    renderButtons();
+    setTimeout(() => {
+        const choice = aiChoose();
+        aiBusy = false;
+        $('thinking').hidden = true;
+        if (G.phase !== 'play') return render();
+        if (choice.resign) { finish({ resign: G.toMove }); return; }
+        doMove(choice.pass ? -1 : choice.p);
+        if (choice.pass && G.phase === 'play') toastHint('🤖 컴퓨터가 한 수 쉬었어요. 더 둘 곳이 없으면 같이 패스해서 대국을 끝내요.');
+    }, 60);
+}
+
+function undo() {
+    if (aiBusy || !G.history.length) return;
+    if (G.phase !== 'play') hideScoreUI();
+    G.phase = 'play'; G.dead = null;
+    let n = 1;
+    if (G.mode === 'ai') {
+        // 내 차례로 돌아갈 때까지
+        n = G.toMove === G.human ? 2 : 1;
+        if (G.history.length < n) n = G.history.length;
+    }
+    for (let i = 0; i < n; i++) { restore(G.history.pop()); G.moves.pop(); }
+    estimate = null;
+    save(); render(); maybeAI();
+}
+
+// ===== 계가 =====
+function startScoring() {
+    G.phase = 'score';
+    $('thinking').hidden = false; $('thinking').textContent = '🧮 죽은 돌을 판단하는 중…';
+    setTimeout(() => {
+        const est = estimateOwnership(N === 19 ? 1200 : 700);
+        G.dead = new Uint8Array(N * N);
+        const seen = new Uint8Array(N * N);
+        for (let p = 0; p < N * N; p++) {
+            if (G.b[p] === EMPTY || seen[p]) continue;
+            const g = group(G.b, p); let s = 0;
+            for (const q of g.stones) { seen[q] = 1; s += est.own[q]; }
+            s /= g.stones.length;
+            const dead = G.b[p] === BLACK ? s < -0.35 : s > 0.35;
+            if (dead) for (const q of g.stones) G.dead[q] = 1;
+        }
+        $('thinking').hidden = true; $('thinking').textContent = '🤔 컴퓨터가 생각 중…';
+        Snd.play('end');
+        $('playActions').hidden = true; $('scoreActions').hidden = false;
+        toastHint('대국 종료! 컴퓨터가 죽은 돌(✕)을 추측했어요. 틀렸다면 돌을 눌러 바꾼 뒤 <b>계가 확정</b>을 눌러요.');
+        save(); render();
+    }, 60);
+}
+function hideScoreUI() { $('playActions').hidden = false; $('scoreActions').hidden = true; }
+function scoreNow() {
+    const b = G.b.slice(), deadCap = { 1: 0, 2: 0 };
+    if (G.dead) for (let p = 0; p < N * N; p++) if (G.dead[p] && b[p] !== EMPTY) { deadCap[3 - b[p]]++; b[p] = EMPTY; }
+    const terr = territoryMap(b);
+    const t = { 1: 0, 2: 0 };
+    for (let p = 0; p < N * N; p++) if (b[p] === EMPTY && terr[p]) t[terr[p]]++;
+    const black = t[1] + G.caps[1] + deadCap[1], white = t[2] + G.caps[2] + deadCap[2] + G.komi;
+    return { terr: t, deadCap, black, white, terrMap: terr, clean: b };
+}
+function finish(opts = {}) {
+    G.phase = 'end';
+    let html;
+    if (opts.resign) {
+        const winner = 3 - opts.resign;
+        G.result = `${colorName(winner)} 불계승`;
+        html = `<h3>🏳️ ${colorName(opts.resign)} 기권</h3><p style="font-size:18px;margin:8px 0"><b>${colorName(winner)} 불계승!</b></p>`;
+    } else {
+        const s = scoreNow();
+        const diff = s.black - s.white, winner = diff > 0 ? BLACK : WHITE;
+        G.result = `${colorName(winner)} ${Math.abs(diff)}집 승`;
+        html = `<h3>🧮 계가 결과</h3>
+            <table class="report">
+                <tr><th></th><th>⚫ 흑</th><th>⚪ 백</th></tr>
+                <tr><td>집</td><td>${s.terr[1]}</td><td>${s.terr[2]}</td></tr>
+                <tr><td>따낸 돌</td><td>${G.caps[1]}</td><td>${G.caps[2]}</td></tr>
+                <tr><td>죽은 돌 (상대)</td><td>${s.deadCap[1]}</td><td>${s.deadCap[2]}</td></tr>
+                <tr><td>덤</td><td>-</td><td>${G.komi}</td></tr>
+                <tr class="total"><td>합계</td><td>${s.black}</td><td>${s.white}</td></tr>
+            </table>
+            <p style="font-size:18px"><b>${colorName(winner)} ${Math.abs(diff)}집 승!</b></p>`;
+    }
+    if (G.mode === 'ai') {
+        const winner = G.result.startsWith(colorName(G.human)) ? 'me' : 'ai';
+        html += `<p style="margin-top:6px;color:#718096">${winner === 'me' ? '🎉 축하해요! 컴퓨터를 이겼어요.' : '🤖 컴퓨터의 승리예요. 다시 도전해 보세요!'}</p>`;
+    }
+    html += `<div class="row"><button class="primary" id="againBtn">새 대국</button><button id="closeBtn">판 보기</button></div>`;
+    $('modal').innerHTML = html; $('modalBg').hidden = false;
+    $('againBtn').addEventListener('click', () => { $('modalBg').hidden = true; startNew(); });
+    $('closeBtn').addEventListener('click', () => { $('modalBg').hidden = true; });
+    Snd.play('end');
+    hideScoreUI();
+    save(); render();
+}
+
+// ===== 그리기 =====
+const cvs = $('board'), ctx2 = cvs.getContext('2d');
+const SZ = 600;
+function geom() { const m = N === 19 ? 30 : 38, cell = (SZ - 2 * m) / (N - 1); return { m, cell }; }
+const ptXY = p => { const { m, cell } = geom(); return [m + (p % N) * cell, m + ((p / N) | 0) * cell]; };
+function stars() {
+    if (N === 9) return [[2, 2], [6, 2], [4, 4], [2, 6], [6, 6]];
+    if (N === 13) return [[3, 3], [9, 3], [6, 6], [3, 9], [9, 9]];
+    return [3, 9, 15].flatMap(y => [3, 9, 15].map(x => [x, y]));
+}
+function drawStone(c, x, y, r, color, alpha = 1) {
+    c.save(); c.globalAlpha = alpha;
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.arc(x + r * 0.12, y + r * 0.16, r, 0, Math.PI * 2); c.fill();
+    const g = c.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+    if (color === BLACK) { g.addColorStop(0, '#6b6b6b'); g.addColorStop(0.45, '#1c1c1c'); g.addColorStop(1, '#050505'); }
+    else { g.addColorStop(0, '#ffffff'); g.addColorStop(0.6, '#ececec'); g.addColorStop(1, '#bdbdbd'); }
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    c.restore();
+}
+function render() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cvs.width !== SZ * dpr) { cvs.width = SZ * dpr; cvs.height = SZ * dpr; }
+    const c = ctx2; c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { m, cell } = geom(), r = cell * 0.47;
+    // 나무 판
+    const wood = c.createLinearGradient(0, 0, SZ, SZ);
+    wood.addColorStop(0, '#eac889'); wood.addColorStop(0.5, '#ddb26a'); wood.addColorStop(1, '#d4a55c');
+    c.fillStyle = wood; c.fillRect(0, 0, SZ, SZ);
+    c.strokeStyle = 'rgba(150,100,40,0.12)'; c.lineWidth = 1;
+    for (let i = 0; i < 26; i++) { c.beginPath(); const y = i * 24 + Math.sin(i) * 6; c.moveTo(0, y); c.bezierCurveTo(200, y + 10, 400, y - 10, SZ, y + 4); c.stroke(); }
+    // 선
+    c.strokeStyle = '#3d2b1a'; c.lineWidth = 1;
+    for (let i = 0; i < N; i++) {
+        c.beginPath(); c.moveTo(m, m + i * cell); c.lineTo(m + (N - 1) * cell, m + i * cell); c.stroke();
+        c.beginPath(); c.moveTo(m + i * cell, m); c.lineTo(m + i * cell, m + (N - 1) * cell); c.stroke();
+    }
+    c.lineWidth = 2; c.strokeRect(m, m, (N - 1) * cell, (N - 1) * cell); c.lineWidth = 1;
+    c.fillStyle = '#3d2b1a';
+    for (const [x, y] of stars()) { c.beginPath(); c.arc(m + x * cell, m + y * cell, N === 19 ? 3.2 : 4, 0, Math.PI * 2); c.fill(); }
+    // 좌표
+    c.fillStyle = 'rgba(61,43,26,0.75)'; c.font = `${N === 19 ? 10 : 12}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let i = 0; i < N; i++) {
+        c.fillText(COLS[i], m + i * cell, m * 0.42); c.fillText(COLS[i], m + i * cell, SZ - m * 0.42);
+        c.fillText(String(N - i), m * 0.42, m + i * cell); c.fillText(String(N - i), SZ - m * 0.42, m + i * cell);
+    }
+    // 형세 판단 / 계가 영역 표시
+    let terrMap = null;
+    if (G.phase === 'score' || G.phase === 'end') {
+        if (!G.result || G.result.includes('집')) terrMap = scoreNow().terrMap;
+    }
+    // 돌
+    for (let p = 0; p < N * N; p++) {
+        const v = G.b[p]; if (v === EMPTY) continue;
+        const [x, y] = ptXY(p);
+        const dead = G.dead && G.dead[p] && G.phase !== 'play';
+        drawStone(c, x, y, r, v, dead ? 0.45 : 1);
+        if (dead) {
+            c.strokeStyle = v === BLACK ? '#fff' : '#e53e3e'; c.lineWidth = 2;
+            c.beginPath(); c.moveTo(x - r * 0.4, y - r * 0.4); c.lineTo(x + r * 0.4, y + r * 0.4); c.moveTo(x + r * 0.4, y - r * 0.4); c.lineTo(x - r * 0.4, y + r * 0.4); c.stroke();
+            c.lineWidth = 1;
+        }
+    }
+    if (terrMap) {
+        for (let p = 0; p < N * N; p++) {
+            const owner = terrMap[p];
+            const empty = G.b[p] === EMPTY || (G.dead && G.dead[p]);
+            if (!owner || !empty) continue;
+            const [x, y] = ptXY(p), s = cell * 0.32;
+            c.fillStyle = owner === BLACK ? 'rgba(20,20,20,0.85)' : 'rgba(255,255,255,0.95)';
+            c.fillRect(x - s / 2, y - s / 2, s, s);
+            c.strokeStyle = 'rgba(0,0,0,0.4)'; c.strokeRect(x - s / 2, y - s / 2, s, s);
+        }
+    } else if (estimate) {
+        for (let p = 0; p < N * N; p++) {
+            const o = estimate.own[p];
+            if (Math.abs(o) < 0.25) continue;
+            const [x, y] = ptXY(p), s = cell * (0.25 + Math.abs(o) * 0.25);
+            if (G.b[p] !== EMPTY && Math.sign(o) === (G.b[p] === BLACK ? 1 : -1)) continue; // 살아있는 돌은 표시 안 함
+            c.fillStyle = o > 0 ? `rgba(20,20,20,${0.35 + Math.abs(o) * 0.5})` : `rgba(255,255,255,${0.45 + Math.abs(o) * 0.5})`;
+            c.fillRect(x - s / 2, y - s / 2, s, s);
+        }
+    }
+    // 마지막 수
+    if (G.last >= 0 && G.b[G.last] !== EMPTY) {
+        const [x, y] = ptXY(G.last);
+        c.fillStyle = '#e53e3e'; c.beginPath(); c.arc(x, y, r * 0.28, 0, Math.PI * 2); c.fill();
+    }
+    // 미리보기 돌 (마우스·두 번 누르기)
+    const ghost = pendingTap >= 0 ? pendingTap : hover;
+    if (G.phase === 'play' && ghost >= 0 && G.b[ghost] === EMPTY && !isAITurn()) {
+        const [x, y] = ptXY(ghost);
+        drawStone(c, x, y, r, G.toMove, pendingTap >= 0 ? 0.7 : 0.45);
+        if (pendingTap >= 0) { c.strokeStyle = '#667eea'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, r + 3, 0, Math.PI * 2); c.stroke(); c.lineWidth = 1; }
+    }
+    renderInfo();
+}
+function renderInfo() {
+    const me = G.mode === 'ai' ? G.human : 0;
+    $('nameB').textContent = '흑' + (G.mode === 'ai' ? (me === BLACK ? ' (나)' : ' (컴퓨터)') : '');
+    $('nameW').textContent = '백' + (G.mode === 'ai' ? (me === WHITE ? ' (나)' : ' (컴퓨터)') : '') + ` · 덤 ${G.komi}`;
+    $('capB').textContent = `따낸 돌 ${G.caps[1]}`;
+    $('capW').textContent = `따낸 돌 ${G.caps[2]}`;
+    $('pB').classList.toggle('turn', G.phase === 'play' && G.toMove === BLACK);
+    $('pW').classList.toggle('turn', G.phase === 'play' && G.toMove === WHITE);
+    $('moveNum').textContent = `${G.moves.length}수`;
+    const st = $('status');
+    st.classList.toggle('win', G.phase === 'end');
+    if (G.phase === 'end') st.textContent = `🏁 대국 종료 — ${G.result}`;
+    else if (G.phase === 'score') st.textContent = '🧮 계가 중 — 죽은 돌을 확인해 주세요';
+    else if (isAITurn()) st.textContent = `🤖 컴퓨터(${colorName(G.toMove)}) 차례`;
+    else st.textContent = `${G.toMove === BLACK ? '⚫' : '⚪'} ${colorName(G.toMove)} 차례${G.mode === 'ai' ? ' (나)' : ''}${G.passes ? ' · 상대가 패스했어요' : ''}`;
+    renderButtons();
+}
+function renderButtons() {
+    const busy = aiBusy || isAITurn();
+    $('passBtn').disabled = G.phase !== 'play' || busy;
+    $('resignBtn').disabled = G.phase !== 'play' || busy;
+    $('estBtn').disabled = G.phase !== 'play' || busy;
+    $('undoBtn').disabled = aiBusy || !G.history.length || G.phase === 'end';
+    $('estBtn').classList.toggle('on', !!estimate);
+}
+function toastHint(html) { $('hint').innerHTML = html || ''; }
+
+// ===== 입력 =====
+function pointAt(ev) {
+    const rect = cvs.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * SZ / rect.width, y = (ev.clientY - rect.top) * SZ / rect.height;
+    const { m, cell } = geom();
+    const i = Math.round((x - m) / cell), j = Math.round((y - m) / cell);
+    if (i < 0 || j < 0 || i >= N || j >= N) return -1;
+    const [px, py] = [m + i * cell, m + j * cell];
+    if (Math.hypot(x - px, y - py) > cell * 0.55) return -1;
+    return j * N + i;
+}
+cvs.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    const p = pointAt(e);
+    if (p !== hover) { hover = p; render(); }
+});
+cvs.addEventListener('pointerleave', () => { if (hover !== -1) { hover = -1; render(); } });
+cvs.addEventListener('pointerup', e => {
+    Snd.init();
+    const p = pointAt(e);
+    if (p < 0) return;
+    if (G.phase === 'score') { toggleDead(p); return; }
+    if (G.phase !== 'play' || aiBusy || isAITurn()) return;
+    // 휴대폰에서 큰 판은 두 번 눌러야 착수 (실수 방지)
+    if (e.pointerType === 'touch' && N >= 13 && pendingTap !== p) {
+        if (G.b[p] !== EMPTY) return;
+        pendingTap = p; render(); toastHint('같은 자리를 한 번 더 누르면 돌이 놓여요.'); return;
+    }
+    if (doMove(p)) maybeAI();
+});
+function toggleDead(p) {
+    if (G.b[p] === EMPTY) return;
+    const g = group(G.b, p), v = G.dead[p] ? 0 : 1;
+    // 같은 색으로 연결된(빈칸 사이로 이어진) 무리 전체를 한 번에
+    for (const q of g.stones) G.dead[q] = v;
+    Snd.play('stone'); save(); render();
+}
+
+$('passBtn').addEventListener('click', () => { Snd.init(); if (doMove(-1)) maybeAI(); });
+$('undoBtn').addEventListener('click', undo);
+$('resignBtn').addEventListener('click', () => {
+    if (!confirm('정말 기권할까요?')) return;
+    finish({ resign: G.mode === 'ai' ? G.human : G.toMove });
+});
+$('estBtn').addEventListener('click', () => {
+    if (estimate) { estimate = null; render(); toastHint(''); return; }
+    $('thinking').hidden = false; $('thinking').textContent = '📊 형세를 판단하는 중…';
+    setTimeout(() => {
+        estimate = estimateOwnership(N === 19 ? 1000 : 600);
+        $('thinking').hidden = true; $('thinking').textContent = '🤔 컴퓨터가 생각 중…';
+        // 어느 한쪽이 가질 가능성이 높은 점(돌 + 빈 곳)만 세서 비교 (덤 반영)
+        let bl = 0, wh = 0;
+        for (const o of estimate.own) { if (o > 0.2) bl++; else if (o < -0.2) wh++; }
+        const lead = bl - wh - G.komi;
+        const early = G.moves.length < N * N / 4;
+        toastHint(`📊 형세 판단: 흑 영역 약 ${bl} · 백 영역 약 ${wh} + 덤 ${G.komi} → <b>${Math.abs(lead) < 2 ? '팽팽해요' : (lead > 0 ? '흑' : '백') + ' 약 ' + Math.abs(lead).toFixed(1) + '집 우세'}</b><br><span style="font-size:12px">무작위 대국 ${estimate.n}판으로 추정한 값이라 참고만 하세요.${early ? ' 아직 초반이라 빈 곳이 많아 정확하지 않아요.' : ''}</span>`);
+        render();
+    }, 40);
+});
+$('confirmScore').addEventListener('click', () => finish());
+$('resumeBtn').addEventListener('click', () => {
+    G.phase = 'play'; G.dead = null; G.passes = 0; hideScoreUI();
+    toastHint('대국을 이어서 둬요.'); save(); render(); maybeAI();
+});
+$('soundBtn').addEventListener('click', () => Snd.toggle());
+function settings() {
+    return { mode: $('mode').value, level: Number($('level').value), human: Number($('side').value), size: Number($('size').value), komi: Number($('komi').value) };
+}
+function startNew() { newGame(settings()); toastHint(''); }
+$('newBtn').addEventListener('click', () => {
+    if (G && G.phase === 'play' && G.moves.length > 0 && !confirm('지금 대국을 끝내고 새로 시작할까요?')) return;
+    startNew();
+});
+$('mode').addEventListener('change', () => { $('level').disabled = $('side').disabled = $('mode').value !== 'ai'; });
+$('level').addEventListener('change', () => { if (G) { G.level = Number($('level').value); save(); } });
+
+// ===== 저장 =====
+function save() {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+            size: G.size, mode: G.mode, level: G.level, human: G.human, komi: G.komi, moves: G.moves,
+            phase: G.phase, dead: G.dead ? Array.from(G.dead) : null, result: G.result,
+        }));
+    } catch (e) { /* 무시 */ }
+}
+function load() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* 무시 */ }
+    if (!s || ![9, 13, 19].includes(s.size)) return false;
+    newGameSilent(s);
+    for (const p of s.moves) { if (!doMove(p, true)) break; }
+    if (s.phase === 'score' || s.phase === 'end') {
+        G.phase = s.phase; G.dead = s.dead ? Uint8Array.from(s.dead) : new Uint8Array(N * N); G.result = s.result;
+        if (s.phase === 'score') { $('playActions').hidden = true; $('scoreActions').hidden = false; }
+    }
+    $('mode').value = s.mode; $('level').value = String(s.level); $('side').value = String(s.human); $('size').value = String(s.size); $('komi').value = String(s.komi);
+    $('level').disabled = $('side').disabled = s.mode !== 'ai';
+    render();
+    return true;
+}
+function newGameSilent(s) {
+    setupGeometry(s.size);
+    G = { size: s.size, mode: s.mode, level: s.level, human: s.human, komi: s.komi, b: new Int8Array(N * N), toMove: BLACK, ko: -1,
+          caps: { 1: 0, 2: 0 }, moves: [], history: [], passes: 0, phase: 'play', last: -1, dead: null, result: null };
+}
+
+Snd.render();
+if (!load()) startNew();
+else maybeAI();
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>

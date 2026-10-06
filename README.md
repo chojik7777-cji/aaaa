@@ -6,6 +6,7 @@ Vercel 배포 URL: https://aaaa-phi-lovat.vercel.app/
 
 - 자기소개/메뉴: `/index.html`
 - 오목 게임: `/omok.html`
+- 바둑 게임: `/baduk.html` (9·13·19줄, 컴퓨터 4단계 또는 2인 대국, 한국식 계가, 진행 상황 자동 저장)
 - 윷놀이: `/yut.html`
 - 윷놀이 접속자 현황: `/yut-dashboard.html`
 - 카페 운영 게임: `/cafe.html` (혼자 하는 정적 게임, 진행 상황은 브라우저에 자동 저장)
