@@ -111,12 +111,24 @@
         <select id="mode" aria-label="대결 방식">
             <option value="ai">컴퓨터와 대국</option>
             <option value="pvp">2인 대국 (한 기기)</option>
+            <option value="cvc">컴퓨터끼리 대국 (관전)</option>
         </select>
         <select id="level" aria-label="난이도">
             <option value="1">1단계 · 입문</option>
             <option value="2" selected>2단계 · 초급</option>
             <option value="3">3단계 · 중급</option>
             <option value="4">4단계 · 고급</option>
+        </select>
+        <select id="levelW" aria-label="백 컴퓨터 난이도" hidden>
+            <option value="1">1단계 · 입문</option>
+            <option value="2">2단계 · 초급</option>
+            <option value="3" selected>3단계 · 중급</option>
+            <option value="4">4단계 · 고급</option>
+        </select>
+        <select id="speed" aria-label="관전 속도" hidden>
+            <option value="1600">🐢 느리게</option>
+            <option value="600" selected>🚶 보통</option>
+            <option value="120">🐇 빠르게</option>
         </select>
         <select id="side" aria-label="내 돌">
             <option value="1">내가 흑 (먼저)</option>
@@ -147,6 +159,7 @@
     </div>
 
     <div class="actions" id="playActions">
+        <button id="pauseBtn" hidden>⏸️ 일시정지</button>
         <button id="passBtn">✋ 한 수 쉬기 (패스)</button>
         <button id="undoBtn">↩️ 무르기</button>
         <button id="estBtn">📊 형세 판단</button>
@@ -180,6 +193,7 @@
                 <li><b>형세 판단</b>: 지금 누가 앞서는지 영역을 색으로 보여주고 대략의 차이를 알려줘요.</li>
                 <li>휴대폰에서 13줄·19줄은 실수를 막기 위해 <b>같은 자리를 두 번 눌러야</b> 돌이 놓여요.</li>
                 <li>진행 중인 대국은 자동 저장돼서 새로고침해도 이어서 둘 수 있어요.</li>
+                <li><b>컴퓨터끼리 대국 (관전)</b>: 흑·백 컴퓨터의 단계를 각각 정해 대국을 구경해요. 속도 조절·일시정지가 되고, 끝나면 자동으로 계가해요.</li>
             </ul>
         </div>
     </details>
@@ -378,8 +392,8 @@ const LEVELS = {
     3: { mc: 700, top: 24 },
     4: { mc: 1700, top: 32 },
 };
-function aiChoose() {
-    const c = G.toMove, lv = LEVELS[G.level];
+function aiChoose(level) {
+    const c = G.toMove, lv = LEVELS[level || G.level];
     const cands = candidates(c);
     const oppPassed = G.passes > 0;
     if (!cands.length) return { pass: true };
@@ -474,6 +488,7 @@ function newGame(opts) {
     setupGeometry(opts.size);
     G = {
         size: opts.size, mode: opts.mode, level: opts.level, human: opts.human, komi: opts.komi,
+        levelB: opts.levelB || opts.level, levelW: opts.levelW || opts.level, paused: false,
         b: new Int8Array(N * N), toMove: BLACK, ko: -1, caps: { 1: 0, 2: 0 },
         moves: [], history: [], passes: 0, phase: 'play', last: -1, dead: null, result: null,
     };
@@ -482,7 +497,9 @@ function newGame(opts) {
     save(); render();
     maybeAI();
 }
-const isAITurn = () => G.mode === 'ai' && G.phase === 'play' && G.toMove !== G.human;
+const isAITurn = () => G.phase === 'play' && (G.mode === 'cvc' || (G.mode === 'ai' && G.toMove !== G.human));
+const LEVEL_NAMES = { 1: '입문', 2: '초급', 3: '중급', 4: '고급' };
+const cvcLevel = c => (c === BLACK ? G.levelB : G.levelW);
 const colorName = c => (c === BLACK ? '흑' : '백');
 const coord = p => p < 0 ? '패스' : COLS[p % N] + (N - ((p / N) | 0));
 
@@ -521,22 +538,35 @@ function doMove(p, silent) {
 
 function maybeAI() {
     if (!isAITurn() || aiBusy) return;
+    const cvc = G.mode === 'cvc';
+    if (cvc && G.paused) return;
     aiBusy = true;
+    const game = G;
+    $('thinking').textContent = cvc ? `🤖 ${colorName(G.toMove)}(${cvcLevel(G.toMove)}단계) 생각 중…` : '🤔 컴퓨터가 생각 중…';
     $('thinking').hidden = false;
     renderButtons();
     setTimeout(() => {
-        const choice = aiChoose();
+        if (game !== G || (cvc && G.paused)) { // 새 대국으로 바뀌었거나 일시정지됨
+            aiBusy = false; $('thinking').hidden = true; renderButtons();
+            if (game !== G) maybeAI(); // 새 대국이 컴퓨터 차례면 이어서
+            return;
+        }
+        // 관전 대국이 끝나지 않고 너무 길어지면 계가로
+        if (cvc && G.moves.length >= N * N * 3) { aiBusy = false; $('thinking').hidden = true; G.passes = 2; startScoring(); return; }
+        const choice = aiChoose(cvc ? cvcLevel(G.toMove) : G.level);
         aiBusy = false;
         $('thinking').hidden = true;
         if (G.phase !== 'play') return render();
         if (choice.resign) { finish({ resign: G.toMove }); return; }
+        const mover = G.toMove;
         doMove(choice.pass ? -1 : choice.p);
-        if (choice.pass && G.phase === 'play') toastHint('🤖 컴퓨터가 한 수 쉬었어요. 더 둘 곳이 없으면 같이 패스해서 대국을 끝내요.');
-    }, 60);
+        if (choice.pass && G.phase === 'play') toastHint(cvc ? `🤖 ${colorName(mover)} 컴퓨터가 한 수 쉬었어요.` : '🤖 컴퓨터가 한 수 쉬었어요. 더 둘 곳이 없으면 같이 패스해서 대국을 끝내요.');
+        maybeAI(); // 관전 대국은 다음 수로 계속
+    }, cvc ? Number($('speed').value) : 60);
 }
 
 function undo() {
-    if (aiBusy || !G.history.length) return;
+    if (aiBusy || !G.history.length || G.mode === 'cvc') return;
     if (G.phase !== 'play') hideScoreUI();
     G.phase = 'play'; G.dead = null;
     let n = 1;
@@ -569,8 +599,14 @@ function startScoring() {
         $('thinking').hidden = true; $('thinking').textContent = '🤔 컴퓨터가 생각 중…';
         Snd.play('end');
         $('playActions').hidden = true; $('scoreActions').hidden = false;
-        toastHint('대국 종료! 컴퓨터가 죽은 돌(✕)을 추측했어요. 틀렸다면 돌을 눌러 바꾼 뒤 <b>계가 확정</b>을 눌러요.');
         save(); render();
+        if (G.mode === 'cvc') {
+            toastHint('관전 대국 종료! 죽은 돌(✕)과 집을 표시했어요. 잠시 후 계가 결과를 보여줘요.');
+            const game = G;
+            setTimeout(() => { if (G === game && G.phase === 'score') finish(); }, 2200);
+        } else {
+            toastHint('대국 종료! 컴퓨터가 죽은 돌(✕)을 추측했어요. 틀렸다면 돌을 눌러 바꾼 뒤 <b>계가 확정</b>을 눌러요.');
+        }
     }, 60);
 }
 function hideScoreUI() { $('playActions').hidden = false; $('scoreActions').hidden = true; }
@@ -605,11 +641,14 @@ function finish(opts = {}) {
             </table>
             <p style="font-size:18px"><b>${colorName(winner)} ${Math.abs(diff)}집 승!</b></p>`;
     }
+    if (G.mode === 'cvc') {
+        html += `<p style="margin-top:6px;color:#718096">👀 관전한 대국: ⚫ 흑 ${G.levelB}단계(${LEVEL_NAMES[G.levelB]}) vs ⚪ 백 ${G.levelW}단계(${LEVEL_NAMES[G.levelW]})</p>`;
+    }
     if (G.mode === 'ai') {
         const winner = G.result.startsWith(colorName(G.human)) ? 'me' : 'ai';
         html += `<p style="margin-top:6px;color:#718096">${winner === 'me' ? '🎉 축하해요! 컴퓨터를 이겼어요.' : '🤖 컴퓨터의 승리예요. 다시 도전해 보세요!'}</p>`;
     }
-    html += `<div class="row"><button class="primary" id="againBtn">새 대국</button><button id="closeBtn">판 보기</button></div>`;
+    html += `<div class="row"><button class="primary" id="againBtn">${G.mode === 'cvc' ? '한 판 더 관전' : '새 대국'}</button><button id="closeBtn">판 보기</button></div>`;
     $('modal').innerHTML = html; $('modalBg').hidden = false;
     $('againBtn').addEventListener('click', () => { $('modalBg').hidden = true; startNew(); });
     $('closeBtn').addEventListener('click', () => { $('modalBg').hidden = true; });
@@ -716,8 +755,13 @@ function render() {
 }
 function renderInfo() {
     const me = G.mode === 'ai' ? G.human : 0;
-    $('nameB').textContent = '흑' + (G.mode === 'ai' ? (me === BLACK ? ' (나)' : ' (컴퓨터)') : '');
-    $('nameW').textContent = '백' + (G.mode === 'ai' ? (me === WHITE ? ' (나)' : ' (컴퓨터)') : '') + ` · 덤 ${G.komi}`;
+    if (G.mode === 'cvc') {
+        $('nameB').textContent = `흑 (컴퓨터 ${G.levelB}단계)`;
+        $('nameW').textContent = `백 (컴퓨터 ${G.levelW}단계) · 덤 ${G.komi}`;
+    } else {
+        $('nameB').textContent = '흑' + (G.mode === 'ai' ? (me === BLACK ? ' (나)' : ' (컴퓨터)') : '');
+        $('nameW').textContent = '백' + (G.mode === 'ai' ? (me === WHITE ? ' (나)' : ' (컴퓨터)') : '') + ` · 덤 ${G.komi}`;
+    }
     $('capB').textContent = `따낸 돌 ${G.caps[1]}`;
     $('capW').textContent = `따낸 돌 ${G.caps[2]}`;
     $('pB').classList.toggle('turn', G.phase === 'play' && G.toMove === BLACK);
@@ -727,16 +771,21 @@ function renderInfo() {
     st.classList.toggle('win', G.phase === 'end');
     if (G.phase === 'end') st.textContent = `🏁 대국 종료 — ${G.result}`;
     else if (G.phase === 'score') st.textContent = '🧮 계가 중 — 죽은 돌을 확인해 주세요';
+    else if (G.mode === 'cvc') st.textContent = G.paused ? '⏸️ 관전 일시정지 — ▶️ 계속 보기를 누르세요' : `👀 관전 중 · ${G.toMove === BLACK ? '⚫' : '⚪'} ${colorName(G.toMove)} 컴퓨터(${cvcLevel(G.toMove)}단계) 차례`;
     else if (isAITurn()) st.textContent = `🤖 컴퓨터(${colorName(G.toMove)}) 차례`;
     else st.textContent = `${G.toMove === BLACK ? '⚫' : '⚪'} ${colorName(G.toMove)} 차례${G.mode === 'ai' ? ' (나)' : ''}${G.passes ? ' · 상대가 패스했어요' : ''}`;
     renderButtons();
 }
 function renderButtons() {
-    const busy = aiBusy || isAITurn();
+    const busy = aiBusy || isAITurn(), cvc = G.mode === 'cvc';
     $('passBtn').disabled = G.phase !== 'play' || busy;
     $('resignBtn').disabled = G.phase !== 'play' || busy;
-    $('estBtn').disabled = G.phase !== 'play' || busy;
-    $('undoBtn').disabled = aiBusy || !G.history.length || G.phase === 'end';
+    $('estBtn').disabled = G.phase !== 'play' || (busy && !cvc);
+    $('undoBtn').disabled = cvc || aiBusy || !G.history.length || G.phase === 'end';
+    $('pauseBtn').hidden = !cvc || G.phase !== 'play';
+    $('pauseBtn').textContent = G.paused ? '▶️ 계속 보기' : '⏸️ 일시정지';
+    $('pauseBtn').classList.toggle('primary', !!G.paused);
+    $('passBtn').hidden = $('resignBtn').hidden = $('undoBtn').hidden = cvc;
     $('estBtn').classList.toggle('on', !!estimate);
 }
 function toastHint(html) { $('hint').innerHTML = html || ''; }
@@ -763,7 +812,10 @@ cvs.addEventListener('pointerup', e => {
     const p = pointAt(e);
     if (p < 0) return;
     if (G.phase === 'score') { toggleDead(p); return; }
-    if (G.phase !== 'play' || aiBusy || isAITurn()) return;
+    if (G.phase !== 'play' || aiBusy || isAITurn()) {
+        if (G.mode === 'cvc' && G.phase === 'play') toastHint('👀 관전 중이에요. 직접 두려면 대결 방식을 바꾸고 새 대국을 눌러요.');
+        return;
+    }
     // 휴대폰에서 큰 판은 두 번 눌러야 착수 (실수 방지)
     if (e.pointerType === 'touch' && N >= 13 && pendingTap !== p) {
         if (G.b[p] !== EMPTY) return;
@@ -807,21 +859,47 @@ $('resumeBtn').addEventListener('click', () => {
 });
 $('soundBtn').addEventListener('click', () => Snd.toggle());
 function settings() {
-    return { mode: $('mode').value, level: Number($('level').value), human: Number($('side').value), size: Number($('size').value), komi: Number($('komi').value) };
+    const mode = $('mode').value, level = Number($('level').value);
+    return { mode, level, levelB: level, levelW: Number($('levelW').value), human: Number($('side').value), size: Number($('size').value), komi: Number($('komi').value) };
+}
+// 대결 방식에 맞게 설정 칸 보이기/숨기기 (관전 모드에선 흑·백 난이도와 속도)
+function syncControls() {
+    const mode = $('mode').value, cvc = mode === 'cvc';
+    $('level').disabled = mode === 'pvp';
+    $('side').hidden = cvc; $('side').disabled = mode !== 'ai';
+    $('levelW').hidden = $('speed').hidden = !cvc;
+    for (const [sel, prefix] of [[$('level'), cvc ? '⚫ 흑 ' : ''], [$('levelW'), '⚪ 백 ']]) {
+        for (const o of sel.options) o.textContent = `${prefix}${o.value}단계 · ${LEVEL_NAMES[o.value]}`;
+    }
+    $('level').setAttribute('aria-label', cvc ? '흑 컴퓨터 난이도' : '난이도');
 }
 function startNew() { newGame(settings()); toastHint(''); }
 $('newBtn').addEventListener('click', () => {
     if (G && G.phase === 'play' && G.moves.length > 0 && !confirm('지금 대국을 끝내고 새로 시작할까요?')) return;
     startNew();
 });
-$('mode').addEventListener('change', () => { $('level').disabled = $('side').disabled = $('mode').value !== 'ai'; });
-$('level').addEventListener('change', () => { if (G) { G.level = Number($('level').value); save(); } });
+$('mode').addEventListener('change', syncControls);
+$('level').addEventListener('change', () => {
+    if (!G) return;
+    if (G.mode === 'cvc' && $('mode').value === 'cvc') G.levelB = Number($('level').value);
+    else G.level = Number($('level').value);
+    save(); render();
+});
+try { const sp = localStorage.getItem('baduk-speed'); if (sp && [...$('speed').options].some(o => o.value === sp)) $('speed').value = sp; } catch (e) { /* 기본값 */ }
+$('speed').addEventListener('change', () => { try { localStorage.setItem('baduk-speed', $('speed').value); } catch (e) { /* 무시 */ } });
+$('levelW').addEventListener('change', () => { if (G && G.mode === 'cvc') { G.levelW = Number($('levelW').value); save(); render(); } });
+$('pauseBtn').addEventListener('click', () => {
+    if (G.mode !== 'cvc') return;
+    G.paused = !G.paused;
+    render();
+    if (!G.paused) maybeAI();
+});
 
 // ===== 저장 =====
 function save() {
     try {
         localStorage.setItem(SAVE_KEY, JSON.stringify({
-            size: G.size, mode: G.mode, level: G.level, human: G.human, komi: G.komi, moves: G.moves,
+            size: G.size, mode: G.mode, level: G.level, levelB: G.levelB, levelW: G.levelW, human: G.human, komi: G.komi, moves: G.moves,
             phase: G.phase, dead: G.dead ? Array.from(G.dead) : null, result: G.result,
         }));
     } catch (e) { /* 무시 */ }
@@ -836,18 +914,22 @@ function load() {
         G.phase = s.phase; G.dead = s.dead ? Uint8Array.from(s.dead) : new Uint8Array(N * N); G.result = s.result;
         if (s.phase === 'score') { $('playActions').hidden = true; $('scoreActions').hidden = false; }
     }
-    $('mode').value = s.mode; $('level').value = String(s.level); $('side').value = String(s.human); $('size').value = String(s.size); $('komi').value = String(s.komi);
-    $('level').disabled = $('side').disabled = s.mode !== 'ai';
+    $('mode').value = s.mode; $('side').value = String(s.human); $('size').value = String(s.size); $('komi').value = String(s.komi);
+    $('level').value = String(s.mode === 'cvc' ? G.levelB : s.level); $('levelW').value = String(G.levelW);
+    if (G.mode === 'cvc' && G.phase === 'play') G.paused = true; // 다시 열면 일시정지 상태로
+    syncControls();
     render();
     return true;
 }
 function newGameSilent(s) {
     setupGeometry(s.size);
-    G = { size: s.size, mode: s.mode, level: s.level, human: s.human, komi: s.komi, b: new Int8Array(N * N), toMove: BLACK, ko: -1,
+    G = { size: s.size, mode: s.mode, level: s.level, levelB: s.levelB || s.level, levelW: s.levelW || s.level, paused: false,
+          human: s.human, komi: s.komi, b: new Int8Array(N * N), toMove: BLACK, ko: -1,
           caps: { 1: 0, 2: 0 }, moves: [], history: [], passes: 0, phase: 'play', last: -1, dead: null, result: null };
 }
 
 Snd.render();
+syncControls();
 if (!load()) startNew();
 else maybeAI();
 window.addEventListener('resize', render);
