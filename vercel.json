@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/api/baduk/:action", "destination": "/api/baduk?action=:action" }
+  ]
+}

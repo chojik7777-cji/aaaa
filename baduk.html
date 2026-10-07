@@ -23,11 +23,13 @@
         .status { font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 12px; min-height: 22px; }
         .status.win { color: #e53e3e; font-size: 18px; }
         .controls { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-        .controls button, .controls select {
+        .controls button, .controls select, .controls input {
             padding: 9px 12px; background: #f7fafc; color: #4a5568;
             border: 1px solid #e2e8f0; border-radius: 10px;
             font-size: 14px; font-family: inherit; cursor: pointer; transition: all 0.2s;
         }
+        .controls input { min-width: 120px; text-transform: uppercase; }
+        .online-info { font-size: 13px; color: #4a5568; margin: -2px 0 10px; min-height: 18px; }
         .controls button:hover:not(:disabled) { background: #667eea; color: white; border-color: #667eea; }
         .controls button:disabled { opacity: 0.4; cursor: default; }
         .controls button:focus-visible, .controls select:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
@@ -112,6 +114,7 @@
             <option value="ai">컴퓨터와 대국</option>
             <option value="pvp">2인 대국 (한 기기)</option>
             <option value="cvc">컴퓨터끼리 대국 (관전)</option>
+            <option value="net">온라인 방 대국</option>
         </select>
         <select id="level" aria-label="난이도">
             <option value="1">1단계 · 입문</option>
@@ -146,6 +149,12 @@
         </select>
         <button class="primary" id="newBtn">새 대국</button>
     </div>
+    <div class="controls" id="onlineControls" hidden>
+        <button id="createRoomBtn" type="button">온라인 방 만들기</button>
+        <input id="roomInput" maxlength="6" placeholder="방 코드 입력" autocomplete="off">
+        <button id="joinRoomBtn" type="button">방 입장</button>
+    </div>
+    <p class="online-info" id="onlineInfo"></p>
 
     <div class="scorebar">
         <div class="player" id="pB"><div class="dot b"></div><div><b id="nameB">흑</b><span id="capB">따낸 돌 0</span></div></div>
@@ -479,6 +488,7 @@ const Snd = (() => {
 const $ = id => document.getElementById(id);
 const SAVE_KEY = 'baduk-save-v1';
 let G = null;
+const NET = { active: false, roomId: null, playerId: null, playerIndex: null, guestCount: 0, timer: null };
 let estimate = null;     // 형세 판단 결과
 let pendingTap = -1;     // 휴대폰 두 번 눌러 착수
 let hover = -1;
@@ -498,6 +508,8 @@ function newGame(opts) {
     maybeAI();
 }
 const isAITurn = () => G.phase === 'play' && (G.mode === 'cvc' || (G.mode === 'ai' && G.toMove !== G.human));
+const isNetTurn = () => G && G.mode === 'net' && NET.active && G.phase === 'play' && (NET.playerIndex === null || NET.playerIndex === (G.toMove === BLACK ? 0 : 1));
+const canHumanPlay = () => G && G.phase === 'play' && !aiBusy && !isAITurn() && (G.mode !== 'net' || isNetTurn());
 const LEVEL_NAMES = { 1: '입문', 2: '초급', 3: '중급', 4: '고급' };
 const cvcLevel = c => (c === BLACK ? G.levelB : G.levelW);
 const colorName = c => (c === BLACK ? '흑' : '백');
@@ -755,7 +767,12 @@ function render() {
 }
 function renderInfo() {
     const me = G.mode === 'ai' ? G.human : 0;
-    if (G.mode === 'cvc') {
+    if (G.mode === 'net') {
+        const role = NET.playerIndex === 0 ? '나' : NET.playerIndex === 1 ? '상대' : '공동참여자';
+        $('nameB').textContent = `흑${NET.playerIndex === 0 ? ' (나)' : NET.playerIndex === 1 ? ' (상대)' : ''}`;
+        $('nameW').textContent = `백${NET.playerIndex === 1 ? ' (나)' : NET.playerIndex === 0 ? ' (상대)' : ''} · 덤 ${G.komi}`;
+        $('onlineInfo').textContent = NET.roomId ? `방 코드: ${NET.roomId} · 나는 ${role} · 공동참여자 ${NET.guestCount || 0}명` : '온라인 방을 만들거나 방 코드로 입장하세요.';
+    } else if (G.mode === 'cvc') {
         $('nameB').textContent = `흑 (컴퓨터 ${G.levelB}단계)`;
         $('nameW').textContent = `백 (컴퓨터 ${G.levelW}단계) · 덤 ${G.komi}`;
     } else {
@@ -772,16 +789,19 @@ function renderInfo() {
     if (G.phase === 'end') st.textContent = `🏁 대국 종료 — ${G.result}`;
     else if (G.phase === 'score') st.textContent = '🧮 계가 중 — 죽은 돌을 확인해 주세요';
     else if (G.mode === 'cvc') st.textContent = G.paused ? '⏸️ 관전 일시정지 — ▶️ 계속 보기를 누르세요' : `👀 관전 중 · ${G.toMove === BLACK ? '⚫' : '⚪'} ${colorName(G.toMove)} 컴퓨터(${cvcLevel(G.toMove)}단계) 차례`;
+    else if (G.mode === 'net' && !NET.roomId) st.textContent = '온라인 방을 만들거나 방 코드로 입장하세요';
+    else if (G.mode === 'net' && !isNetTurn()) st.textContent = `${G.toMove === BLACK ? '⚫' : '⚪'} ${colorName(G.toMove)} 차례 — 상대를 기다리는 중`;
     else if (isAITurn()) st.textContent = `🤖 컴퓨터(${colorName(G.toMove)}) 차례`;
     else st.textContent = `${G.toMove === BLACK ? '⚫' : '⚪'} ${colorName(G.toMove)} 차례${G.mode === 'ai' ? ' (나)' : ''}${G.passes ? ' · 상대가 패스했어요' : ''}`;
+    if (G.mode !== 'net') $('onlineInfo').textContent = '';
     renderButtons();
 }
 function renderButtons() {
-    const busy = aiBusy || isAITurn(), cvc = G.mode === 'cvc';
-    $('passBtn').disabled = G.phase !== 'play' || busy;
-    $('resignBtn').disabled = G.phase !== 'play' || busy;
-    $('estBtn').disabled = G.phase !== 'play' || (busy && !cvc);
-    $('undoBtn').disabled = cvc || aiBusy || !G.history.length || G.phase === 'end';
+    const busy = aiBusy || isAITurn() || (G.mode === 'net' && !isNetTurn()), cvc = G.mode === 'cvc', net = G.mode === 'net';
+    $('passBtn').disabled = G.phase !== 'play' || busy || (net && !NET.roomId);
+    $('resignBtn').disabled = G.phase !== 'play' || busy || (net && !NET.roomId);
+    $('estBtn').disabled = G.phase !== 'play' || (busy && !cvc && !net);
+    $('undoBtn').disabled = cvc || net || aiBusy || !G.history.length || G.phase === 'end';
     $('pauseBtn').hidden = !cvc || G.phase !== 'play';
     $('pauseBtn').textContent = G.paused ? '▶️ 계속 보기' : '⏸️ 일시정지';
     $('pauseBtn').classList.toggle('primary', !!G.paused);
@@ -812,8 +832,9 @@ cvs.addEventListener('pointerup', e => {
     const p = pointAt(e);
     if (p < 0) return;
     if (G.phase === 'score') { toggleDead(p); return; }
-    if (G.phase !== 'play' || aiBusy || isAITurn()) {
+    if (!canHumanPlay()) {
         if (G.mode === 'cvc' && G.phase === 'play') toastHint('👀 관전 중이에요. 직접 두려면 대결 방식을 바꾸고 새 대국을 눌러요.');
+        else if (G.mode === 'net' && G.phase === 'play') toastHint(NET.roomId ? '상대 차례입니다. 기다려 주세요.' : '온라인 방을 만들거나 입장해 주세요.');
         return;
     }
     // 휴대폰에서 큰 판은 두 번 눌러야 착수 (실수 방지)
@@ -821,7 +842,8 @@ cvs.addEventListener('pointerup', e => {
         if (G.b[p] !== EMPTY) return;
         pendingTap = p; render(); toastHint('같은 자리를 한 번 더 누르면 돌이 놓여요.'); return;
     }
-    if (doMove(p)) maybeAI();
+    if (G.mode === 'net') netMove(p);
+    else if (doMove(p)) maybeAI();
 });
 function toggleDead(p) {
     if (G.b[p] === EMPTY) return;
@@ -831,11 +853,12 @@ function toggleDead(p) {
     Snd.play('stone'); save(); render();
 }
 
-$('passBtn').addEventListener('click', () => { Snd.init(); if (doMove(-1)) maybeAI(); });
+$('passBtn').addEventListener('click', () => { Snd.init(); if (G.mode === 'net') netMove(-1); else if (doMove(-1)) maybeAI(); });
 $('undoBtn').addEventListener('click', undo);
 $('resignBtn').addEventListener('click', () => {
     if (!confirm('정말 기권할까요?')) return;
-    finish({ resign: G.mode === 'ai' ? G.human : G.toMove });
+    if (G.mode === 'net') netResign();
+    else finish({ resign: G.mode === 'ai' ? G.human : G.toMove });
 });
 $('estBtn').addEventListener('click', () => {
     if (estimate) { estimate = null; render(); toastHint(''); return; }
@@ -862,23 +885,89 @@ function settings() {
     const mode = $('mode').value, level = Number($('level').value);
     return { mode, level, levelB: level, levelW: Number($('levelW').value), human: Number($('side').value), size: Number($('size').value), komi: Number($('komi').value) };
 }
+
+// ===== 온라인 방 =====
+async function api(path, data) {
+    const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || '서버 오류');
+    return json;
+}
+function applyNet(payload) {
+    const g = payload.room.game;
+    setupGeometry(g.size);
+    G = { ...g, mode: 'net', b: Int8Array.from(g.b), dead: g.dead ? Uint8Array.from(g.dead) : null, history: [], paused: false };
+    NET.active = true; NET.roomId = payload.room.roomId; NET.guestCount = payload.room.guestCount || 0;
+    estimate = null; pendingTap = -1; aiBusy = false; $('thinking').hidden = true;
+    $('mode').value = 'net'; $('size').value = String(G.size); $('komi').value = String(G.komi);
+    syncControls(); hideScoreUI(); render();
+    if (G.phase === 'score') { $('playActions').hidden = true; $('scoreActions').hidden = false; }
+}
+function startPolling() {
+    clearInterval(NET.timer);
+    NET.timer = setInterval(async () => {
+        if (!NET.active || !NET.roomId) return;
+        try {
+            const res = await fetch(`/api/baduk/state?roomId=${encodeURIComponent(NET.roomId)}`, { cache: 'no-store' });
+            const json = await res.json();
+            if (json.ok) applyNet(json);
+        } catch (e) { console.warn(e); }
+    }, 900);
+}
+async function createRoom() {
+    try {
+        const cfg = settings(); cfg.mode = 'net';
+        const data = await api('/api/baduk/create', cfg);
+        NET.playerId = data.playerId; NET.playerIndex = data.playerIndex;
+        applyNet(data); startPolling(); toastHint('방 코드를 상대에게 알려주세요.');
+    } catch (e) { alert(e.message); }
+}
+async function joinRoom() {
+    try {
+        const code = $('roomInput').value.trim().toUpperCase();
+        if (!code) return alert('방 코드를 입력하세요.');
+        const data = await api('/api/baduk/join', { roomId: code });
+        NET.playerId = data.playerId; NET.playerIndex = data.playerIndex;
+        applyNet(data); startPolling(); toastHint('온라인 방에 입장했습니다.');
+    } catch (e) { alert(e.message); }
+}
+async function netMove(p) {
+    if (!NET.active || !NET.roomId) return toastHint('온라인 방을 만들거나 입장해 주세요.');
+    try { Snd.play('stone'); applyNet(await api('/api/baduk/move', { roomId: NET.roomId, playerId: NET.playerId, p })); }
+    catch (e) { toastHint(e.message); }
+}
+async function netReset() {
+    try { applyNet(await api('/api/baduk/reset', { roomId: NET.roomId, playerId: NET.playerId })); }
+    catch (e) { alert(e.message); }
+}
+async function netResign() {
+    try { applyNet(await api('/api/baduk/resign', { roomId: NET.roomId, playerId: NET.playerId })); }
+    catch (e) { alert(e.message); }
+}
 // 대결 방식에 맞게 설정 칸 보이기/숨기기 (관전 모드에선 흑·백 난이도와 속도)
 function syncControls() {
-    const mode = $('mode').value, cvc = mode === 'cvc';
-    $('level').disabled = mode === 'pvp';
-    $('side').hidden = cvc; $('side').disabled = mode !== 'ai';
+    const mode = $('mode').value, cvc = mode === 'cvc', net = mode === 'net';
+    $('level').disabled = mode === 'pvp' || net;
+    $('side').hidden = cvc || net; $('side').disabled = mode !== 'ai';
     $('levelW').hidden = $('speed').hidden = !cvc;
+    $('onlineControls').hidden = !net;
     for (const [sel, prefix] of [[$('level'), cvc ? '⚫ 흑 ' : ''], [$('levelW'), '⚪ 백 ']]) {
         for (const o of sel.options) o.textContent = `${prefix}${o.value}단계 · ${LEVEL_NAMES[o.value]}`;
     }
     $('level').setAttribute('aria-label', cvc ? '흑 컴퓨터 난이도' : '난이도');
 }
-function startNew() { newGame(settings()); toastHint(''); }
+function startNew() {
+    if (G && G.mode === 'net' && NET.active) { netReset(); toastHint(''); return; }
+    if (NET.active && $('mode').value !== 'net') { clearInterval(NET.timer); NET.active = false; NET.roomId = NET.playerId = null; NET.playerIndex = null; NET.guestCount = 0; }
+    newGame(settings()); toastHint('');
+}
 $('newBtn').addEventListener('click', () => {
     if (G && G.phase === 'play' && G.moves.length > 0 && !confirm('지금 대국을 끝내고 새로 시작할까요?')) return;
     startNew();
 });
-$('mode').addEventListener('change', syncControls);
+$('mode').addEventListener('change', () => { syncControls(); if ($('mode').value === 'net') toastHint('온라인 방을 만들거나 방 코드로 입장하세요.'); });
+$('createRoomBtn').addEventListener('click', createRoom);
+$('joinRoomBtn').addEventListener('click', joinRoom);
 $('level').addEventListener('change', () => {
     if (!G) return;
     if (G.mode === 'cvc' && $('mode').value === 'cvc') G.levelB = Number($('level').value);
@@ -899,7 +988,7 @@ $('pauseBtn').addEventListener('click', () => {
 function save() {
     try {
         localStorage.setItem(SAVE_KEY, JSON.stringify({
-            size: G.size, mode: G.mode, level: G.level, levelB: G.levelB, levelW: G.levelW, human: G.human, komi: G.komi, moves: G.moves,
+            size: G.size, mode: G.mode === 'net' ? 'pvp' : G.mode, level: G.level, levelB: G.levelB, levelW: G.levelW, human: G.human, komi: G.komi, moves: G.moves,
             phase: G.phase, dead: G.dead ? Array.from(G.dead) : null, result: G.result,
         }));
     } catch (e) { /* 무시 */ }
