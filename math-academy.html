@@ -1,86 +1,1662 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AI 수학학원: 60초 운영</title>
-  <style>
-    *{box-sizing:border-box} body{margin:0;min-height:100vh;font-family:'Segoe UI','Apple SD Gothic Neo','맑은 고딕',sans-serif;background:linear-gradient(135deg,#111827 0%,#312e81 45%,#0f766e 100%);color:#172033;padding:16px}.app{max-width:1180px;margin:0 auto}.hero,.panel,.card,.report{background:rgba(255,255,255,.94);border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.22)}.hero{padding:24px;margin-bottom:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}h1{margin:0;color:#1e1b4b;font-size:30px}.sub{margin:8px 0 0;color:#475569;line-height:1.55}.btn,a.btn{border:0;border-radius:14px;padding:12px 15px;background:#4f46e5;color:#fff;font-weight:800;text-decoration:none;cursor:pointer;box-shadow:0 8px 18px rgba(79,70,229,.25)}.btn.secondary{background:#e0e7ff;color:#3730a3;box-shadow:none}.btn.warn{background:#f97316}.btn.good{background:#059669}.btn:disabled{opacity:.55;cursor:not-allowed}.screen{display:none}.screen.active{display:block}.scenario-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:18px}.scenario{border:2px solid #e5e7eb;border-radius:18px;padding:18px;background:#fff;text-align:left;cursor:pointer;transition:.2s}.scenario:hover{transform:translateY(-3px);border-color:#6366f1;box-shadow:0 12px 30px rgba(0,0,0,.12)}.scenario h2{margin:0 0 8px;color:#312e81}.scenario p{color:#475569;line-height:1.55}.tag{display:inline-block;border-radius:999px;background:#ecfeff;color:#0e7490;font-size:12px;font-weight:900;padding:5px 9px;margin-bottom:8px}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.panel{padding:18px}.stats{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:12px}.stat b{display:block;font-size:22px;color:#1e40af}.stat span{font-size:12px;color:#64748b}.bar{height:8px;background:#e2e8f0;border-radius:999px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#4f46e5);border-radius:999px}.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}.action{background:#fff;border:1px solid #dbeafe;border-radius:16px;padding:14px;text-align:left;cursor:pointer}.action:hover{border-color:#4f46e5;background:#eef2ff}.action strong{display:block;color:#1e1b4b;margin-bottom:6px}.action small{color:#64748b;line-height:1.45}.clock{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.time{font-size:34px;font-weight:900;color:#dc2626}.period{font-weight:900;color:#3730a3}.npc{display:grid;gap:10px}.msg{border-left:5px solid #4f46e5;background:#f8fafc;border-radius:14px;padding:12px}.msg b{display:block;color:#1e1b4b;margin-bottom:5px}.log{height:260px;overflow:auto;background:#0f172a;color:#dbeafe;border-radius:16px;padding:12px;font-size:13px}.log div{border-bottom:1px solid rgba(255,255,255,.08);padding:6px 0}.report{padding:22px;text-align:center}.grade{font-size:64px;font-weight:1000;color:#4f46e5}.report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:18px 0;text-align:left}.mini{background:#f8fafc;border-radius:14px;padding:12px}.mini b{color:#1e1b4b}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.notice{font-size:12px;color:#64748b;margin-top:10px}@media(max-width:800px){body{padding:10px}h1{font-size:24px}.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.actions{grid-template-columns:1fr}.time{font-size:28px}.hero,.panel{padding:14px}}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수학학원 운영 게임</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body {
+            font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex;
+            justify-content: center; align-items: flex-start; padding: 16px;
+            color: #2d3748;
+        }
+        .card {
+            background: white; border-radius: 20px;
+            padding: 24px 20px; max-width: 760px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { font-size: 26px; text-align: center; margin-bottom: 4px; display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .sub { text-align: center; font-size: 13px; color: #718096; margin-bottom: 14px; line-height: 1.5; }
+        h2 { font-size: 16px; color: #4a5568; margin: 18px 0 8px; }
+        button, select {
+            font-family: inherit; font-size: 14px; cursor: pointer;
+            padding: 8px 12px; border-radius: 10px; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; transition: all 0.15s;
+        }
+        button:hover:not(:disabled) { background: #667eea; color: white; border-color: #667eea; }
+        button:disabled { opacity: 0.4; cursor: default; }
+        button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
+        .primary { background: #667eea; color: white; border-color: #667eea; font-weight: 600; }
+        .primary:hover:not(:disabled) { background: #5a67d8; }
+        .rename { font-size: 13px; padding: 4px 8px; border-radius: 8px; color: #718096; }
+
+        .stats {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+            background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat { text-align: center; min-width: 0; }
+        .stat .k { font-size: 12px; color: #718096; }
+        .stat .v { font-size: 15px; font-weight: 700; color: #2d3748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .stat .v.minus { color: #c53030; }
+        .meter { height: 5px; background: #edf2f7; border-radius: 3px; overflow: hidden; margin: 4px auto 0; max-width: 100px; }
+        .meter div { height: 100%; border-radius: 3px; background: #9f7aea; }
+
+        .audio-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+        .audio-row button { padding: 5px 10px; font-size: 13px; }
+        .audio-row button.off { opacity: 0.55; }
+        #scene {
+            display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
+            border-radius: 14px; background: #eef2f0;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 18px rgba(0,0,0,0.12);
+        }
+
+        .phase-title { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .phase-title b { font-size: 17px; }
+        .ap { display: flex; gap: 4px; align-items: center; font-size: 13px; color: #718096; }
+        .ap span { width: 14px; height: 14px; border-radius: 50%; background: #667eea; display: inline-block; }
+        .ap span.used { background: #e2e8f0; }
+        .event { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #fefcbf; color: #744210; font-size: 14px; line-height: 1.6; }
+        .event.calm { background: #ebf8ff; color: #2a4365; }
+
+        .actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; }
+        .act { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: 10px; }
+        .act .t { font-weight: 700; font-size: 14px; }
+        .act .d { font-size: 12px; color: #718096; line-height: 1.4; }
+        .act .c { font-size: 11px; color: #a0aec0; }
+        .act:hover:not(:disabled) .d, .act:hover:not(:disabled) .c { color: #e2e8f0; }
+        .settings { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 14px; color: #4a5568; }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #4a5568; margin-top: 8px; }
+        .chips span { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 3px 10px; }
+
+        .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+        .stu {
+            border: 2px solid #e2e8f0; border-radius: 12px; padding: 8px 10px; background: white;
+            display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-align: left; color: #2d3748;
+        }
+        button.stu:hover { border-color: #a3bffa; background: white; color: #2d3748; }
+        .stu.sel { border-color: #667eea; background: #f0f4ff; box-shadow: 0 0 0 3px rgba(102,126,234,0.2); }
+        .stu .top { display: flex; justify-content: space-between; align-items: center; gap: 4px; flex-wrap: wrap; }
+        .stu .nm { font-weight: 700; font-size: 14px; white-space: nowrap; }
+        .stu .gr { color: #718096; font-size: 11px; }
+        .stu .tags { min-height: 15px; color: #718096; font-size: 11px; }
+        .bar { display: flex; align-items: center; gap: 6px; }
+        .bar i { font-style: normal; width: 34px; color: #718096; font-size: 11px; }
+        .bar div { flex: 1; height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
+        .bar div b { display: block; height: 100%; border-radius: 3px; }
+        .teachers { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .tch { border: 1px solid #e2e8f0; border-radius: 12px; padding: 8px 10px; font-size: 13px; background: #fbfdff; }
+        .tch b { font-size: 14px; }
+        .tch .m { color: #718096; font-size: 12px; margin-top: 2px; }
+        .start-row { display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+        .start-row .primary { padding: 12px 28px; font-size: 16px; }
+        .lesson-note { text-align: center; font-size: 14px; color: #4a5568; margin-top: 12px; min-height: 22px; }
+
+        /* 직접 강의 미니게임 */
+        .quiz { text-align: center; }
+        .quiz .q { font-size: 30px; font-weight: 800; color: #22543d; background: #2f4f3a; color: #f0fff4; border-radius: 12px; padding: 18px 10px; margin: 10px 0; font-family: 'Segoe UI', sans-serif; letter-spacing: 0.5px; border: 6px solid #8b5e3c; }
+        .quiz .q small { display: block; font-size: 13px; font-weight: 500; color: #c6f6d5; margin-top: 6px; letter-spacing: 0; }
+        .quiz .row { display: flex; gap: 8px; justify-content: center; align-items: center; }
+        .quiz input { font: inherit; font-size: 22px; width: 150px; text-align: center; padding: 8px; border: 2px solid #e2e8f0; border-radius: 10px; }
+        .quiz .timer { height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+        .quiz .timer div { height: 100%; background: linear-gradient(90deg, #f6ad55, #e53e3e); width: 100%; }
+        .quiz .info { display: flex; justify-content: space-between; font-size: 13px; color: #718096; }
+        .quiz .fb { min-height: 22px; font-weight: 700; margin-top: 8px; }
+        .keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+        .keypad button { font-size: 18px; padding: 10px 0; }
+
+        .toast-wrap { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 20; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
+        .toast { background: rgba(45,55,72,0.94); color: white; padding: 8px 14px; border-radius: 16px; font-size: 14px; animation: pop 0.2s ease-out; text-align: center; line-height: 1.45; }
+        .toast.good { background: rgba(47,133,90,0.95); }
+        .toast.bad { background: rgba(197,48,48,0.95); }
+        .toast.chat { background: #fee500; color: #3c1e1e; }
+        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .modal-bg { position: fixed; inset: 0; background: rgba(26,32,44,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+        .modal { background: white; border-radius: 18px; padding: 22px; max-width: 500px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+        .modal h3 { font-size: 19px; text-align: center; margin-bottom: 12px; }
+        .modal .row { display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+        .choices { display: flex; flex-direction: column; gap: 8px; }
+        .choices button { text-align: left; line-height: 1.5; padding: 10px 12px; }
+        .who { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
+        .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; background: #f0f4ff; flex: none; }
+        .say { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px 14px 14px 14px; padding: 10px 12px; font-size: 14px; line-height: 1.6; }
+        .say b { display: block; font-size: 12px; color: #718096; margin-bottom: 2px; }
+        .feedback { margin-top: 12px; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+        .feedback.g2 { background: #f0fff4; color: #22543d; }
+        .feedback.g1 { background: #fffaf0; color: #744210; }
+        .feedback.g0 { background: #fff5f5; color: #742a2a; }
+        .report { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+        .report td { padding: 6px 4px; border-bottom: 1px solid #edf2f7; }
+        .report td:last-child { text-align: right; font-weight: 600; }
+        .report tr.total td { border-top: 2px solid #cbd5e0; border-bottom: none; font-size: 16px; }
+        .plus { color: #2f855a; } .minus { color: #c53030; }
+        .msg { text-align: center; font-size: 14px; color: #4a5568; margin: 12px 0 0; line-height: 1.65; }
+        .chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; margin: 18px 0 2px; padding: 0 4px; border-bottom: 1px solid #e2e8f0; position: relative; }
+        .chart div { flex: 1; border-radius: 4px 4px 0 0; position: relative; min-height: 2px; background: linear-gradient(#a3bffa, #667eea); }
+        .chart div.neg { background: linear-gradient(#feb2b2, #e53e3e); }
+        .chart div span { position: absolute; top: -15px; left: -4px; right: -4px; text-align: center; font-size: 9px; color: #4a5568; white-space: nowrap; }
+        .chart-x { display: flex; gap: 4px; padding: 0 4px; font-size: 10px; color: #a0aec0; }
+        .chart-x span { flex: 1; text-align: center; }
+        .grade { font-size: 44px; text-align: center; margin: 6px 0; }
+        .name-input { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; }
+        .cand { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; text-align: left; }
+        .cand b { font-size: 15px; }
+        .rules { margin-top: 16px; text-align: left; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7fafc; }
+        .rules summary { cursor: pointer; padding: 12px 16px; font-weight: 600; color: #4a5568; font-size: 15px; }
+        .rules-body { padding: 0 16px 16px; color: #4a5568; font-size: 14px; line-height: 1.75; }
+        .rules-body ul { padding-left: 18px; }
+        .footer { margin-top: 18px; font-size: 13px; text-align: center; color: #a0aec0; letter-spacing: 0.3px; }
+
+        @media (max-width: 560px) {
+            .card { padding: 18px 12px; }
+            .stats { grid-template-columns: repeat(3, 1fr); }
+            .roster { grid-template-columns: repeat(2, 1fr); }
+            .actions { grid-template-columns: repeat(2, 1fr); }
+            .quiz .q { font-size: 24px; }
+        }
+    </style>
 </head>
 <body>
-<div class="app">
-  <header class="hero">
-    <div class="top"><div><h1>🧮 AI 수학학원: 60초 운영</h1><p class="sub">60초 동안 수학학원 원장이 되어 수업품질, 학부모 신뢰, 학생만족, 강사에너지를 균형 있게 관리하세요. AI는 실제 API가 아닌 <b>로컬 시뮬레이션 조언자</b>입니다.</p></div><div class="toolbar"><a class="btn secondary" href="index.html">자기소개</a><button class="btn secondary" id="resetAll">저장 초기화</button></div></div>
-  </header>
+<div class="card">
+    <h1><span>🧮 <span id="acName">우리 수학학원</span></span><button class="rename" id="renameBtn" aria-label="학원 이름 바꾸기">✏️ 이름 바꾸기</button></h1>
+    <p class="sub">수학학원 원장이 되어 1년(3월~이듬해 2월) 동안 학원을 운영해 보세요.<br>직접 칠판 앞에서 문제를 풀어 강의하고, 강사를 뽑고, 아이들의 성적을 올려 동네 최고의 학원을 만들어요!</p>
 
-  <section id="start" class="screen active panel">
-    <h2>운영 콘셉트를 고르세요</h2>
-    <div class="scenario-grid" id="scenarioGrid"></div>
-    <p class="notice">자동 저장됩니다. 중간에 나갔다 와도 이어서 할 수 있습니다.</p>
-  </section>
-
-  <section id="game" class="screen">
-    <div class="grid">
-      <main class="panel">
-        <div class="top"><div class="clock"><span class="time" id="timeLeft">60</span><span class="period" id="periodText">개원 준비</span></div><div class="toolbar"><button class="btn good" id="pauseBtn">일시정지</button><button class="btn warn" id="finishBtn">하루 마감</button></div></div>
-        <div class="stats" id="stats"></div>
-        <h3>이번 교시에 할 일</h3>
-        <div class="actions" id="actions"></div>
-      </main>
-      <aside class="panel">
-        <div class="npc" id="npc"></div>
-        <h3>운영 로그</h3>
-        <div class="log" id="log"></div>
-      </aside>
+    <div class="stats">
+        <div class="stat"><div class="k">기간</div><div class="v" id="sMonth"></div></div>
+        <div class="stat"><div class="k">운영 자금</div><div class="v" id="sMoney"></div></div>
+        <div class="stat"><div class="k">원생</div><div class="v" id="sStudents"></div></div>
+        <div class="stat"><div class="k">평판</div><div class="v" id="sRep"></div><div class="meter"><div id="mRep"></div></div></div>
+        <div class="stat"><div class="k">평균 실력</div><div class="v" id="sSkill"></div><div class="meter"><div id="mSkill" style="background:#48bb78"></div></div></div>
     </div>
-  </section>
 
-  <section id="end" class="screen report">
-    <h2 id="reportTitle">하루 운영 리포트</h2>
-    <div class="grade" id="grade">A</div>
-    <p id="gradeText"></p>
-    <div class="report-grid" id="reportGrid"></div>
-    <div class="toolbar" style="justify-content:center"><button class="btn" id="againBtn">다시 운영하기</button><a class="btn secondary" href="index.html">자기소개로</a></div>
-  </section>
+    <div class="audio-row">
+        <button id="musicBtn" title="단축키: M">🎵 음악</button>
+        <button id="sfxBtn">🔊 효과음</button>
+    </div>
+    <canvas id="scene" width="720" height="330" aria-label="학원 강의실 모습"></canvas>
+
+    <section id="plan">
+        <div class="phase-title">
+            <b id="monthTitle"></b>
+            <div class="ap" id="apDots"></div>
+        </div>
+        <div class="event" id="eventBox"></div>
+
+        <h2>🗓️ 이번 달 할 일</h2>
+        <div class="actions" id="actions"></div>
+        <div class="chips" id="chips"></div>
+
+        <h2>💰 수강료 (한 달)</h2>
+        <div class="settings">
+            <select id="feeSel" aria-label="월 수강료">
+                <option value="300000">30만 원 (저렴 · 문의 많음)</option>
+                <option value="400000">40만 원 (보통)</option>
+                <option value="500000">50만 원 (프리미엄 · 문의 적음)</option>
+                <option value="600000">60만 원 (최고급 · 평판 높을 때)</option>
+            </select>
+            <span style="font-size:12px;color:#718096">비싸면 만족도 기준이 높아지고 신규 문의가 줄어요.</span>
+        </div>
+
+        <h2 id="tchTitle">👩‍🏫 강사진</h2>
+        <div class="teachers" id="teachers"></div>
+
+        <h2 id="stuTitle">👥 원생</h2>
+        <p class="sub" style="text-align:left;margin-bottom:8px">📞 학부모 상담은 원생을 먼저 눌러 선택하세요.</p>
+        <div class="roster" id="roster"></div>
+
+        <div class="start-row">
+            <button class="primary" id="classBtn">🔔 이번 달 수업 시작</button>
+            <button id="resetBtn">처음부터 다시</button>
+        </div>
+    </section>
+
+    <section id="lesson" hidden>
+        <p class="lesson-note" id="lessonNote"></p>
+        <div class="start-row"><button id="skipBtn">⏩ 빨리 감기</button></div>
+    </section>
+
+    <details class="rules">
+        <summary>📖 게임 방법</summary>
+        <div class="rules-body">
+            <ul>
+                <li>한 달에 <b>행동 4번</b>을 쓸 수 있어요. 할 일을 고르고 <b>이번 달 수업 시작</b>을 누르면 한 달이 지나가요.</li>
+                <li><b>🧑‍🏫 직접 강의</b>: 칠판의 수학 문제를 제한 시간 안에 풀어요. 많이 맞힐수록 이번 달 수업 품질이 올라 원생 실력이 쑥쑥 자라요.</li>
+                <li>원생이 많아지면 <b>강사를 채용</b>하고 <b>강의실</b>을 늘려야 해요. 한 반(강사 1명)은 최대 10명이에요.</li>
+                <li>4·6·10·12월에는 <b>내신 시험</b>, 11월에는 <b>수능</b>이 있어요. 성적이 오르면 평판이 올라가고 문의가 늘어요.</li>
+                <li>만족도가 낮은 원생은 학원을 그만둘 수 있어요. 학부모 상담으로 마음을 붙잡아 보세요.</li>
+                <li>운영 자금이 바닥나면 폐업이에요. 1년 뒤 순이익·원생 수·성적 향상으로 원장 등급이 매겨져요.</li>
+            </ul>
+        </div>
+    </details>
+
+    <p class="footer">made by jeongik</p>
 </div>
+
+<div class="toast-wrap" id="toasts"></div>
+<div class="modal-bg" id="modalBg" hidden><div class="modal" id="modal"></div></div>
+
 <script>
-const scenarios={
-  내신집중반:{tag:'안정형',desc:'시험 직전 성적 향상과 학부모 신뢰를 노립니다.',money:520,rep:55,sat:58,parent:66,energy:70,quality:62,students:24,homework:58},
-  사고력수학반:{tag:'장기성장형',desc:'깊이 있는 문제 해결력과 입소문을 키웁니다.',money:460,rep:62,sat:64,parent:55,energy:74,quality:68,students:18,homework:52},
-  AI수학코칭반:{tag:'실험형',desc:'개별 진단과 자동 피드백으로 차별화합니다.',money:430,rep:50,sat:60,parent:52,energy:67,quality:72,students:20,homework:65}
+'use strict';
+
+// ===== 기본 설정 =====
+const TOTAL_MONTHS = 12;
+const SAVE_KEY = 'math-academy-save-v2';
+const NAME_KEY = 'math-academy-name-v1';
+const DEFAULT_NAME = '우리 수학학원';
+const RENT = 1500000, BOOK_COST = 20000, CLASS_SIZE = 10, AP_PER_MONTH = 4;
+const MONTH_LABEL = m => `${((m + 1) % 12) + 1}월`;           // 1 → 3월 … 10 → 12월, 11 → 1월, 12 → 2월
+const EXAMS = { 2: '1학기 중간고사', 4: '1학기 기말고사', 8: '2학기 중간고사', 10: '2학기 기말고사' };
+const SUNEUNG_MONTH = 9;   // 11월
+
+const ACTIONS = {
+    teach:   { name: '직접 강의', icon: '🧑‍🏫', ap: 1, cost: 0, desc: '칠판 앞에서 수학 문제 풀기! 맞힐수록 수업 품질 ↑' },
+    consult: { name: '학부모 상담', icon: '📞', ap: 1, cost: 0, target: true, desc: '선택한 원생 만족도 ↑ · 고민을 알게 돼요' },
+    promo:   { name: '블로그·전단지 홍보', icon: '📢', ap: 1, cost: 500000, desc: '이번 달 신규 문의 ↑' },
+    seminar: { name: '입시 설명회', icon: '🎤', ap: 2, cost: 1500000, desc: '평판 ↑ · 문의 크게 ↑' },
+    mock:    { name: '모의고사 실시', icon: '📝', ap: 1, cost: 300000, desc: '원생 의욕 ↑ · 약점 파악으로 수업 품질 ↑' },
+    hire:    { name: '강사 채용', icon: '🤝', ap: 1, cost: 0, desc: '면접 보고 강사를 뽑아요 (월급 발생)' },
+    build:   { name: '시설 투자', icon: '🏗️', ap: 1, cost: 0, desc: '강의실·자습실·셔틀버스·질문방' },
+    train:   { name: '강사 연수', icon: '🎓', ap: 1, cost: 1000000, desc: '모든 강사 실력 +6' },
+    book:    { name: '자체 교재 개발', icon: '📚', ap: 1, cost: 400000, desc: '이번 달 수업 품질 +20, 다음 달부터 교재비 절약' },
 };
-const defs={money:'운영자금',rep:'평판',sat:'학생만족',parent:'학부모신뢰',energy:'강사에너지',quality:'수업품질',students:'등록생',homework:'숙제완성'};
-const actions=[
- {name:'문제풀이 특강',tip:'수업품질·평판 상승, 강사에너지 감소',fx:{quality:7,rep:5,energy:-8,sat:2}},
- {name:'개별 상담',tip:'학부모신뢰 상승, 에너지 감소',fx:{parent:9,energy:-6,rep:2}},
- {name:'숙제 피드백',tip:'숙제완성·학생만족 상승, 에너지 감소',fx:{homework:10,sat:5,energy:-7}},
- {name:'광고/상담전화',tip:'등록생·자금 상승, 신뢰 소폭 위험',fx:{students:2,money:70,energy:-5,parent:-2}},
- {name:'교재개편',tip:'수업품질 상승, 자금·에너지 사용',fx:{quality:10,money:-80,energy:-7,rep:2}},
- {name:'강사휴식',tip:'에너지 회복, 단기 만족도 소폭 감소',fx:{energy:16,sat:-3,quality:-2}},
- {name:'무료 진단테스트',tip:'상담 유입과 학부모신뢰 상승, 자금 사용',fx:{parent:6,students:1,rep:4,money:-50}},
- {name:'상위권 클리닉',tip:'평판 크게 상승, 만족도는 난도 때문에 흔들림',fx:{rep:8,quality:5,sat:-2,energy:-6}}
+const FACILITIES = {
+    room:    { name: '강의실 증설', icon: '🚪', cost: 5000000, upkeep: 300000, max: 3, desc: '정원 +10명 (최대 5개 강의실)' },
+    study:   { name: '자습실', icon: '📖', cost: 5000000, upkeep: 200000, max: 1, desc: '원생 의욕·실력 성장 ↑' },
+    shuttle: { name: '셔틀버스', icon: '🚌', cost: 6000000, upkeep: 600000, max: 1, desc: '신규 문의 ↑ · 만족도 ↑' },
+    qna:     { name: '온라인 질문방', icon: '💬', cost: 1500000, upkeep: 100000, max: 1, desc: '만족도 ↑' },
+};
+
+const SURNAMES = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '송', '전', '홍', '유'];
+const GIVEN = ['민준', '서윤', '도윤', '서연', '하준', '지우', '시우', '하윤', '주원', '지유', '예준', '수아', '지호', '채원', '준서', '지민',
+               '은우', '다은', '건우', '예린', '현우', '소율', '우진', '하은', '선우', '윤서', '유찬', '가은', '태윤', '나연', '승민', '예서', '시윤', '아린'];
+const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3'];
+const TEACHER_STYLES = [
+    { key: 'kind', name: '친절한 설명', icon: '😊', desc: '원생 만족도가 잘 올라요' },
+    { key: 'strict', name: '엄격한 관리', icon: '📏', desc: '실력은 잘 오르지만 만족도는 조금 낮아요' },
+    { key: 'star', name: '스타 강사', icon: '⭐', desc: '평판과 신규 문의가 늘어요' },
+    { key: 'calm', name: '꼼꼼한 첨삭', icon: '✍️', desc: '하위권 원생 실력이 잘 올라요' },
 ];
-const events=[
- ['학부모 문의 폭주',{parent:4,students:1,energy:-3}],['시험 직전 결석',{sat:-4,homework:-5}],['숙제 미제출 증가',{homework:-7,parent:-2}],['성적 향상 후기',{rep:7,parent:5}],['강사 피로 누적',{energy:-8,quality:-2}],['신규 상담 예약',{students:1,money:40}],['학생 질문이 폭발적으로 늘어남',{sat:4,energy:-5,quality:2}]
+const CONCERNS = [
+    { key: 'grade', line: '아이가 열심히 다니는데 성적이 그대로예요. 계속 보내야 할지 고민이에요.',
+      c: [{ t: '최근 모의고사·숙제 기록을 보여드리고, 약점 단원과 앞으로 3개월 계획을 구체적으로 말씀드린다.', g: 2 },
+          { t: '"조금만 더 기다리시면 오릅니다"라고 안심시킨다.', g: 1 },
+          { t: '"아이가 숙제를 잘 안 해와서 그래요."라고 말한다.', g: 0 }] },
+    { key: 'fee', line: '요즘 형편이 좀 어려워서 학원비가 부담돼요…',
+      c: [{ t: '형편을 이해한다며 형제 할인이나 분납 같은 방법을 함께 찾아보고, 아이 성장 상황을 꼼꼼히 공유한다.', g: 2 },
+          { t: '다음 달까지만 다녀보고 결정하시라고 한다.', g: 1 },
+          { t: '"저희 학원은 원래 이 가격이에요."라고 말한다.', g: 0 }] },
+    { key: 'friend', line: '아이가 반 친구들이랑 잘 안 맞는다고 학원 가기 싫다네요.',
+      c: [{ t: '아이와 따로 이야기해 보고, 원하면 반 이동도 검토하겠다고 약속한다.', g: 2 },
+          { t: '수업 시간에 신경 써서 지켜보겠다고 한다.', g: 1 },
+          { t: '"공부하러 오는 곳이니 친구는 상관없어요."라고 한다.', g: 0 }] },
+    { key: 'other', line: '옆 동네에 새로 생긴 학원이 좋다던데, 옮길까 고민 중이에요.',
+      c: [{ t: '우리 학원의 커리큘럼과 아이의 성장 기록을 차분히 설명하고, 아이 의견도 꼭 들어보시라고 한다.', g: 2 },
+          { t: '이번 달 수강료를 조금 깎아드린다고 한다.', g: 1 },
+          { t: '"그 학원은 별로라던데요."라고 경쟁 학원을 깎아내린다.', g: 0 }] },
+    { key: 'pace', line: '진도가 너무 빨라서 아이가 따라가기 힘들어해요.',
+      c: [{ t: '부족한 단원을 보충 과제와 질문 시간으로 채워주겠다고 하고, 2주 뒤 다시 연락드리기로 한다.', g: 2 },
+          { t: '반을 한 단계 낮추는 것을 권한다.', g: 1 },
+          { t: '"다른 아이들은 다 따라와요."라고 말한다.', g: 0 }] },
 ];
-let S=null,timer=null,paused=false;
-const $=id=>document.getElementById(id); const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
-function save(){localStorage.setItem('mathAcademyGame',JSON.stringify(S));}
-function load(){try{S=JSON.parse(localStorage.getItem('mathAcademyGame')||'null')}catch{S=null}}
-function newGame(name){S={scenario:name,...scenarios[name],time:60,period:0,ended:false,log:[`${name}으로 개원했습니다.`],acts:0};save();show('game');startTimer();render();}
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active')}
-function applyFx(fx){for(const [k,v] of Object.entries(fx)){if(['money','students'].includes(k))S[k]=Math.max(0,S[k]+v);else S[k]=clamp(S[k]+v)}}
-function doAction(a){if(!S||S.ended||paused)return;applyFx(a.fx);S.acts++;S.log.unshift(`실행: ${a.name}`);save();render()}
-function tick(){if(!S||paused||S.ended)return;S.time--; if(S.time%5===0){S.period++; const [m,fx]=events[(S.period+S.students+S.acts)%events.length];applyFx(fx);S.log.unshift(`이벤트: ${m}`)} if(S.time<=0)endDay(); save();render();}
-function startTimer(){clearInterval(timer);timer=setInterval(tick,1000)}
-function weak(){return Object.entries({평판:S.rep,학생만족:S.sat,학부모신뢰:S.parent,강사에너지:S.energy,수업품질:S.quality,숙제완성:S.homework}).sort((a,b)=>a[1]-b[1])[0]}
-function pickActions(){const [w]=weak(); let names=['문제풀이 특강','개별 상담','숙제 피드백','강사휴식']; if(w==='평판')names=['광고/상담전화','무료 진단테스트','상위권 클리닉','문제풀이 특강']; if(w==='학부모신뢰')names=['개별 상담','무료 진단테스트','숙제 피드백','교재개편']; if(w==='강사에너지')names=['강사휴식','개별 상담','문제풀이 특강','광고/상담전화']; if(w==='수업품질')names=['교재개편','문제풀이 특강','상위권 클리닉','숙제 피드백']; return names.map(n=>actions.find(a=>a.name===n));}
-function advice(){const [w,v]=weak();return {vice:`가장 약한 지표는 ${w}(${v})입니다. 이번 교시는 ${w}을 보완하는 선택이 유리합니다.`,student:S.sat>70?'학생들이 수업 흐름을 잘 따라오고 있어요.':S.homework<50?'숙제 피드백이 부족하다는 반응이 나옵니다.':'분위기는 보통입니다. 한 번의 좋은 수업이 필요합니다.',parent:S.parent>70?'학부모 신뢰가 안정적입니다. 재등록 가능성이 높습니다.':S.parent<50?'학부모 상담과 진단 리포트가 필요합니다.':'문의는 있지만 확신까지는 조금 더 필요합니다.'}}
-function render(){if(!S)return;$('timeLeft').textContent=S.time;$('periodText').textContent=S.period?`${S.period}교시 진행 중`:'개원 준비';$('stats').innerHTML=Object.entries(defs).map(([k,n])=>`<div class="stat"><b>${k==='money'?S[k]+'만':S[k]}</b><span>${n}</span>${['money','students'].includes(k)?'':`<div class="bar"><i style="width:${S[k]}%"></i></div>`}</div>`).join('');$('actions').innerHTML=pickActions().map((a,i)=>`<button class="action" data-i="${i}"><strong>${a.name}</strong><small>${a.tip}</small></button>`).join('');document.querySelectorAll('.action').forEach((b,i)=>b.onclick=()=>doAction(pickActions()[i]));const ad=advice();$('npc').innerHTML=`<div class="msg"><b>AI 부원장 조언</b>${ad.vice}</div><div class="msg"><b>학생 반응</b>${ad.student}</div><div class="msg"><b>학부모 메시지</b>${ad.parent}</div>`;$('log').innerHTML=S.log.slice(0,40).map(x=>`<div>${x}</div>`).join('')}
-function score(){return Math.round((S.rep+S.sat+S.parent+S.energy+S.quality+S.homework)/6 + Math.min(15,S.students/2)+Math.min(10,S.money/120))}
-function endDay(){S.ended=true;clearInterval(timer);const sc=score();const grade=sc>=92?'S':sc>=82?'A':sc>=70?'B':sc>=58?'C':'D';const [risk]=weak();$('grade').textContent=grade;$('gradeText').textContent=grade==='S'?'입소문과 재등록이 동시에 터진 하루입니다.':grade==='A'?'재등록이 기대되는 안정적인 하루입니다.':grade==='B'?'운영은 괜찮지만 약한 지표 보완이 필요합니다.':'내일은 핵심 지표 하나에 집중해야 합니다.';$('reportGrid').innerHTML=`<div class="mini"><b>운영자금</b><br>${S.money}만원</div><div class="mini"><b>등록생</b><br>${S.students}명</div><div class="mini"><b>강점</b><br>${Object.entries({평판:S.rep,학생만족:S.sat,학부모신뢰:S.parent,수업품질:S.quality}).sort((a,b)=>b[1]-a[1])[0][0]}</div><div class="mini"><b>위험</b><br>${risk}</div><div class="mini"><b>AI 다음 조언</b><br>${advice().vice}</div>`;save();show('end')}
-$('scenarioGrid').innerHTML=Object.entries(scenarios).map(([n,s])=>`<button class="scenario" data-name="${n}"><span class="tag">${s.tag}</span><h2>${n}</h2><p>${s.desc}</p></button>`).join('');document.querySelectorAll('.scenario').forEach(b=>b.onclick=()=>newGame(b.dataset.name));$('pauseBtn').onclick=()=>{paused=!paused;$('pauseBtn').textContent=paused?'재개':'일시정지'};$('finishBtn').onclick=endDay;$('againBtn').onclick=()=>{localStorage.removeItem('mathAcademyGame');S=null;show('start')};$('resetAll').onclick=()=>{if(confirm('저장된 수학학원 운영게임을 초기화할까요?')){localStorage.removeItem('mathAcademyGame');location.reload()}};load();if(S){if(S.ended){show('end');endDay()}else{show('game');startTimer();render()}}
+
+// ===== 유틸 =====
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const rnd = (a, b) => a + Math.random() * (b - a);
+const won = n => (n < 0 ? '-' : '') + Math.abs(Math.round(n)).toLocaleString('ko-KR') + '원';
+const manwon = n => { const v = Math.round(n / 10000); return (v < 0 ? '-' : '') + Math.abs(v).toLocaleString('ko-KR') + '만'; };
+function josa(word, a, b) { const code = word.charCodeAt(word.length - 1) - 0xac00; return word + (code >= 0 && code <= 11171 && code % 28 ? a : b); }
+function toast(msg, cls = '', ms = 2400) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + cls; el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(() => el.remove(), ms);
+    while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+}
+function openModal(html) { $('modal').innerHTML = html; $('modalBg').hidden = false; }
+function closeModal() { $('modalBg').hidden = true; }
+
+// 사람 그리기용 팔레트 (카페·교회 게임과 같은 옷 표현)
+const SKINS_P = ['#f6d2b8', '#eab58f', '#c98e64', '#8d5a3b', '#f3c9a0'];
+const HAIRS_P = ['#2d2320', '#5a3825', '#a0522d', '#d8b36a', '#1b1b1b', '#9e9e9e', '#7a2e3a'];
+const SHIRTS_P = ['#e76f51', '#2a9d8f', '#457b9d', '#f4a261', '#8e7dbe', '#e9c46a', '#6c757d', '#d62828', '#43aa8b', '#f28482',
+                '#ffafcc', '#a2d2ff', '#cdb4db', '#b5e48c', '#ffd6a5', '#fdffb6', '#9bf6ff', '#bdb2ff', '#f1faee', '#e5e5e5',
+                '#6a994e', '#bc4749', '#386641', '#7f5539', '#b08968', '#023e8a', '#ff7b00', '#ff006e', '#8338ec', '#264653',
+                '#fb8500', '#219ebc', '#d4a373', '#588157', '#9d0208', '#f7b267', '#22223b', '#c9ada7'];
+const ACCENTS_P = ['#ffffff', '#f8f1e5', '#222222', '#ffd166', '#90e0ef', '#f4acb7', '#b5e48c', '#e63946', '#1d3557', '#ff9f1c', '#8ecae6', '#6d597a'];
+const PANTS_P = ['#264653', '#3d405b', '#5c4033', '#343a40', '#6d597a', '#1d3557', '#3a5a8c', '#4f6d9a', '#6f8fb8',
+               '#b59f7b', '#8d7b68', '#2b2b2b', '#6b705c', '#dcd3c3', '#7f4f24', '#495057'];
+const SHOES_P = ['#222222', '#f8f9fa', '#8b5e3c', '#e63946', '#1d3557', '#adb5bd', '#5c4033'];
+const TOPS_P = ['tee', 'stripe', 'hoodie', 'jacket', 'check', 'sweater', 'shirt', 'dress'];
+
+// ===== 학원 이름 (사용자가 바꿀 수 있음) =====
+let acName = DEFAULT_NAME;
+try { acName = (localStorage.getItem(NAME_KEY) || '').trim().slice(0, 16) || DEFAULT_NAME; } catch (e) { /* 기본값 */ }
+function applyName() { $('acName').textContent = acName; document.title = acName + ' · 수학학원 운영 게임'; }
+function setName(n) {
+    acName = (n || '').trim().slice(0, 16) || DEFAULT_NAME;
+    try { if (acName === DEFAULT_NAME) localStorage.removeItem(NAME_KEY); else localStorage.setItem(NAME_KEY, acName); } catch (e) { /* 무시 */ }
+    applyName();
+}
+
+// ===== 상태 =====
+let nextId = 1;
+function makeLook() {
+    const top = pick(TOPS_P);
+    const shirt = pick(SHIRTS_P);
+    let shirt2 = pick(ACCENTS_P); if (shirt2 === shirt) shirt2 = '#ffffff';
+    return {
+        skin: pick(SKINS_P), hair: pick(HAIRS_P), style: Math.floor(Math.random() * 4),
+        top, shirt, shirt2, short: top === 'tee' || top === 'dress',
+        pants: pick(PANTS_P), shoes: pick(SHOES_P), scarf: null,
+        bag: Math.random() < 0.45 ? pick(['#8d5a3b', '#343a40', '#c9ada7', '#e76f51', '#1d3557', '#2a9d8f']) : null,
+        h: rnd(0.9, 1.04),
+    };
+}
+function uniqueName(taken) {
+    for (let i = 0; i < 60; i++) { const n = pick(GIVEN); if (!taken.has(n)) return n; }
+    return pick(GIVEN) + pick(['A', 'B', 'C']);
+}
+function makeStudent(o = {}) {
+    const skill = o.skill ?? Math.round(rnd(25, 62));
+    return {
+        id: nextId++, name: o.name || pick(GIVEN), grade: o.grade || pick(GRADES),
+        skill, startSkill: skill, lastExam: skill,
+        motiv: Math.round(rnd(35, 80)), sat: o.sat ?? Math.round(rnd(58, 74)),
+        months: 0, concern: null, isNew: !!o.isNew, look: makeLook(),
+    };
+}
+function makeTeacher() {
+    const style = pick(TEACHER_STYLES).key;
+    const skill = Math.round(rnd(45, 92));
+    let salary = 1500000 + skill * 15000 + (style === 'star' ? 400000 : 0) + rnd(-200000, 200000);
+    salary = Math.round(salary / 100000) * 100000;
+    const look = makeLook(); look.top = pick(['shirt', 'jacket', 'sweater']); look.short = false; look.bag = null; look.h = rnd(1, 1.06);
+    return { id: nextId++, name: pick(SURNAMES) + pick(GIVEN), style, skill, salary, months: 0, look };
+}
+function newState() {
+    nextId = 1;
+    const taken = new Set(), students = [];
+    for (let i = 0; i < 8; i++) { const n = uniqueName(taken); taken.add(n); students.push(makeStudent({ name: n, grade: GRADES[i % 6] })); }
+    for (const s of students.slice().sort(() => Math.random() - 0.5).slice(0, 2)) s.concern = { type: pick(CONCERNS).key, known: false };
+    return {
+        month: 1, money: 30000000, rep: 30, fee: 400000,
+        ap: AP_PER_MONTH, quality: 0, promo: 0, seminar: false, mock: false, trained: false, book: false, bookOwned: false,
+        fac: { room: 0, study: 0, shuttle: 0, qna: 0 },
+        teachers: [], students, history: [], spend: 0,
+        totals: { joined: 0, left: 0 }, pending: null, consulted: [], monthStarted: false, over: false, nextId,
+    };
+}
+function load() {
+    try {
+        const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+        if (s && Array.isArray(s.students)) { nextId = s.nextId || 500; return Object.assign(newState(), s); }
+    } catch (e) { /* 새로 시작 */ }
+    return newState();
+}
+function save() { S.nextId = nextId; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } }
+let S = load();
+let selected = null, LESSON = null;
+const seats = () => (2 + S.fac.room) * CLASS_SIZE;
+const classesNeeded = () => Math.ceil(S.students.length / CLASS_SIZE);
+const staff = () => S.teachers.length + 1; // 원장 포함
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+
+// ===== 칠판 수학 문제 (학년별, 정수 답) =====
+const sup = n => `<sup>${n}</sup>`, sub = n => `<sub>${n}</sub>`;
+const sgn = (b, first) => (b < 0 ? ' − ' : first ? '' : ' + ') + Math.abs(b);
+function ri(a, b) { return Math.floor(rnd(a, b + 1)); }
+const PROBLEMS = {
+    mul:   () => { const a = ri(13, 49), b = ri(3, 9); return { q: `${a} × ${b}`, a: a * b, tag: '연산' }; },
+    sq:    () => { const n = ri(11, 25); return { q: `${n}${sup(2)}`, a: n * n, tag: '제곱수' }; },
+    int:   () => { const a = ri(-9, -2), b = ri(3, 8), c = ri(-12, 12); return { q: `(${a}) × ${b}${sgn(c)}`, a: a * b + c, tag: '중1 · 정수의 계산' }; },
+    lin:   () => { const x = ri(-6, 12), a = ri(2, 9), b = ri(-15, 20); return { q: `${a}x${sgn(b)} = ${a * x + b}`, a: x, tag: '중1 · 일차방정식 (x = ?)' }; },
+    sys:   () => { const x = ri(1, 15), y = ri(1, 15); return { q: `x + y = ${x + y},&nbsp; x − y = ${x - y}`, a: x, tag: '중2 · 연립방정식 (x = ?)' }; },
+    slope: () => { const m = ri(-5, 6) || 2, b = ri(-6, 6), x1 = ri(-3, 2), x2 = x1 + ri(1, 4); return { q: `두 점 (${x1}, ${m * x1 + b}), (${x2}, ${m * x2 + b})를 지나는 직선의 기울기`, a: m, tag: '중2 · 일차함수' }; },
+    quad:  () => { let p = ri(1, 9), q = ri(1, 9); if (p === q) q = p + 1; return { q: `x${sup(2)} − ${p + q}x + ${p * q} = 0`, a: Math.max(p, q), tag: '중3 · 이차방정식 (큰 근 x = ?)' }; },
+    comb:  () => { const n = ri(5, 9), k = ri(2, 3); let c = 1; for (let i = 0; i < k; i++) c = c * (n - i) / (i + 1); return { q: `${sub(n)}C${sub(k)}`, a: Math.round(c), tag: '고1 · 경우의 수 (조합)' }; },
+    seq:   () => { const a1 = ri(1, 9), d = ri(2, 7), n = ri(5, 12); return { q: `첫째항 ${a1}, 공차 ${d}인 등차수열의 제${n}항`, a: a1 + (n - 1) * d, tag: '고1 · 수열' }; },
+    pow:   () => { const k = ri(5, 10); return { q: `2${sup(k)}`, a: 2 ** k, tag: '고1 · 지수' }; },
+    log:   () => { const b = pick([2, 3, 5]), e = ri(2, b === 2 ? 8 : 4); return { q: `log${sub(b)} ${b ** e}`, a: e, tag: '고2 · 로그' }; },
+    deriv: () => { const a = ri(1, 5), b = ri(-6, 6), c = ri(-3, 4); return { q: `f(x) = ${a === 1 ? '' : a}x${sup(2)}${sgn(b)}x 일 때 f′(${c})`, a: 2 * a * c + b, tag: '고2 · 미분' }; },
+    integ: () => { const k = ri(2, 5); return { q: `∫${sub(0)}${sup(k)} 3x${sup(2)} dx`, a: k ** 3, tag: '고3 · 적분' }; },
+};
+const TIERS = [['mul', 'sq', 'int', 'lin'], ['lin', 'sys', 'slope', 'quad', 'comb', 'seq', 'pow'], ['quad', 'comb', 'log', 'deriv', 'integ', 'seq']];
+function makeProblem(tier) { return PROBLEMS[pick(TIERS[tier])](); }
+
+// ===== 사운드: 공부할 때 듣는 로파이 배경음악 + 효과음 (Web Audio 합성, 음원 파일 없음) =====
+const Sound = (() => {
+    const PREF_KEY = 'math-academy-audio-v1';
+    const MUSIC_VOL = 0.65;
+    const pref = { music: true, sfx: true };
+    try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
+    const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
+
+    let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
+    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+
+    function init() {
+        if (!ctx) {
+            try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+            master = ctx.createGain(); master.gain.value = 0.9;
+            const comp = ctx.createDynamicsCompressor();
+            master.connect(comp); comp.connect(ctx.destination);
+            musicBus = ctx.createGain(); musicBus.gain.value = MUSIC_VOL;
+            const warm = ctx.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 5000;
+            musicBus.connect(warm); warm.connect(master);
+            // 예배실 잔향
+            const rev = ctx.createConvolver(), wet = ctx.createGain();
+            const irLen = Math.floor(ctx.sampleRate * 2.8), ir = ctx.createBuffer(2, irLen, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) {
+                const d = ir.getChannelData(ch);
+                for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3);
+            }
+            rev.buffer = ir; wet.gain.value = 0.18;
+            musicBus.connect(rev); rev.connect(wet); wet.connect(master);
+            sfxBus = ctx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(master);
+            sfxBus.connect(rev);
+            noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+            const d = noiseBuf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        }
+        if (ctx.state === 'suspended') ctx.resume();
+        if (pref.music) startMusic();
+    }
+
+    function tone(freq, t, dur, o = {}) {
+        const { type = 'sine', vol = 0.15, attack = 0.005, glide = 0, dest = sfxBus, filter = 0 } = o;
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        if (glide) osc.frequency.exponentialRampToValueAtTime(glide, t + attack + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + attack + dur);
+        let out = osc;
+        if (filter) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filter; osc.connect(f); out = f; }
+        out.connect(g); g.connect(dest);
+        osc.start(t); osc.stop(t + attack + dur + 0.03);
+    }
+    function noise(t, dur, o = {}) {
+        const { type = 'bandpass', freq = 1000, q = 1, vol = 0.15, attack = 0.005, hold = 0, sweep = 0, dest = sfxBus } = o;
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q;
+        f.frequency.setValueAtTime(freq, t);
+        if (sweep) f.frequency.exponentialRampToValueAtTime(sweep, t + attack + hold + dur);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        if (hold) g.gain.setValueAtTime(vol, t + attack + hold);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + attack + hold + dur);
+        src.connect(f); f.connect(g); g.connect(dest);
+        src.start(t, Math.random() * 1.5); src.stop(t + attack + hold + dur + 0.03);
+    }
+    // 기타 현 (카르플러스-스트롱)
+    const ksCache = {};
+    function ksBuf(m) {
+        if (ksCache[m]) return ksCache[m];
+        const sr = ctx.sampleRate, len = Math.floor(sr * 1.6), N = Math.max(2, Math.round(sr / mtof(m)));
+        const buf = ctx.createBuffer(1, len, sr), out = buf.getChannelData(0), ring = new Float32Array(N);
+        let prev = 0;
+        for (let i = 0; i < N; i++) { prev = prev * 0.5 + (Math.random() * 2 - 1) * 0.5; ring[i] = prev; }
+        for (let i = 0, idx = 0; i < len; i++) {
+            const nxt = idx + 1 === N ? 0 : idx + 1, a = ring[idx];
+            out[i] = a * 1.5; ring[idx] = 0.996 * 0.5 * (a + ring[nxt]); idx = nxt;
+        }
+        return (ksCache[m] = buf);
+    }
+    function pluck(m, t, vol) {
+        const src = ctx.createBufferSource(); src.buffer = ksBuf(m);
+        const g = ctx.createGain(); g.gain.value = vol;
+        src.connect(g); g.connect(sfxBus); src.start(t); src.stop(t + 1.6);
+    }
+
+    const SFX = {
+        click: t => tone(880, t, 0.06, { vol: 0.06 }),
+        bell: t => [784, 659, 698, 523].forEach((f, i) => { // 학교 종 (딩동댕동)
+            tone(f, t + i * 0.42, 1.1, { vol: 0.09 }); tone(f * 2.4, t + i * 0.42, 0.5, { vol: 0.02 });
+        }),
+        marker: t => { for (let i = 0; i < 3; i++) noise(t + i * 0.12, 0.08, { freq: 3500 + i * 400, q: 3, vol: 0.05, sweep: 5200 }); },
+        correct: t => { tone(1047, t, 0.12, { type: 'triangle', vol: 0.08 }); tone(1568, t + 0.1, 0.25, { type: 'triangle', vol: 0.08 }); },
+        wrong: t => { tone(220, t, 0.12, { type: 'square', vol: 0.04, filter: 1200 }); tone(196, t + 0.14, 0.2, { type: 'square', vol: 0.04, filter: 1200 }); },
+        cash: t => { noise(t, 0.04, { freq: 3000, vol: 0.08 }); tone(2637, t + 0.05, 0.5, { type: 'triangle', vol: 0.07 }); tone(3520, t + 0.11, 0.6, { type: 'triangle', vol: 0.06 }); },
+        pop: t => { tone(988, t, 0.07, { vol: 0.08 }); tone(1480, t + 0.07, 0.1, { vol: 0.08 }); },
+        page: t => { noise(t, 0.18, { freq: 3000, q: 0.6, vol: 0.08, sweep: 6000 }); noise(t + 0.22, 0.15, { freq: 2600, q: 0.6, vol: 0.06, sweep: 5000 }); },
+        good: t => [659, 784, 988, 1319].forEach((f, i) => tone(f, t + i * 0.08, 0.35, { type: 'triangle', vol: 0.06 })),
+        ok: t => { tone(659, t, 0.2, { type: 'triangle', vol: 0.06 }); tone(784, t + 0.12, 0.3, { type: 'triangle', vol: 0.06 }); },
+        bad: t => tone(330, t, 0.25, { type: 'triangle', vol: 0.06, glide: 247 }),
+        build: t => { for (let i = 0; i < 4; i++) noise(t + i * 0.14, 0.06, { type: 'lowpass', freq: 700, vol: 0.18 }); tone(523, t + 0.6, 0.4, { type: 'triangle', vol: 0.06 }); },
+        newbie: t => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, t + i * 0.07, 0.4, { type: 'triangle', vol: 0.06 })),
+        strum: t => [52, 59, 64, 67, 71, 76].forEach((m, i) => pluck(m, t + i * 0.025, 0.1)),
+    };
+    function play(name) {
+        if (!ctx || !pref.sfx || !SFX[name]) return;
+        try { SFX[name](ctx.currentTime + 0.01); } catch (e) { /* 소리 없이 진행 */ }
+    }
+
+    // --- 배경음악: 공부용 로파이 (Cmaj7 - Am9 - Fmaj7 - G6, 느긋한 비트) ---
+    const CHORDS = [
+        [36, 52, 55, 59, 62], // Cmaj9
+        [45, 55, 59, 60, 64], // Am9
+        [41, 57, 60, 64, 67], // Fmaj9
+        [43, 55, 59, 62, 64], // G6
+        [40, 55, 59, 62, 67], // Em7
+        [45, 55, 60, 64, 67], // Am7
+        [38, 53, 57, 60, 65], // Dm9
+        [43, 53, 59, 62, 65], // G7
+    ];
+    const MEL = [72, 74, 76, 79, 81, 84];
+    const BPM = 72, STEP = 60 / BPM / 2;
+    let step = 0, nextTime = 0, melIdx = 2, intensity = 1;
+    function keys(m, t, dur, vol) {
+        tone(mtof(m), t, dur, { vol, attack: 0.012, dest: musicBus });
+        tone(mtof(m) * 2, t, dur * 0.3, { type: 'triangle', vol: vol * 0.12, attack: 0.012, dest: musicBus });
+    }
+    function playStep(s, t0) {
+        const bar = Math.floor(s / 8) % CHORDS.length, pos = s % 8;
+        const t = t0 + (pos % 2 === 1 ? STEP * 0.18 : 0); // 살짝 스윙
+        const ch = CHORDS[bar], notes = ch.slice(1);
+        if (pos === 0) { notes.forEach((m, i) => keys(m, t + i * 0.02, 2.4, 0.032)); tone(mtof(ch[0]), t, STEP * 6, { type: 'triangle', vol: 0.11, filter: 500, attack: 0.02, dest: musicBus }); }
+        if (pos === 5 && Math.random() < 0.6) notes.slice(1, 3).forEach((m, i) => keys(m, t + i * 0.015, 1.2, 0.022));
+        if (pos === 4) tone(mtof(ch[0] + 7), t, STEP * 3, { type: 'triangle', vol: 0.08, filter: 500, dest: musicBus });
+        // 부드러운 드럼
+        if (pos === 0 || pos === 5) tone(100, t, 0.2, { vol: 0.2 * intensity, glide: 45, dest: musicBus });
+        if (pos === 2 || pos === 6) { noise(t, 0.12, { freq: 1600, q: 0.8, vol: 0.035, dest: musicBus }); }
+        noise(t, 0.03, { type: 'highpass', freq: 7500, vol: pos % 2 ? 0.012 : 0.02, dest: musicBus });
+        if (Math.random() < 0.08) noise(t + Math.random() * STEP, 0.01, { freq: 3000, q: 4, vol: 0.015, dest: musicBus }); // LP 잡음
+        if ((pos === 2 || pos === 6) && Math.random() < 0.3) {
+            melIdx = clamp(melIdx + pick([-2, -1, 1, 2]), 0, MEL.length - 1);
+            tone(mtof(MEL[melIdx]), t, 0.8, { vol: 0.03, dest: musicBus });
+        }
+    }
+    function schedule() {
+        if (!ctx) return;
+        if (nextTime < ctx.currentTime) nextTime = ctx.currentTime + 0.05;
+        while (nextTime < ctx.currentTime + 0.3) {
+            try { playStep(step, nextTime); } catch (e) { /* 무시 */ }
+            nextTime += STEP;
+            step = (step + 1) % (8 * CHORDS.length);
+        }
+    }
+    function startMusic() {
+        if (musicTimer || !ctx) return;
+        step = 0; nextTime = ctx.currentTime + 0.1;
+        musicBus.gain.cancelScheduledValues(ctx.currentTime);
+        musicBus.gain.setValueAtTime(MUSIC_VOL, ctx.currentTime);
+        musicTimer = setInterval(schedule, 60);
+    }
+    function stopMusic() {
+        clearInterval(musicTimer); musicTimer = null;
+        if (ctx) musicBus.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
+    }
+    // 찬양 시간엔 음악을 조금 크고 풍성하게
+    function setIntensity(k) {
+        intensity = k;
+        if (ctx && musicTimer) musicBus.gain.setTargetAtTime(MUSIC_VOL * (k > 1 ? 1.2 : k < 1 ? 0.35 : 1), ctx.currentTime, 0.4);
+    }
+
+    function renderButtons() {
+        $('musicBtn').textContent = pref.music ? '🎵 음악 켜짐' : '🎵 음악 꺼짐';
+        $('sfxBtn').textContent = pref.sfx ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
+        $('musicBtn').classList.toggle('off', !pref.music);
+        $('sfxBtn').classList.toggle('off', !pref.sfx);
+    }
+    function toggleMusic() {
+        pref.music = !pref.music; savePref();
+        if (pref.music) { init(); startMusic(); } else stopMusic();
+        renderButtons();
+    }
+    function toggleSfx() { pref.sfx = !pref.sfx; savePref(); init(); renderButtons(); play('click'); }
+
+    return { init, play, setIntensity, toggleMusic, toggleSfx, renderButtons };
+})();
+
+// ===== 학원 강의실 장면 (캔버스 애니메이션) =====
+const Scene = (() => {
+    const W = 720, H = 330, WALL = 150, BOARD_Y = 152;
+    const DOOR = { x: 680, y: 152 };
+    const ROWS = [212, 260, 308];
+    const COLS = Array.from({ length: 6 }, (_, i) => 132 + i * 86);
+    const SEATS = ROWS.flatMap(y => COLS.map(x => ({ x, y })));
+    const TEACH_X = [158, 562, 616, 104, 210]; // 칠판 글씨를 가리지 않게 칠판 양옆에 서요
+    const TEACH_RANGE = [[120, 200], [545, 600], [600, 640], [90, 140], [180, 215]];
+    const cvs = $('scene'), c = cvs.getContext('2d');
+    const lerp = (a, b, k) => a + (b - a) * k;
+    function fit() {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (cvs.width !== W * dpr) { cvs.width = W * dpr; cvs.height = H * dpr; }
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function rr(x, y, w, h, r) { c.beginPath(); if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); }
+    function ell(x, y, rx, ry) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); }
+    function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+    function shade(hex, amt) {
+        const f = v => Math.max(0, Math.min(255, Math.round(amt >= 0 ? v + (255 - v) * amt : v * (1 + amt))));
+        return `rgb(${hexToRgb(hex).map(f).join(',')})`;
+    }
+    function volGrad(x0, x1, hex) {
+        const g = c.createLinearGradient(x0, 0, x1, 0);
+        g.addColorStop(0, shade(hex, 0.28)); g.addColorStop(0.4, shade(hex, 0.05)); g.addColorStop(1, shade(hex, -0.32));
+        return g;
+    }
+
+    let t = 0, phase = 'idle', people = [], teachers = [], particles = [], banner = '', doorOpen = 0;
+    let board = { lines: [], big: null, tag: '' };
+    const director = {
+        x: 158, y: BOARD_Y, tx: 158, ty: BOARD_Y, phase: 0, moving: false, lanyard: true, book: false,
+        look: { skin: '#f3c9a0', hair: '#2d2320', style: 0, top: 'jacket', shirt: '#3d4a5c', shirt2: '#ffffff', short: false,
+                pants: '#2b2b2b', shoes: '#5c4033', scarf: null, bag: null, h: 1.07 },
+    };
+
+    // ---------- 사람 그리기 (카페·교회 게임과 같은 옷 표현) ----------
+    function drawLegs(L, seated, sw) {
+        const shoe = (x, y, w) => {
+            c.fillStyle = L.shoes || '#222'; rr(x, y, w, 4, 2); c.fill();
+            c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + 1, y + 0.5, w - 3, 1);
+        };
+        if (seated) {
+            c.fillStyle = volGrad(-6, 14, L.pants); rr(-6, -18, 20, 7, 3); c.fill();
+            c.fillStyle = volGrad(9, 15, L.pants); rr(9, -16, 6, 16, 3); c.fill();
+            shoe(8, -3, 10);
+            return;
+        }
+        for (const [x, off] of [[-9, sw * 3], [1, -sw * 3]]) {
+            c.fillStyle = volGrad(x + off, x + off + 8, L.pants);
+            rr(x + off, -24, 8, 24, 3); c.fill();
+            if (/^#(3a5a8c|4f6d9a|6f8fb8)$/.test(L.pants)) { // 청바지 박음선
+                c.strokeStyle = 'rgba(255,210,120,0.35)'; c.beginPath(); c.moveTo(x + off + 5, -22); c.lineTo(x + off + 5, -5); c.stroke();
+            }
+        }
+        shoe(-10 + sw * 3, -4, 10); shoe(0 - sw * 3, -4, 10);
+    }
+    function drawArm(L, x, y, back) {
+        const len = 24, sleeve = L.short ? 10 : len;
+        if (L.short) { c.fillStyle = volGrad(x + 0.5, x + 6.5, L.skin); rr(x + 0.5, y + 6, 6, len - 6, 3); c.fill(); }
+        c.fillStyle = volGrad(x, x + 7, L.shirt); rr(x, y, 7, sleeve, 3); c.fill();
+        if (L.top === 'stripe') { c.fillStyle = L.shirt2; for (let yy = y + 4; yy < y + sleeve - 1; yy += 7) c.fillRect(x, yy, 7, 2.5); }
+        if (!L.short && (L.top === 'sweater' || L.top === 'hoodie')) { c.fillStyle = shade(L.shirt, -0.2); c.fillRect(x, y + len - 5, 7, 4); }
+        if (!L.short && L.top === 'jacket') { c.fillStyle = L.shirt2; c.fillRect(x, y + len - 3, 7, 2); }
+        if (back) { c.fillStyle = 'rgba(0,0,0,0.13)'; rr(x, y, 7, len, 3); c.fill(); }
+        c.fillStyle = L.skin; ell(x + 3.5, y + len + 1, 4, 4); c.fill();
+        c.fillStyle = 'rgba(0,0,0,0.12)'; ell(x + 4.5, y + len + 2, 2.5, 2.5); c.fill();
+    }
+    function drawTorso(L, dy, apron, seated) {
+        const top = L.top || 'tee', y0 = -60 + dy, x0 = -14, w = 28, h = 38;
+        if (top === 'dress') { // 치마
+            c.fillStyle = volGrad(-18, 18, L.shirt);
+            c.beginPath();
+            if (seated) { c.moveTo(-12, y0 + 30); c.lineTo(12, y0 + 30); c.lineTo(18, y0 + 44); c.lineTo(-10, y0 + 44); }
+            else { c.moveTo(-13, y0 + 30); c.lineTo(13, y0 + 30); c.lineTo(17, y0 + 50); c.lineTo(-17, y0 + 50); }
+            c.closePath(); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.12)';
+            for (const fx of [-6, 2, 9]) { c.beginPath(); c.moveTo(fx, y0 + 32); c.lineTo(fx + 1.5, y0 + (seated ? 44 : 50)); c.lineTo(fx + 3, y0 + 32); c.fill(); }
+        }
+        if (top === 'hoodie') { c.fillStyle = shade(L.shirt, -0.22); ell(0, y0 + 1, 12, 6); c.fill(); }
+        c.save();
+        rr(x0, y0, w, h, 9);
+        c.fillStyle = volGrad(x0, x0 + w, L.shirt); c.fill();
+        c.clip();
+        switch (top) {
+            case 'stripe':
+                c.fillStyle = L.shirt2;
+                for (let y = y0 + 5; y < y0 + h; y += 7) c.fillRect(x0 - 1, y, w + 2, 3);
+                break;
+            case 'check':
+                c.globalAlpha = 0.35; c.fillStyle = L.shirt2;
+                for (let x = x0 + 3; x < x0 + w; x += 8) c.fillRect(x, y0, 3, h);
+                for (let y = y0 + 3; y < y0 + h; y += 8) c.fillRect(x0, y, w, 3);
+                c.globalAlpha = 1;
+                c.fillStyle = shade(L.shirt, -0.3); for (let i = 0; i < 3; i++) { ell(0, y0 + 9 + i * 8, 1.1, 1.1); c.fill(); }
+                break;
+            case 'jacket':
+                c.fillStyle = volGrad(-5, 5, L.shirt2); c.fillRect(-5, y0, 10, h);
+                c.fillStyle = shade(L.shirt, -0.15);
+                c.beginPath(); c.moveTo(-5, y0); c.lineTo(-1, y0 + 14); c.lineTo(-7, y0 + 8); c.fill();
+                c.beginPath(); c.moveTo(5, y0); c.lineTo(1, y0 + 14); c.lineTo(7, y0 + 8); c.fill();
+                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.moveTo(-11, y0 + 28); c.lineTo(-6, y0 + 28); c.moveTo(6, y0 + 28); c.lineTo(11, y0 + 28); c.stroke();
+                break;
+            case 'hoodie':
+                c.fillStyle = shade(L.shirt, -0.15); rr(-9, y0 + 22, 18, 10, 3); c.fill();
+                c.strokeStyle = L.shirt2; c.lineWidth = 1.2;
+                c.beginPath(); c.moveTo(-3, y0 + 3); c.lineTo(-3.5, y0 + 13); c.moveTo(3, y0 + 3); c.lineTo(3.5, y0 + 13); c.stroke();
+                c.lineWidth = 1;
+                break;
+            case 'sweater':
+                c.fillStyle = L.shirt2; c.beginPath(); c.moveTo(-6, y0); c.lineTo(0, y0 + 10); c.lineTo(6, y0); c.fill();
+                c.fillStyle = shade(L.shirt, -0.2); c.fillRect(x0, y0 + h - 6, w, 6);
+                c.strokeStyle = 'rgba(0,0,0,0.12)';
+                for (let x = x0 + 2; x < x0 + w; x += 3) { c.beginPath(); c.moveTo(x, y0 + h - 6); c.lineTo(x, y0 + h); c.stroke(); }
+                c.strokeStyle = 'rgba(255,255,255,0.18)';
+                for (let y = y0 + 14; y < y0 + h - 8; y += 6) { c.beginPath(); c.moveTo(-10, y); c.lineTo(-6, y + 3); c.lineTo(-2, y); c.moveTo(2, y); c.lineTo(6, y + 3); c.lineTo(10, y); c.stroke(); }
+                break;
+            case 'shirt':
+                c.strokeStyle = shade(L.shirt, -0.25); c.beginPath(); c.moveTo(0, y0 + 4); c.lineTo(0, y0 + h); c.stroke();
+                c.fillStyle = shade(L.shirt, -0.35); for (let i = 0; i < 4; i++) { ell(1.8, y0 + 10 + i * 7, 0.9, 0.9); c.fill(); }
+                c.fillStyle = L.shirt2 === '#222222' ? '#ffffff' : L.shirt2;
+                c.beginPath(); c.moveTo(-7, y0); c.lineTo(0, y0 + 5); c.lineTo(-2, y0 + 9); c.lineTo(-8, y0 + 3); c.fill();
+                c.beginPath(); c.moveTo(7, y0); c.lineTo(0, y0 + 5); c.lineTo(2, y0 + 9); c.lineTo(8, y0 + 3); c.fill();
+                break;
+            case 'dress':
+                c.fillStyle = L.shirt2; c.fillRect(x0, y0 + 26, w, 4);
+                c.fillStyle = shade(L.shirt, 0.35); ell(0, y0 + 1, 7, 3); c.fill();
+                break;
+            default: // tee: 가슴 프린트
+                c.fillStyle = L.shirt2; ell(3, y0 + 15, 4.5, 4.5); c.fill();
+                c.fillStyle = shade(L.shirt, -0.2); ell(0, y0 + 1, 7, 3); c.fill();
+        }
+        // 위는 밝고 아래는 그늘진 음영, 목 그림자
+        const g = c.createLinearGradient(0, y0, 0, y0 + h);
+        g.addColorStop(0, 'rgba(255,255,255,0.14)'); g.addColorStop(0.45, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.18)');
+        c.fillStyle = g; c.fillRect(x0, y0, w, h);
+        c.fillStyle = 'rgba(0,0,0,0.13)'; ell(0, y0, 8, 3); c.fill();
+        c.restore();
+        rr(x0, y0, w, h, 9); c.strokeStyle = 'rgba(0,0,0,0.16)'; c.stroke();
+        if (apron) {
+            c.fillStyle = volGrad(-10, 10, apron); rr(-10, y0 + 10, 20, 30, 4); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.15)'; rr(-6, y0 + 24, 12, 7, 2); c.fill();
+            c.strokeStyle = apron; c.lineWidth = 2; c.beginPath(); c.moveTo(-6, y0 + 10); c.lineTo(-4, y0); c.moveTo(6, y0 + 10); c.lineTo(4, y0); c.stroke(); c.lineWidth = 1;
+        }
+        if (L.bag) {
+            c.strokeStyle = L.bag; c.lineWidth = 2; c.beginPath(); c.moveTo(-11, y0 + 2); c.lineTo(11, y0 + 26); c.stroke(); c.lineWidth = 1;
+            c.fillStyle = volGrad(9, 20, L.bag); rr(9, y0 + 24, 11, 10, 2); c.fill();
+            c.fillStyle = 'rgba(0,0,0,0.2)'; c.fillRect(9, y0 + 27, 11, 1.5);
+        }
+        if (L.scarf) {
+            c.fillStyle = volGrad(-12, 12, L.scarf); rr(-12, y0 - 3, 24, 7, 3); c.fill();
+            c.fillStyle = volGrad(4, 10, L.scarf); rr(4, y0 + 2, 6, 15, 2); c.fill();
+            c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(4, y0 + 13, 6, 1.5);
+        }
+    }
+    function drawFront(p, walking) {
+        const L = p.look, s = L.h;
+        const sw = walking ? Math.sin(p.phase) : 0, bob = walking ? Math.abs(Math.sin(p.phase)) * 1.5 : 0;
+        c.save(); c.translate(p.x, p.y); c.globalAlpha = p.alpha ?? 1; c.scale(s, s);
+        c.fillStyle = 'rgba(0,0,0,0.15)'; ell(0, 0, 15, 4); c.fill();
+        const dy = -bob;
+        drawLegs(L, false, sw);
+        const armSwing = walking ? sw * 4 : 0;
+        drawArm(L, -19, -56 + dy + armSwing, true);
+        drawTorso(L, dy, null, false);
+        if (p.lanyard) { // 선생님 명찰
+            c.strokeStyle = '#e53e3e'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-6, -60 + dy); c.lineTo(0, -44 + dy); c.lineTo(6, -60 + dy); c.stroke(); c.lineWidth = 1;
+            c.fillStyle = '#fff'; rr(-5, -44 + dy, 10, 8, 1.5); c.fill(); c.fillStyle = '#667eea'; c.fillRect(-4, -42 + dy, 8, 2);
+        }
+        if (p.book) { c.save(); c.translate(15, -32 + dy); c.fillStyle = '#3b2f5c'; rr(-6, -8, 12, 15, 1.5); c.fill(); c.fillStyle = '#d4af37'; c.fillRect(-1, -5, 2, 8); c.fillRect(-3, -3, 6, 2); c.restore(); }
+        drawArm(L, 12, -56 + dy - armSwing, false);
+        drawHead(L, -72 + dy, p.mood || 'happy');
+        c.restore();
+    }
+    function drawHead(L, hy, mood) {
+        c.fillStyle = L.skin; ell(0, hy, 13, 13); c.fill();
+        const hg = c.createRadialGradient(-5, hy - 5, 1, 0, hy, 14);
+        hg.addColorStop(0, 'rgba(255,255,255,0.3)'); hg.addColorStop(0.55, 'rgba(255,255,255,0)'); hg.addColorStop(1, 'rgba(0,0,0,0.14)');
+        c.fillStyle = hg; ell(0, hy, 13, 13); c.fill();
+        c.fillStyle = L.hair;
+        if (L.style === 1) { c.beginPath(); c.arc(0, hy - 2, 14.5, Math.PI, 0); c.fill(); rr(-15, hy - 3, 6, 22, 3); c.fill(); rr(9, hy - 3, 6, 22, 3); c.fill(); }
+        else if (L.style === 2) { c.beginPath(); c.arc(0, hy - 2, 14, Math.PI, 0); c.fill(); ell(0, hy - 16, 6, 6); c.fill(); }
+        else if (L.style === 3) { c.beginPath(); c.arc(0, hy - 2, 14, Math.PI * 1.05, Math.PI * 1.95); c.fill(); c.fillRect(-13, hy - 6, 26, 4); }
+        else { c.beginPath(); c.arc(0, hy - 2, 14, Math.PI, 0); c.fill(); }
+        c.fillStyle = 'rgba(255,120,120,0.25)'; ell(-8, hy + 4, 3, 2); c.fill(); ell(8, hy + 4, 3, 2); c.fill();
+        c.fillStyle = '#222'; ell(-4.5, hy + 1, 1.6, 1.8); c.fill(); ell(4.5, hy + 1, 1.6, 1.8); c.fill();
+        c.strokeStyle = '#222'; c.lineWidth = 1.3; c.beginPath();
+        if (mood === 'sad') c.arc(0, hy + 10, 4, 1.2 * Math.PI, 1.8 * Math.PI);
+        else c.arc(0, hy + 4, 4, 0.15 * Math.PI, 0.85 * Math.PI);
+        c.stroke(); c.lineWidth = 1;
+    }
+    // 뒷모습으로 의자에 앉은 아이 (강단을 바라봄)
+    function drawBack(p) {
+        const L = p.look, s = L.h * 0.95;
+        const sway = phase === 'praise' ? Math.sin(t * 2.2 + p.seed) * 2 : 0;
+        c.save(); c.translate(p.x + sway, p.y); c.globalAlpha = p.alpha ?? 1; c.scale(s, s);
+        c.fillStyle = 'rgba(0,0,0,0.12)'; ell(0, 0, 16, 4); c.fill();
+        // 몸 (뒷모습)
+        c.fillStyle = volGrad(-14, 14, L.shirt); rr(-14, -64, 28, 36, 9); c.fill();
+        if (L.top === 'stripe') { c.save(); rr(-14, -64, 28, 36, 9); c.clip(); c.fillStyle = L.shirt2; for (let y = -60; y < -28; y += 7) c.fillRect(-15, y, 30, 3); c.restore(); }
+        if (L.top === 'hoodie') { c.fillStyle = shade(L.shirt, -0.18); rr(-9, -66, 18, 14, 6); c.fill(); }
+        const g = c.createLinearGradient(0, -64, 0, -28); g.addColorStop(0, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0.18)');
+        c.fillStyle = g; rr(-14, -64, 28, 36, 9); c.fill();
+        // 팔 (찬양 시간에 손 들기)
+        if (phase === 'praise' && p.handsUp) {
+            c.fillStyle = volGrad(-22, -14, L.shirt); c.save(); c.translate(-13, -60); c.rotate(-0.35); rr(-4, -26, 7, 26, 3); c.fill(); c.fillStyle = L.skin; ell(0, -28, 4, 4); c.fill(); c.restore();
+            c.fillStyle = volGrad(14, 22, L.shirt); c.save(); c.translate(13, -60); c.rotate(0.35); rr(-3, -26, 7, 26, 3); c.fill(); c.fillStyle = L.skin; ell(0, -28, 4, 4); c.fill(); c.restore();
+        } else {
+            c.fillStyle = volGrad(-20, -13, L.shirt); rr(-19, -60, 7, 22, 3); c.fill();
+            c.fillStyle = volGrad(13, 20, L.shirt); rr(12, -60, 7, 22, 3); c.fill();
+        }
+        // 머리 (뒤통수)
+        const hy = -76;
+        c.fillStyle = L.skin; ell(-12.5, hy + 2, 2.5, 4); c.fill(); ell(12.5, hy + 2, 2.5, 4); c.fill();
+        if (L.style === 3) { c.fillStyle = L.skin; ell(0, hy, 13, 13); c.fill(); c.fillStyle = L.hair; c.beginPath(); c.arc(0, hy + 1, 13, 0.05 * Math.PI, 0.95 * Math.PI); c.fill(); }
+        else {
+            c.fillStyle = L.hair; ell(0, hy, 13.5, 13.5); c.fill();
+            if (L.style === 1) { rr(-12, hy, 24, 20, 6); c.fill(); }
+            if (L.style === 2) { ell(0, hy - 13, 6, 6); c.fill(); }
+            c.fillStyle = 'rgba(255,255,255,0.12)'; ell(-4, hy - 6, 6, 4); c.fill();
+        }
+        // 의자 등받이
+        const wood = '#8b5e3c';
+        c.fillStyle = shade(wood, -0.25); c.fillRect(-13, -20, 3, 20); c.fillRect(10, -20, 3, 20);
+        c.fillStyle = volGrad(-15, 15, wood); rr(-15, -42, 30, 20, 4); c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.15)'; c.fillRect(-13, -40, 26, 2);
+        c.restore();
+    }
+    function drawEmptyChair(x, y) {
+        const wood = '#8b5e3c';
+        c.save(); c.translate(x, y); c.scale(0.95, 0.95);
+        c.fillStyle = 'rgba(0,0,0,0.1)'; ell(0, 0, 15, 3.5); c.fill();
+        c.fillStyle = shade(wood, -0.25); c.fillRect(-13, -20, 3, 20); c.fillRect(10, -20, 3, 20);
+        c.fillStyle = shade(wood, -0.1); c.fillRect(-14, -24, 28, 5);
+        c.fillStyle = volGrad(-15, 15, wood); rr(-15, -42, 30, 20, 4); c.fill();
+        c.restore();
+    }
+    function drawDesk(x, y) {
+        c.save(); c.translate(x, y);
+        c.fillStyle = '#7a5a3c'; c.fillRect(-22, -50, 3, 22); c.fillRect(19, -50, 3, 22);
+        c.fillStyle = volGrad(-28, 28, '#c8a27a'); rr(-28, -58, 56, 9, 2); c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.25)'; c.fillRect(-26, -57, 52, 2);
+        c.restore();
+    }
+
+    // ---------- 배경 ----------
+    function boardText(s) {
+        return String(s).replace(/<sup>2<\/sup>/g, '²').replace(/<sup>3<\/sup>/g, '³').replace(/<sup>(\d+)<\/sup>/g, '^$1')
+            .replace(/<sub>(\d+)<\/sub>/g, (_, d) => d.split('').map(ch => '₀₁₂₃₄₅₆₇₈₉'[ch]).join('')).replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '');
+    }
+    function drawRoom() {
+        const wg = c.createLinearGradient(0, 0, 0, WALL);
+        wg.addColorStop(0, '#eef4ef'); wg.addColorStop(1, '#dfe9e1');
+        c.fillStyle = wg; c.fillRect(0, 0, W, WALL);
+        c.fillStyle = '#c9d6cc'; c.fillRect(0, WALL - 26, W, 26);
+        c.fillStyle = '#b4c4b8'; c.fillRect(0, WALL - 28, W, 3);
+        const fg = c.createLinearGradient(0, WALL, 0, H);
+        fg.addColorStop(0, '#d9c9ae'); fg.addColorStop(1, '#c4b08f');
+        c.fillStyle = fg; c.fillRect(0, WALL, W, H - WALL);
+        c.strokeStyle = 'rgba(80,60,30,0.12)';
+        for (let x = -40; x < W; x += 34) { c.beginPath(); c.moveTo(x, WALL); c.lineTo(x + 30, H); c.stroke(); }
+        // 창문
+        const sky = c.createLinearGradient(0, 22, 0, 108); sky.addColorStop(0, '#a5d8ff'); sky.addColorStop(1, '#e7f5ff');
+        c.fillStyle = '#e2e8f0'; rr(24, 20, 132, 90, 4); c.fill();
+        c.fillStyle = sky; c.fillRect(30, 26, 120, 78);
+        c.fillStyle = 'rgba(255,255,255,0.85)'; ell(70 + Math.sin(t * 0.2) * 8, 46, 18, 7); c.fill(); ell(84 + Math.sin(t * 0.2) * 8, 42, 12, 7); c.fill();
+        c.fillStyle = '#94a3b8'; c.fillRect(30, 84, 120, 20);
+        for (let i = 0; i < 5; i++) { c.fillStyle = ['#cbd5e1', '#a0aec0', '#b8c2cc', '#cbd5e1', '#a0aec0'][i]; c.fillRect(34 + i * 23, 62 - (i % 3) * 10, 18, 42 + (i % 3) * 10); }
+        c.strokeStyle = '#cbd5e0'; c.lineWidth = 3; c.beginPath(); c.moveTo(90, 26); c.lineTo(90, 104); c.stroke(); c.lineWidth = 1;
+        // 화이트보드
+        c.fillStyle = '#a0aec0'; rr(184, 12, 352, 112, 6); c.fill();
+        c.fillStyle = '#fdfefe'; c.fillRect(190, 18, 340, 100);
+        c.fillStyle = 'rgba(0,0,0,0.04)'; c.fillRect(190, 18, 340, 6);
+        c.fillStyle = '#718096'; c.fillRect(200, 118, 320, 5);
+        for (const [x, col] of [[220, '#2b6cb0'], [236, '#c53030'], [252, '#2f855a']]) { c.fillStyle = col; rr(x, 112, 12, 5, 2); c.fill(); }
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        if (board.big) {
+            c.fillStyle = '#718096'; c.font = '11px sans-serif'; c.fillText(board.tag, 360, 30);
+            c.fillStyle = '#1a365d'; let fs = 28; c.font = `bold ${fs}px "Segoe UI", sans-serif`;
+            const txt = boardText(board.big);
+            while (fs > 12 && c.measureText(txt).width > 320) { fs--; c.font = `bold ${fs}px "Segoe UI", sans-serif`; }
+            c.fillText(txt, 360, 70);
+        } else {
+            const cols = ['#2b6cb0', '#c53030', '#2f855a'];
+            board.lines.slice(0, 3).forEach((ln, i) => {
+                c.fillStyle = cols[i % 3]; c.font = i === 0 ? 'bold 15px sans-serif' : '14px "Segoe UI", sans-serif';
+                c.fillText(boardText(ln), 360, 38 + i * 28);
+            });
+        }
+        // 시계·게시물
+        c.fillStyle = '#fff'; ell(586, 40, 16, 16); c.fill(); c.strokeStyle = '#4a5568'; c.lineWidth = 3; c.stroke(); c.lineWidth = 1.5;
+        const a1 = t * 0.05, a2 = t * 0.6;
+        c.beginPath(); c.moveTo(586, 40); c.lineTo(586 + Math.cos(a1) * 8, 40 + Math.sin(a1) * 8); c.moveTo(586, 40); c.lineTo(586 + Math.cos(a2) * 12, 40 + Math.sin(a2) * 12); c.stroke(); c.lineWidth = 1;
+        c.fillStyle = '#fefcbf'; c.save(); c.translate(588, 86); c.rotate(-0.05); c.fillRect(-30, -18, 60, 36); c.fillStyle = '#c53030'; c.font = 'bold 10px sans-serif'; c.fillText('목표!', 0, -7); c.fillStyle = '#2d3748'; c.fillText('수학 1등급', 0, 8); c.restore();
+        // 문
+        const dw = 44 * (1 - doorOpen * 0.7);
+        c.fillStyle = '#4a5568'; c.fillRect(656, 54, 52, WALL - 54);
+        c.fillStyle = '#2d3748'; c.fillRect(660, 58, 44, WALL - 58);
+        c.fillStyle = '#9aa5b1'; c.fillRect(660, 58, dw, WALL - 58);
+        c.fillStyle = 'rgba(220,240,255,0.8)'; c.fillRect(660 + dw * 0.2, 68, dw * 0.6, 28);
+        c.fillStyle = '#e2e8f0'; ell(660 + dw - 6, 106, 2.5, 2.5); c.fill();
+        // 교탁
+    }
+    function drawPodium() {
+        c.fillStyle = volGrad(30, 92, '#8b6b4a'); rr(30, BOARD_Y - 38, 62, 38, 3); c.fill();
+        c.fillStyle = '#6b4f35'; c.fillRect(26, BOARD_Y - 42, 70, 6);
+        c.fillStyle = '#2b6cb0'; rr(40, BOARD_Y - 52, 18, 10, 2); c.fill(); c.fillStyle = '#e53e3e'; rr(60, BOARD_Y - 50, 14, 8, 2); c.fill();
+    }
+
+    // ---------- 상태 변경 ----------
+    function setBoard(lines, big, tag) { board = { lines: lines || [], big: big || null, tag: tag || '' }; }
+    function setBanner(b) { banner = b || ''; }
+    function idle(teacherList) {
+        phase = 'idle'; people = []; particles = [];
+        teachers = [director, ...teacherList.map((tc, i) => ({ x: TEACH_X[(i + 1) % TEACH_X.length], y: BOARD_Y + 22, tx: TEACH_X[(i + 1) % TEACH_X.length], ty: BOARD_Y + 22, phase: 0, moving: false, look: tc.look, name: tc.name }))];
+        director.x = director.tx = 158; director.y = director.ty = BOARD_Y;
+    }
+    function directorTo(x, y) { director.tx = x; director.ty = y ?? BOARD_Y; }
+    // 직접 강의할 때만 칠판 앞 가운데로 나와요
+    function startClass(list) {
+        phase = 'class'; particles = [];
+        const order = SEATS.map((_, i) => i).sort((a, b) => (SEATS[a].y - SEATS[b].y) || (Math.random() - 0.5));
+        people = list.slice(0, SEATS.length).map((st, i) => {
+            const seat = SEATS[order[i]];
+            return {
+                id: st.id, name: st.name, look: st.look, isNew: st.isNew, seed: Math.random() * 6, mood: 'happy',
+                x: DOOR.x, y: DOOR.y, alpha: 0, phase: 0, delay: i * 0.3 + Math.random() * 0.2, state: 'wait',
+                path: [[DOOR.x, seat.y + 18], [seat.x, seat.y + 18], [seat.x, seat.y]], sx: seat.x, sy: seat.y, bubble: null,
+            };
+        });
+        teachers.forEach((tc, i) => { tc.tx = TEACH_X[i % TEACH_X.length]; tc.ty = BOARD_Y + (i ? 22 : 0); });
+    }
+    function setPhase(p) {
+        phase = p;
+        if (p === 'leave') {
+            people.forEach((q, i) => { q.state = 'leave'; q.delay = i * 0.18; q.path = [[q.x, q.y + 18], [DOOR.x, q.y + 18], [DOOR.x, DOOR.y]]; });
+        }
+        if (p === 'exam') people.forEach(q => { q.bubble = { text: '📝', until: t + 99 }; });
+    }
+    function emote(id, text, dur = 2) { const q = people.find(p => p.id === id); if (q) q.bubble = { text, until: t + dur }; }
+    function emoteAll(fn) { people.forEach(q => { const e = fn(q.id); if (e) q.bubble = { text: e, until: t + 3.5 }; }); }
+    const seatedCount = () => people.filter(p => p.state === 'seated').length;
+    const allGone = () => people.length === 0;
+
+    // ---------- 업데이트 ----------
+    function moveToward(o, speed, dt) {
+        const dx = o.tx - o.x, dy = o.ty - o.y, d = Math.hypot(dx, dy);
+        if (d > 1) { const st = Math.min(d, speed * dt); o.x += dx / d * st; o.y += dy / d * st; o.phase += dt * 14; o.moving = true; }
+        else { o.x = o.tx; o.y = o.ty; o.moving = false; }
+    }
+    function update(dt) {
+        t += dt;
+        teachers.forEach((tc, i) => {
+            moveToward(tc, 120, dt);
+            const [lo, hi] = TEACH_RANGE[i % TEACH_RANGE.length];
+            if (phase === 'class' && !tc.moving && Math.random() < dt * 0.5) tc.tx = rnd(lo, hi);
+        });
+        if (phase === 'class' && Math.random() < dt * 6) { // 판서 가루
+            particles.push({ x: rnd(220, 500), y: rnd(40, 110), vy: rnd(5, 15), life: 0.8, max: 0.8, dust: true });
+        }
+        if (phase === 'class' && Math.random() < dt * 1.6 && people.length) {
+            const q = pick(people); if (q.state === 'seated' && (!q.bubble || t > q.bubble.until)) q.bubble = { text: pick(['💡', '✏️', '🤔', '❓', '😵', '✅', '📐']), until: t + rnd(1.2, 2.4) };
+        }
+        for (const p of people) {
+            if (p.delay > 0) { p.delay -= dt; continue; }
+            if (p.state === 'wait') p.state = 'enter';
+            if (p.path.length) {
+                const [tx, ty] = p.path[0], ddx = tx - p.x, ddy = ty - p.y, d = Math.hypot(ddx, ddy), st = 150 * dt;
+                if (d <= st) { p.x = tx; p.y = ty; p.path.shift(); if (!p.path.length && p.state === 'enter') p.state = 'seated'; }
+                else { p.x += ddx / d * st; p.y += ddy / d * st; }
+                p.phase += dt * 12;
+            }
+            p.alpha = p.state === 'wait' ? 0 : Math.min(1, Math.hypot(p.x - DOOR.x, p.y - DOOR.y) / 14);
+        }
+        people = people.filter(p => !(p.state === 'leave' && !p.path.length));
+        doorOpen += ((people.some(p => p.state !== 'wait' && Math.hypot(p.x - DOOR.x, p.y - DOOR.y) < 40) ? 1 : 0) - doorOpen) * Math.min(1, dt * 10);
+        for (const q of particles) { q.y += q.vy * dt; q.life -= dt; }
+        particles = particles.filter(q => q.life > 0);
+    }
+
+    // ---------- 그리기 ----------
+    function draw() {
+        fit();
+        c.clearRect(0, 0, W, H);
+        drawRoom();
+        const list = [{ y: BOARD_Y + 0.5, f: drawPodium }];
+        for (const s of SEATS) {
+            const sitter = people.find(p => p.state === 'seated' && p.sx === s.x && p.sy === s.y);
+            list.push({ y: s.y - 0.5, f: () => drawDesk(s.x, s.y) });
+            if (!sitter) list.push({ y: s.y, f: () => drawEmptyChair(s.x, s.y) });
+        }
+        for (const p of people) {
+            if (p.state === 'wait') continue;
+            list.push({ y: p.y, f: () => p.state === 'seated' ? drawBack(p) : drawFront(p, p.path.length > 0) });
+        }
+        for (const tc of teachers) list.push({ y: tc.y, f: () => drawFront(tc, tc.moving) });
+        list.sort((a, b) => a.y - b.y).forEach(o => o.f());
+        for (const q of particles) { c.fillStyle = `rgba(160,174,192,${q.life / q.max * 0.6})`; ell(q.x, q.y, 1.3, 1.3); c.fill(); }
+        c.textAlign = 'center'; c.textBaseline = 'bottom';
+        for (const p of people) {
+            if (p.state === 'wait' || p.alpha < 0.5) continue;
+            const top = p.y - (p.state === 'seated' ? 96 : 92) * p.look.h;
+            if (p.bubble && t < p.bubble.until) { c.font = '16px sans-serif'; c.fillText(p.bubble.text, p.x + 10, top + 4); }
+            if (p.isNew && p.state !== 'leave') { c.font = 'bold 9px sans-serif'; c.fillStyle = '#e53e3e'; c.fillText('신규', p.x, top + 16); }
+            if (p.state !== 'seated') { c.font = '9px sans-serif'; c.fillStyle = '#2d3748'; c.fillText(p.name, p.x, top + 16); }
+        }
+        c.font = '9px sans-serif'; c.fillStyle = '#4a5568';
+        teachers.forEach((tc, i) => c.fillText(i === 0 ? '원장(나)' : tc.name + ' 쌤', tc.x, tc.y - 98 * tc.look.h));
+        if (banner) {
+            c.fillStyle = 'rgba(45,55,72,0.82)'; rr(W / 2 - 120, H - 34, 240, 26, 13); c.fill();
+            c.fillStyle = '#fff'; c.font = 'bold 13px sans-serif'; c.textBaseline = 'middle'; c.fillText(banner, W / 2, H - 21);
+        }
+    }
+
+    return { idle, directorTo, startClass, setPhase, setBoard, setBanner, emote, emoteAll, update, draw, seatedCount, allGone };
+})();
+
+// ===== 게임 진행 =====
+const STYLE = k => TEACHER_STYLES.find(s => s.key === k) || TEACHER_STYLES[0];
+const byId = id => S.students.find(s => s.id === id);
+const repLabel = r => r >= 80 ? '🔥 명문' : r >= 60 ? '⭐ 인기' : r >= 40 ? '🙂 보통' : r >= 20 ? '😐 무명' : '🥶 위기';
+const BOARD_TOPICS = [
+    ['오늘의 개념', 'y = ax² + bx + c', 'a² − b² = (a + b)(a − b)'],
+    ['핵심 공식', 'sin²θ + cos²θ = 1', 'aₙ = a₁ + (n − 1)d'],
+    ['오늘의 개념', 'f′(x) = lim (f(x+h) − f(x)) / h', '∫ xⁿ dx = xⁿ⁺¹/(n+1) + C'],
+    ['복습', '(x + a)(x + b) = x² + (a+b)x + ab', '근의 공식 x = (−b ± √D) / 2a'],
+    ['시험 대비', 'log a + log b = log ab', 'ₙCᵣ = n! / r!(n−r)!'],
+];
+
+function renderStats() {
+    $('sMonth').textContent = `${MONTH_LABEL(Math.min(S.month, TOTAL_MONTHS))} (${Math.min(S.month, TOTAL_MONTHS)}/12)`;
+    $('sMoney').textContent = manwon(S.money) + '원';
+    $('sMoney').classList.toggle('minus', S.money < 0);
+    $('sStudents').textContent = `${S.students.length} / ${seats()}명`;
+    $('sRep').textContent = repLabel(S.rep);
+    $('mRep').style.width = clamp(S.rep, 0, 100) + '%';
+    const sk = avg(S.students.map(s => s.skill));
+    $('sSkill').textContent = S.students.length ? Math.round(sk) + '점' : '-';
+    $('mSkill').style.width = clamp(sk, 0, 100) + '%';
+}
+
+function monthEvent() {
+    const m = S.month;
+    const lines = [];
+    if (m === 1) lines.push('🌸 <b>신학기 시작!</b> 상담 문의가 많은 달이에요. 홍보를 해두면 원생을 많이 모을 수 있어요.');
+    if (EXAMS[m]) lines.push(`📝 이번 달은 <b>${EXAMS[m]}</b>! 수업이 끝나면 성적이 나와요. 직접 강의·모의고사로 대비하세요.`);
+    if (EXAMS[m + 1]) lines.push(`⏰ 다음 달 ${EXAMS[m + 1]}이 있어요. 미리 실력을 끌어올려 두세요.`);
+    if (m === SUNEUNG_MONTH) lines.push('🎯 이번 달은 <b>수능</b>! 고3 원생들의 결과가 학원 평판을 크게 좌우해요.');
+    if (m === 6) lines.push('☀️ 여름방학 특강 시즌! 신규 문의가 늘어나요.');
+    if (m === 11 || m === 12) lines.push('❄️ 겨울방학 선행 시즌! 신규 문의가 늘어나요.');
+    if (S.event) lines.push(S.event);
+    if (classesNeeded() > staff()) lines.push(`⚠️ 원생이 ${S.students.length}명인데 수업할 사람이 ${staff()}명뿐이라 한 반 인원이 너무 많아요. <b>강사를 채용</b>하세요!`);
+    if (S.students.length >= seats() - 2) lines.push('🚪 강의실이 거의 꽉 찼어요. 원생을 더 받으려면 <b>강의실 증설</b>이 필요해요.');
+    if (!lines.length) return { text: '📚 평범한 한 달이에요. 수업 품질을 높이고 원생들의 마음을 챙겨 보세요.', calm: true };
+    return { text: lines.join('<br>') };
+}
+
+function startMonth() {
+    if (!S.monthStarted) {
+        S.monthStarted = true;
+        S.ap = AP_PER_MONTH; S.quality = 0; S.promo = 0; S.seminar = false; S.mock = false; S.trained = false; S.book = false; S.spend = 0; S.consulted = [];
+        S.event = '';
+        // 무작위 사건
+        if (S.month > 1) {
+            const r = Math.random();
+            if (r < 0.12) { S.event = '🏢 길 건너에 <b>경쟁 학원</b>이 새로 생겼어요. 이번 달 신규 문의가 줄어들 수 있어요.'; S.rival = true; }
+            else if (r < 0.24) { S.event = '💬 지역 맘카페에 <b>우리 학원 칭찬 글</b>이 올라왔어요! 평판 +4'; S.rep = clamp(S.rep + 4, 0, 100); }
+            else if (r < 0.32) { S.event = '❄️ 강의실 <b>에어컨이 고장</b>나서 수리비 80만 원이 나갔어요.'; S.money -= 800000; S.spend += 800000; }
+            else if (r < 0.40 && S.teachers.length) {
+                const tc = pick(S.teachers);
+                S.pending = { type: 'scout', id: tc.id };
+            }
+            else S.rival = false;
+            // 새로운 고민
+            for (const s of S.students) if (!s.concern && Math.random() < 0.12) s.concern = { type: pick(CONCERNS).key, known: false };
+        }
+        save();
+    }
+    selected = null; LESSON = null;
+    $('plan').hidden = false; $('lesson').hidden = true;
+    Scene.idle(S.teachers);
+    Scene.setBoard(BOARD_TOPICS[(S.month - 1) % BOARD_TOPICS.length]);
+    Scene.setBanner('');
+    Sound.setIntensity(1);
+    $('feeSel').value = String(S.fee);
+    renderPlan();
+    if (S.pending && S.pending.type === 'scout') setTimeout(showScout, 300);
+}
+
+function whyBlocked(k) {
+    const a = ACTIONS[k];
+    if (S.ap < a.ap) return '행동 부족';
+    if (a.cost > S.money) return '자금 부족';
+    if (k === 'teach' && S.quality >= 100) return '품질 최고';
+    if (k === 'promo' && S.promo >= 2) return '이번 달 충분';
+    if (k === 'seminar' && S.seminar) return '이번 달 완료';
+    if (k === 'mock' && S.mock) return '이번 달 완료';
+    if (k === 'train' && (S.trained || !S.teachers.length)) return S.trained ? '이번 달 완료' : '강사 없음';
+    if (k === 'book' && S.book) return '이번 달 완료';
+    if (k === 'hire' && S.teachers.length >= 4) return '강사 최대';
+    return '';
+}
+
+function renderPlan() {
+    renderStats();
+    $('monthTitle').textContent = `📅 ${MONTH_LABEL(S.month)} — 이번 달 운영 계획`;
+    $('apDots').innerHTML = '남은 행동 ' + Array.from({ length: AP_PER_MONTH }, (_, i) => `<span class="${i < S.ap ? '' : 'used'}"></span>`).join('');
+    const ev = monthEvent();
+    $('eventBox').innerHTML = ev.text;
+    $('eventBox').classList.toggle('calm', !!ev.calm);
+    $('actions').innerHTML = Object.entries(ACTIONS).map(([k, a]) => {
+        const why = whyBlocked(k);
+        const cost = [`행동 ${a.ap}`, a.cost ? manwon(a.cost) + '원' : ''].filter(Boolean).join(' · ');
+        return `<button class="act" data-act="${k}" ${why ? 'disabled' : ''}><span class="t">${a.icon} ${a.name}</span><span class="d">${a.desc}</span><span class="c">${why ? '⛔ ' + why : cost}</span></button>`;
+    }).join('');
+    const chips = [`🧑‍🏫 이번 달 수업 품질 ${S.quality}`];
+    if (S.promo) chips.push(`📢 홍보 ${S.promo}회`);
+    if (S.seminar) chips.push('🎤 설명회 완료');
+    if (S.mock) chips.push('📝 모의고사 완료');
+    if (S.bookOwned) chips.push('📚 자체 교재 보유');
+    const fac = Object.entries(FACILITIES).filter(([k]) => S.fac[k]).map(([k, f]) => f.icon + ' ' + f.name.replace(' 증설', '') + (k === 'room' ? ` +${S.fac.room}` : ''));
+    chips.push(...fac);
+    chips.push(`💸 월 고정비 약 ${manwon(monthlyCost(S.students.length))}원`);
+    $('chips').innerHTML = chips.map(x => `<span>${x}</span>`).join('');
+    renderTeachers();
+    renderRoster();
+}
+function renderTeachers() {
+    $('tchTitle').textContent = `👩‍🏫 강사진 (${staff()}명 · 반 ${classesNeeded()}개 필요)`;
+    const me = `<div class="tch"><b>👑 원장 (나)</b><div class="m">직접 강의 미니게임으로 수업 품질을 올려요</div></div>`;
+    $('teachers').innerHTML = me + S.teachers.map(tc => {
+        const st = STYLE(tc.style);
+        return `<div class="tch"><b>${tc.name} 선생님</b> <span style="font-size:12px;color:#718096">${st.icon} ${st.name}</span>
+            <div class="m">실력 ${'★'.repeat(Math.round(tc.skill / 20))}${'☆'.repeat(5 - Math.round(tc.skill / 20))} (${tc.skill}) · 월급 ${manwon(tc.salary)}원</div>
+            <button data-fire="${tc.id}" style="margin-top:6px;font-size:12px;padding:4px 8px">내보내기</button></div>`;
+    }).join('');
+}
+function renderRoster() {
+    $('stuTitle').textContent = `👥 원생 (${S.students.length}명)`;
+    if (!S.students.length) { $('roster').innerHTML = '<p class="sub" style="text-align:left">아직 원생이 없어요. 홍보를 해보세요!</p>'; return; }
+    $('roster').innerHTML = S.students.map(s => {
+        const tags = [];
+        if (s.isNew) tags.push('🆕 신규');
+        if (s.concern && s.concern.known) tags.push('😟 고민 있음');
+        if (S.consulted && S.consulted.includes(s.id)) tags.push('📞 상담 완료');
+        if (s.sat < 40) tags.push('⚠️ 그만둘 수도');
+        return `<button class="stu ${selected === s.id ? 'sel' : ''}" data-stu="${s.id}">
+            <div class="top"><span class="nm">${s.name}</span><span class="gr">${s.grade} · ${s.months}개월째</span></div>
+            <div class="bar"><i>실력</i><div><b style="width:${s.skill}%;background:#48bb78"></b></div></div>
+            <div class="bar"><i>만족</i><div><b style="width:${s.sat}%;background:#f687b3"></b></div></div>
+            <div class="tags">${tags.join(' · ')}</div></button>`;
+    }).join('');
+}
+
+function monthlyCost(n) {
+    const salaries = S.teachers.reduce((a, tc) => a + tc.salary, 0);
+    const upkeep = Object.entries(FACILITIES).reduce((a, [k, f]) => a + f.upkeep * S.fac[k], 0);
+    return RENT + salaries + upkeep + n * (S.bookOwned ? 5000 : BOOK_COST);
+}
+
+// ---------- 행동 ----------
+function doAction(k) {
+    const a = ACTIONS[k];
+    if (whyBlocked(k)) return;
+    if (k === 'teach') return startQuiz();
+    if (k === 'hire') return showHire();
+    if (k === 'build') return showBuild();
+    if (k === 'consult') {
+        const st = byId(selected);
+        if (!st) { toast('먼저 아래에서 원생을 한 명 선택해 주세요 👇'); $('roster').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+        if (S.consulted.includes(st.id)) { toast('이번 달에 이미 상담한 원생이에요.'); return; }
+        spend(a); S.consulted.push(st.id);
+        Scene.directorTo(60, 200);
+        Sound.play('pop');
+        if (st.concern) { st.concern.known = true; save(); renderPlan(); return consultDialog(st); }
+        st.sat = clamp(st.sat + 12, 0, 100);
+        toast(`📞 ${st.name} 어머님: "선생님 덕분에 아이가 수학을 좋아하게 됐어요!" (만족도 +12)`, 'chat', 3200);
+    } else if (k === 'promo') {
+        spend(a); S.promo++; Sound.play('page');
+        toast('📢 블로그 글을 올리고 아파트 게시판에 전단지를 붙였어요. 이번 달 문의가 늘어날 거예요.');
+    } else if (k === 'seminar') {
+        spend(a); S.seminar = true; S.rep = clamp(S.rep + 4, 0, 100); Sound.play('good');
+        toast('🎤 입시 설명회에 학부모 30명이 왔어요! 평판 +4, 이번 달 문의 크게 ↑', 'good', 3000);
+    } else if (k === 'mock') {
+        spend(a); S.mock = true; S.quality = clamp(S.quality + 10, 0, 100); Sound.play('page');
+        S.students.forEach(s => { s.motiv = clamp(s.motiv + 6, 0, 100); });
+        toast('📝 모의고사로 약점을 파악했어요. 원생 의욕 +6, 수업 품질 +10');
+    } else if (k === 'train') {
+        spend(a); S.trained = true; Sound.play('good');
+        S.teachers.forEach(tc => { tc.skill = clamp(tc.skill + 6, 0, 100); });
+        toast('🎓 강사 연수를 다녀왔어요. 모든 강사 실력 +6', 'good');
+    } else if (k === 'book') {
+        spend(a); S.book = true; S.bookOwned = true; S.quality = clamp(S.quality + 20, 0, 100); Sound.play('page');
+        toast('📚 우리 학원만의 교재를 만들었어요! 수업 품질 +20, 다음 달부터 교재비 절약', 'good');
+    }
+    save(); renderPlan();
+}
+function spend(a) { S.ap -= a.ap; S.money -= a.cost; S.spend += a.cost; }
+
+// ---------- 직접 강의 미니게임 ----------
+function startQuiz() {
+    const total = 5, timeLimit = 45;
+    const tiers = [0, 0, 1, 1, 2];
+    const Q = { i: 0, correct: 0, left: timeLimit, prob: makeProblem(tiers[0]), timer: null, done: false };
+    S.ap -= 1; save(); renderPlan();
+    Scene.directorTo(200, 152);
+    openModal(`<div class="quiz">
+        <h3>🧑‍🏫 직접 강의 — 칠판 문제를 풀어요!</h3>
+        <div class="info"><span id="qNum"></span><span id="qScore"></span><span id="qTime"></span></div>
+        <div class="timer"><div id="qBar"></div></div>
+        <div class="q" id="qText"></div>
+        <div class="row"><input id="qIn" inputmode="numeric" autocomplete="off" aria-label="답"><button class="primary" id="qOk">확인</button><button id="qSkip">넘기기</button></div>
+        <div class="fb" id="qFb"></div>
+        <div class="keypad" id="qPad">${['7', '8', '9', '⌫', '4', '5', '6', '−', '1', '2', '3', '0'].map(k => `<button data-k="${k}">${k}</button>`).join('')}</div>
+    </div>`);
+    const input = $('qIn');
+    const show = () => {
+        $('qNum').textContent = `${Q.i + 1} / ${total}번`;
+        $('qScore').textContent = `맞힌 문제 ${Q.correct}개`;
+        $('qText').innerHTML = `${Q.prob.q}<small>${Q.prob.tag}</small>`;
+        Scene.setBoard([], Q.prob.q, Q.prob.tag);
+        input.value = ''; input.focus();
+    };
+    const next = () => {
+        Q.i++;
+        if (Q.i >= total) return finish();
+        Q.prob = makeProblem(tiers[Q.i]);
+        show();
+    };
+    const finish = () => {
+        if (Q.done) return; Q.done = true;
+        clearInterval(Q.timer);
+        let gain = Q.correct * 9 + (Q.correct === total ? 10 : 0);
+        S.quality = clamp(S.quality + gain, 0, 100);
+        Scene.setBoard(BOARD_TOPICS[(S.month - 1) % BOARD_TOPICS.length]);
+        Sound.play(Q.correct >= 3 ? 'good' : Q.correct ? 'ok' : 'bad');
+        $('modal').innerHTML = `<h3>🧑‍🏫 강의 끝!</h3>
+            <p class="msg"><b style="font-size:20px">${Q.correct} / ${total}문제 정답</b><br>${Q.correct === total ? '🎉 완벽한 강의! 원생들이 박수를 쳐요. (보너스 +10)' : Q.correct >= 3 ? '👍 깔끔한 설명이었어요!' : Q.correct ? '🙂 조금 버벅였지만 괜찮았어요.' : '😅 오늘은 칠판 앞에서 진땀을 뺐어요…'}<br>이번 달 수업 품질 <b>+${gain}</b> → ${S.quality}</p>
+            <div class="row"><button class="primary" id="qClose">확인</button></div>`;
+        $('qClose').addEventListener('click', () => { closeModal(); save(); renderPlan(); });
+        $('qClose').focus();
+        save(); renderPlan();
+    };
+    const submit = () => {
+        if (Q.done) return;
+        const v = input.value.replace(/[−–]/g, '-').trim();
+        if (v === '' || v === '-') return;
+        if (Number(v) === Q.prob.a) {
+            Q.correct++; Sound.play('correct'); Sound.play('marker');
+            $('qFb').innerHTML = '<span class="plus">⭕ 정답!</span>';
+        } else {
+            Sound.play('wrong');
+            $('qFb').innerHTML = `<span class="minus">❌ 정답은 ${Q.prob.a}</span>`;
+        }
+        next();
+    };
+    $('qOk').addEventListener('click', submit);
+    $('qSkip').addEventListener('click', () => { if (Q.done) return; $('qFb').innerHTML = `<span style="color:#718096">⏭️ 넘김 (정답 ${Q.prob.a})</span>`; next(); });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    $('qPad').addEventListener('click', e => {
+        const b = e.target.closest('[data-k]'); if (!b) return;
+        const k = b.dataset.k;
+        if (k === '⌫') input.value = input.value.slice(0, -1);
+        else if (k === '−') input.value = input.value.startsWith('-') ? input.value.slice(1) : '-' + input.value;
+        else input.value += k;
+        input.focus();
+    });
+    Q.timer = setInterval(() => {
+        Q.left -= 0.1;
+        const bar = $('qBar'); if (bar) bar.style.width = (Q.left / timeLimit * 100) + '%';
+        const tl = $('qTime'); if (tl) tl.textContent = `⏱️ ${Math.max(0, Math.ceil(Q.left))}초`;
+        if (Q.left <= 0) { $('qFb').innerHTML = '<span class="minus">⏰ 시간 종료!</span>'; finish(); }
+    }, 100);
+    show();
+}
+
+// ---------- 학부모 상담 ----------
+function consultDialog(st) {
+    const cc = CONCERNS.find(x => x.key === st.concern.type);
+    const choices = cc.c.slice().sort(() => Math.random() - 0.5);
+    openModal(`<h3>📞 ${st.name} 학부모 상담</h3>
+        <div class="who"><div class="avatar">👩</div><div class="say"><b>${st.name} 어머님 (${st.grade})</b>${cc.line}</div></div>
+        <div class="choices">${choices.map((c, i) => `<button data-c="${i}">${c.t}</button>`).join('')}</div><div id="cfb"></div>`);
+    $('modal').querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
+        const c = choices[Number(b.dataset.c)];
+        $('modal').querySelectorAll('[data-c]').forEach(x => { x.disabled = true; });
+        b.style.outline = '2px solid #667eea';
+        let res;
+        if (c.g === 2) { st.sat = clamp(st.sat + 22, 0, 100); st.motiv = clamp(st.motiv + 8, 0, 100); st.concern = null; res = '✅ 어머님이 안심하셨어요! 만족도 +22 · 의욕 +8'; Sound.play('good'); }
+        else if (c.g === 1) { st.sat = clamp(st.sat + 8, 0, 100); if (Math.random() < 0.5) st.concern = null; res = st.concern ? '🙂 조금 누그러지셨지만 고민은 남았어요. 만족도 +8' : '🙂 일단 넘어갔어요. 만족도 +8'; Sound.play('ok'); }
+        else { st.sat = clamp(st.sat - 12, 0, 100); res = '😥 어머님이 서운해하세요… 만족도 -12'; Sound.play('bad'); }
+        $('cfb').innerHTML = `<div class="feedback g${c.g}">${res}</div><div class="row"><button class="primary" id="cok">확인</button></div>`;
+        $('cok').addEventListener('click', () => { closeModal(); save(); renderPlan(); });
+        $('cok').focus();
+    }));
+}
+
+// ---------- 강사 채용·스카우트 ----------
+function showHire() {
+    const cands = [makeTeacher(), makeTeacher(), makeTeacher()];
+    openModal(`<h3>🤝 강사 면접</h3>
+        <p class="msg" style="margin:0 0 10px">한 명을 채용하면 행동 1을 써요. 강사 1명은 한 반(최대 ${CLASS_SIZE}명)을 맡아요.</p>
+        <div class="choices">${cands.map((tc, i) => {
+            const st = STYLE(tc.style);
+            return `<div class="cand"><b>${tc.name} 선생님</b> · ${st.icon} ${st.name}<br>
+                <span style="font-size:13px;color:#4a5568">실력 ${'★'.repeat(Math.round(tc.skill / 20))}${'☆'.repeat(5 - Math.round(tc.skill / 20))} (${tc.skill}) · ${st.desc}</span><br>
+                <span style="font-size:13px">월급 <b>${manwon(tc.salary)}원</b></span>
+                <button data-h="${i}" style="float:right;margin-top:-22px" class="primary">채용</button></div>`;
+        }).join('')}</div>
+        <div class="row"><button id="hCancel">다음에 할게요</button></div>`);
+    $('modal').querySelectorAll('[data-h]').forEach(b => b.addEventListener('click', () => {
+        const tc = cands[Number(b.dataset.h)];
+        S.teachers.push(tc); S.ap -= 1; Sound.play('newbie');
+        closeModal(); save(); startMonthRefresh();
+        toast(`🤝 ${tc.name} 선생님이 합류했어요! (월급 ${manwon(tc.salary)}원)`, 'good', 3000);
+    }));
+    $('hCancel').addEventListener('click', closeModal);
+}
+function startMonthRefresh() { Scene.idle(S.teachers); renderPlan(); }
+function showScout() {
+    const tc = S.teachers.find(x => x.id === S.pending.id);
+    if (!tc) { S.pending = null; save(); return; }
+    const raise = 500000;
+    openModal(`<h3>📩 스카우트 제의</h3>
+        <div class="who"><div class="avatar">🧑‍🏫</div><div class="say"><b>${tc.name} 선생님</b>원장님… 다른 학원에서 월급을 더 준다고 오라는데, 고민이 돼요.</div></div>
+        <div class="choices">
+            <button data-s="raise">💰 월급을 ${manwon(raise)}원 올려주며 붙잡는다 (${manwon(tc.salary)} → ${manwon(tc.salary + raise)}원)</button>
+            <button data-s="talk">🍽️ 밥을 사며 학원의 비전을 이야기한다 (50% 확률로 남음)</button>
+            <button data-s="let">👋 축하하며 보내준다</button>
+        </div><div id="sfb"></div>`);
+    $('modal').querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => {
+        const k = b.dataset.s; let msg, g;
+        if (k === 'raise') { tc.salary += raise; msg = `${tc.name} 선생님이 남기로 했어요. 월급이 올랐어요.`; g = 2; }
+        else if (k === 'talk' && Math.random() < 0.5) { msg = `${tc.name} 선생님: "원장님 믿고 계속 함께할게요!"`; g = 2; S.money -= 50000; }
+        else { S.teachers = S.teachers.filter(x => x !== tc); msg = `${tc.name} 선생님이 학원을 떠났어요. 반 편성을 다시 해야 해요.`; g = 0; }
+        S.pending = null; Sound.play(g ? 'good' : 'bad');
+        $('modal').querySelectorAll('[data-s]').forEach(x => { x.disabled = true; });
+        $('sfb').innerHTML = `<div class="feedback g${g}">${msg}</div><div class="row"><button class="primary" id="sok">확인</button></div>`;
+        $('sok').addEventListener('click', () => { closeModal(); save(); startMonthRefresh(); });
+    }));
+}
+
+// ---------- 시설 투자 ----------
+function showBuild() {
+    openModal(`<h3>🏗️ 시설 투자</h3>
+        <p class="msg" style="margin:0 0 10px">하나를 지으면 행동 1을 써요. 매달 유지비가 들어요.</p>
+        <div class="choices">${Object.entries(FACILITIES).map(([k, f]) => {
+            const lv = S.fac[k], max = lv >= f.max, poor = S.money < f.cost;
+            return `<button data-f="${k}" ${max || poor ? 'disabled' : ''}><b>${f.icon} ${f.name}</b> ${k === 'room' ? `(현재 강의실 ${2 + lv}개)` : lv ? '(보유)' : ''}<br>
+                <span style="font-size:12px">${f.desc} · 공사비 ${manwon(f.cost)}원 · 유지비 월 ${manwon(f.upkeep)}원${max ? ' · 완료' : poor ? ' · 자금 부족' : ''}</span></button>`;
+        }).join('')}</div>
+        <div class="row"><button id="bCancel">다음에 할게요</button></div>`);
+    $('modal').querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => {
+        const k = b.dataset.f, f = FACILITIES[k];
+        S.fac[k]++; S.money -= f.cost; S.spend += f.cost; S.ap -= 1;
+        Sound.play('build'); closeModal(); save(); renderPlan();
+        toast(`${f.icon} ${f.name} 완료!`, 'good');
+    }));
+    $('bCancel').addEventListener('click', closeModal);
+}
+
+// ===== 한 달 수업 =====
+const wait = sec => new Promise(r => {
+    const tick = () => { if (!LESSON) return r(); LESSON.waitLeft -= 0.05 * LESSON.speed; if (LESSON.waitLeft <= 0) r(); else setTimeout(tick, 50); };
+    LESSON.waitLeft = sec; setTimeout(tick, 50);
+});
+async function waitUntil(fn, maxSec) {
+    const t0 = performance.now();
+    while (!fn() && (performance.now() - t0) / 1000 * (LESSON ? LESSON.speed : 1) < maxSec) await new Promise(r => setTimeout(r, 100));
+}
+
+async function runMonth() {
+    if (LESSON) return;
+    LESSON = { speed: 1 };
+    $('plan').hidden = true; $('lesson').hidden = false; $('skipBtn').disabled = false;
+    $('scene').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    Sound.play('bell');
+    Scene.idle(S.teachers);
+    Scene.setBoard(BOARD_TOPICS[(S.month - 1) % BOARD_TOPICS.length]);
+    Scene.startClass(S.students);
+    Scene.setBanner('🚪 원생들이 등원하고 있어요');
+    $('lessonNote').textContent = `${MONTH_LABEL(S.month)} 수업 · 원생 ${S.students.length}명이 등원해요.`;
+    await waitUntil(() => Scene.seatedCount() >= Math.min(S.students.length, 18), 12);
+    Scene.setPhase('class'); Scene.setBanner('📐 수업 중'); Sound.play('marker');
+    $('lessonNote').textContent = S.quality >= 60 ? '오늘 수업 반응이 최고예요! 💡' : S.quality > 0 ? '열심히 수업하는 중이에요.' : '수업 준비가 부족해서 원생들이 조금 지루해해요…';
+    await wait(5);
+    const result = simulateMonth();
+    if (result.exam) {
+        Scene.setPhase('exam'); Scene.setBanner(`📝 ${result.exam.name} 결과 발표!`);
+        Scene.emoteAll(id => { const d = result.exam.diff[id]; return d === undefined ? null : d >= 8 ? '🎉' : d >= 0 ? '🙂' : '😢'; });
+        Sound.play(result.exam.avg >= 0 ? 'good' : 'bad');
+        $('lessonNote').innerHTML = `📝 ${result.exam.name}: 평균 <b>${result.exam.avg >= 0 ? '+' : ''}${result.exam.avg.toFixed(1)}점</b>${result.exam.perfect.length ? ` · 💯 ${result.exam.perfect.join(', ')}` : ''}`;
+        await wait(3.5);
+    }
+    if (result.suneung) {
+        Scene.setBanner('🎯 수능 결과 발표!'); Sound.play('good');
+        $('lessonNote').innerHTML = result.suneung.text;
+        await wait(3);
+    }
+    Scene.setPhase('leave'); Scene.setBanner('👋 하원 시간'); Sound.play('bell');
+    await waitUntil(() => Scene.allGone(), 10);
+    Scene.setBanner('');
+    showMonthReport(result);
+}
+
+function simulateMonth() {
+    const n0 = S.students.length;
+    const staffList = [{ skill: 60, style: 'director' }, ...S.teachers];
+    const overflow = classesNeeded() > staff();
+    const res = { joined: [], left: [], graduated: [], growth: 0, exam: null, suneung: null };
+    // 실력 성장 (반 배정: 원장 → 강사 순으로 10명씩)
+    const sorted = S.students.slice().sort((a, b) => b.skill - a.skill);
+    const growths = [];
+    sorted.forEach((s, i) => {
+        const tc = staffList[Math.min(Math.floor(i / CLASS_SIZE), staffList.length - 1)];
+        let g = (tc.skill / 25 + S.quality / 22 + s.motiv / 40 + (S.fac.study ? 1.2 : 0) + (S.mock ? 0.8 : 0) + (S.bookOwned ? 0.6 : 0)) * rnd(0.55, 1.15) * 0.55;
+        if (tc.style === 'strict') g *= 1.2;
+        if (tc.style === 'calm' && s.skill < 45) g *= 1.3;
+        if (overflow) g *= 0.65;
+        if (s.skill > 85) g -= (s.skill - 85) * 0.15;
+        s.skill = clamp(Math.round((s.skill + g) * 10) / 10, 0, 100);
+        growths.push(g);
+        // 만족도
+        let target = 46 + g * 5 + (S.quality >= 60 ? 6 : 0) + (S.fac.qna ? 5 : 0) + (S.fac.shuttle ? 4 : 0)
+            - (S.fee - 400000) / 10000 * 0.7 - (overflow ? 15 : 0) - (s.concern ? 6 : 0);
+        if (tc.style === 'kind') target += 8;
+        if (tc.style === 'strict') target -= 5;
+        s.sat = clamp(Math.round(s.sat + (target - s.sat) * 0.35 + rnd(-3, 3)), 0, 100);
+        s.motiv = clamp(Math.round(s.motiv + (S.fac.study ? 2 : 0) + rnd(-5, 3)), 5, 100);
+        s.months++;
+        s.isNew = false;
+    });
+    res.growth = avg(growths);
+    // 시험
+    if (EXAMS[S.month]) {
+        const diff = {}, perfect = [];
+        let sum = 0;
+        for (const s of S.students) {
+            const d = Math.round(s.skill - s.lastExam + rnd(-4, 4));
+            diff[s.id] = d; sum += d; s.lastExam = s.skill;
+            if (s.skill + rnd(-6, 6) >= 93) perfect.push(s.name);
+        }
+        const a = S.students.length ? sum / S.students.length : 0;
+        S.rep = clamp(S.rep + clamp(a * 0.8, -6, 10) + Math.min(perfect.length, 3) * 2, 0, 100);
+        S.students.forEach(s => { s.sat = clamp(s.sat + (diff[s.id] >= 5 ? 8 : diff[s.id] < 0 ? -8 : 0), 0, 100); });
+        res.exam = { name: EXAMS[S.month], avg: a, perfect: perfect.slice(0, 4), diff };
+    }
+    // 수능 (고3 졸업)
+    if (S.month === SUNEUNG_MONTH) {
+        const seniors = S.students.filter(s => s.grade === '고3');
+        const grades = seniors.map(s => ({ s, g: s.skill >= 88 ? 1 : s.skill >= 78 ? 2 : s.skill >= 66 ? 3 : s.skill >= 52 ? 4 : 5 }));
+        const top = grades.filter(x => x.g <= 2);
+        S.rep = clamp(S.rep + grades.filter(x => x.g === 1).length * 4 + grades.filter(x => x.g === 2).length * 2, 0, 100);
+        res.suneung = {
+            text: seniors.length ? `🎯 수능 수학: ${grades.map(x => `${x.s.name} ${x.g}등급`).join(', ')}${top.length ? ' 🎉' : ''}` : '🎯 올해는 수능을 보는 고3 원생이 없었어요.',
+            list: grades,
+        };
+        res.graduated = seniors.map(s => s.name);
+        S.students = S.students.filter(s => s.grade !== '고3');
+    }
+    // 퇴원
+    for (const s of S.students.slice()) {
+        const p = s.sat < 35 ? 0.35 : s.sat < 50 ? 0.07 : 0.015;
+        if (Math.random() < p) { res.left.push(s.name + (s.sat < 50 ? '' : ' (이사)')); S.students = S.students.filter(x => x !== s); }
+    }
+    // 재정 (이번 달 다닌 원생 기준)
+    const revenue = n0 * S.fee;
+    const salaries = S.teachers.reduce((a, tc) => a + tc.salary, 0);
+    const upkeep = Object.entries(FACILITIES).reduce((a, [k, f]) => a + f.upkeep * S.fac[k], 0);
+    const books = n0 * (S.bookOwned ? 5000 : BOOK_COST);
+    S.money += revenue - RENT - salaries - upkeep - books;
+    res.fin = { revenue, rent: RENT, salaries, upkeep, books, extra: S.spend, net: revenue - RENT - salaries - upkeep - books - S.spend };
+    // 평판
+    const avgSat = avg(S.students.map(s => s.sat));
+    const stars = S.teachers.filter(tc => tc.style === 'star').length;
+    S.rep = clamp(S.rep + (avgSat - 58) * 0.08 + stars * 1.2 - Math.max(0, res.left.length - 1) * 1.5 + (S.quality >= 70 ? 1.5 : 0), 0, 100);
+    S.rep = Math.round(S.rep * 10) / 10;
+    // 신규 상담·등록 (다음 달부터 수업)
+    const season = S.month === 1 ? 3 : S.month === 6 ? 2 : (S.month === 11 || S.month === 12) ? 3 : 0;
+    const feeAdj = { 300000: 2, 400000: 0, 500000: -2, 600000: S.rep >= 70 ? -1 : -5 }[S.fee] ?? 0;
+    let base = 1 + S.rep / 11 + S.promo * 2.5 + (S.seminar ? 4 : 0) + (S.fac.shuttle ? 2 : 0) + stars + season + feeAdj - (S.rival ? 3 : 0);
+    const inquiries = Math.max(0, Math.round(base * rnd(0.7, 1.3)));
+    const conv = clamp(0.45 + S.rep / 220, 0.3, 0.92);
+    let want = 0;
+    for (let i = 0; i < inquiries; i++) if (Math.random() < conv) want++;
+    const room = Math.max(0, seats() - S.students.length);
+    const taken = new Set(S.students.map(s => s.name));
+    for (let i = 0; i < Math.min(want, room); i++) {
+        const nm = uniqueName(taken); taken.add(nm);
+        const g = S.month >= SUNEUNG_MONTH ? pick(['중1', '중2', '중3', '고1', '고2']) : pick(GRADES);
+        const s = makeStudent({ name: nm, grade: g, isNew: true });
+        S.students.push(s); res.joined.push(nm);
+    }
+    res.inquiries = inquiries; res.waiting = Math.max(0, want - room);
+    S.totals.joined += res.joined.length; S.totals.left += res.left.length;
+    S.history.push({ month: S.month, net: res.fin.net, students: S.students.length, rep: S.rep });
+    S.teachers.forEach(tc => tc.months++);
+    save();
+    return res;
+}
+
+function showMonthReport(r) {
+    renderStats();
+    const f = r.fin;
+    const row = (n, v, cls = '') => `<tr><td>${n}</td><td class="${cls}">${v}</td></tr>`;
+    const bankrupt = S.money < 0;
+    let notes = [];
+    if (r.joined.length) notes.push(`🆕 신규 등록 ${r.joined.length}명: ${r.joined.join(', ')}`);
+    if (r.waiting) notes.push(`🚪 정원이 부족해 ${r.waiting}명이 대기 중이에요. 강의실을 늘려 보세요!`);
+    if (r.left.length) notes.push(`👋 퇴원 ${r.left.length}명: ${r.left.join(', ')}`);
+    if (r.graduated.length) notes.push(`🎓 졸업: ${r.graduated.join(', ')}`);
+    if (r.exam) notes.push(`📝 ${r.exam.name} 평균 ${r.exam.avg >= 0 ? '+' : ''}${r.exam.avg.toFixed(1)}점${r.exam.perfect.length ? ` · 💯 ${r.exam.perfect.join(', ')}` : ''}`);
+    if (r.suneung) notes.push(r.suneung.text);
+    if (!r.joined.length && r.inquiries === 0) notes.push('📭 이번 달은 상담 문의가 없었어요. 홍보가 필요해요.');
+    openModal(`<h3>${bankrupt ? '💸 폐업 위기!' : `📊 ${MONTH_LABEL(S.month)} 결산`}</h3>
+        <table class="report">
+            ${row('💰 수강료 수입', '+' + won(f.revenue), 'plus')}
+            ${row('🏢 임대료', '-' + won(f.rent), 'minus')}
+            ${f.salaries ? row('👩‍🏫 강사 월급', '-' + won(f.salaries), 'minus') : ''}
+            ${f.upkeep ? row('🏗️ 시설 유지비', '-' + won(f.upkeep), 'minus') : ''}
+            ${row('📚 교재비', '-' + won(f.books), 'minus')}
+            ${f.extra ? row('📢 홍보·투자·기타', '-' + won(f.extra), 'minus') : ''}
+            <tr class="total"><td>이번 달 순이익</td><td class="${f.net >= 0 ? 'plus' : 'minus'}">${f.net >= 0 ? '+' : ''}${won(f.net)}</td></tr>
+            ${row('운영 자금', won(S.money), S.money < 0 ? 'minus' : '')}
+            ${row('원생 · 평판', `${S.students.length}명 · ${repLabel(S.rep)} (${Math.round(S.rep)})`)}
+            ${row('평균 실력 성장', `+${r.growth.toFixed(1)}점`, 'plus')}
+            ${row('상담 문의', `${r.inquiries}건`)}
+        </table>
+        <p class="msg">${notes.join('<br>')}</p>
+        ${bankrupt ? '<p class="msg minus"><b>운영 자금이 바닥나 학원 문을 닫게 되었어요…</b></p>' : ''}
+        <div class="row"><button class="primary" id="nextBtn">${bankrupt ? '📜 결과 보기' : S.month >= TOTAL_MONTHS ? '🎓 1년 결산 보기' : '다음 달로 →'}</button></div>`);
+    Sound.play(f.net >= 0 ? 'cash' : 'bad');
+    $('nextBtn').focus();
+    $('nextBtn').addEventListener('click', () => {
+        closeModal();
+        LESSON = null;
+        if (bankrupt || S.month >= TOTAL_MONTHS) { S.over = true; S.bankrupt = bankrupt; save(); showEnding(); return; }
+        S.month++; S.monthStarted = false; save();
+        startMonth();
+    });
+}
+
+function showEnding() {
+    LESSON = null;
+    const h = S.history;
+    const profit = S.money - 30000000;
+    const growth = avg(S.students.map(s => s.skill - s.startSkill));
+    const score = S.bankrupt ? 0 : profit / 1000000 * 1.0 + S.students.length * 0.9 + growth * 1.2 + S.rep * 0.35;
+    const [icon, title, msg] =
+        S.bankrupt ? ['💸', '폐업한 원장', '아쉽게도 학원 문을 닫았어요. 고정비를 줄이고 원생을 천천히 늘려 다시 도전해 보세요!'] :
+        score >= 110 ? ['🏆', '대치동 스타 원장', '원생들 성적도, 학원 매출도 최고! 동네에서 모르는 사람이 없는 명문 학원이 되었어요.'] :
+        score >= 75 ? ['🌟', '동네 1등 학원 원장', '학부모들이 줄 서서 상담받는 인기 학원이 되었어요.'] :
+        score >= 45 ? ['📈', '성장하는 학원 원장', '탄탄하게 자리를 잡았어요. 내년이 더 기대돼요!'] :
+                      ['🌱', '초보 원장', '첫해는 쉽지 않았죠. 직접 강의와 상담으로 원생 한 명 한 명을 챙겨 보세요.'];
+    const maxAbs = Math.max(1, ...h.map(x => Math.abs(x.net)));
+    openModal(`<h3>🎓 1년 운영을 마쳤어요!</h3>
+        <div class="grade">${icon}</div>
+        <p class="msg" style="margin-top:0"><b style="font-size:18px">${title}</b><br>${msg}</p>
+        <div class="chart">${h.map(x => `<div class="${x.net < 0 ? 'neg' : ''}" style="height:${Math.abs(x.net) / maxAbs * 100}%"><span>${manwon(x.net)}</span></div>`).join('')}</div>
+        <div class="chart-x">${h.map(x => `<span>${MONTH_LABEL(x.month)}</span>`).join('')}</div>
+        <p style="text-align:center;font-size:12px;color:#718096;margin-top:4px">월별 순이익</p>
+        <table class="report" style="margin-top:10px">
+            <tr><td>운영 자금 (시작 3,000만 원)</td><td class="${profit >= 0 ? 'plus' : 'minus'}">${won(S.money)} (${profit >= 0 ? '+' : ''}${manwon(profit)})</td></tr>
+            <tr><td>현재 원생</td><td>${S.students.length}명</td></tr>
+            <tr><td>1년간 등록 / 퇴원</td><td>${S.totals.joined}명 / ${S.totals.left}명</td></tr>
+            <tr><td>원생 평균 실력 향상</td><td class="plus">+${growth.toFixed(1)}점</td></tr>
+            <tr><td>평판</td><td>${repLabel(S.rep)} (${Math.round(S.rep)})</td></tr>
+            <tr><td>강사진</td><td>${S.teachers.length}명</td></tr>
+        </table>
+        <div class="row"><button class="primary" id="again">🔄 새 학원 차리기</button></div>`);
+    Sound.play(S.bankrupt ? 'bad' : 'good');
+    $('again').addEventListener('click', () => { closeModal(); S = newState(); save(); startMonth(); });
+}
+
+function showRename() {
+    openModal(`<h3>✏️ 학원 이름 바꾸기</h3>
+        <input class="name-input" id="nameInput" maxlength="16" aria-label="학원 이름">
+        <div class="row"><button class="primary" id="nameSave">저장</button><button id="nameDefault">기본값으로</button><button id="nameCancel">취소</button></div>`);
+    const input = $('nameInput'); input.value = acName;
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') $('nameSave').click(); if (e.key === 'Escape') closeModal(); });
+    $('nameSave').addEventListener('click', () => { setName(input.value); Sound.play('good'); closeModal(); toast(`🧮 학원 이름: ${acName}`, 'good'); });
+    $('nameDefault').addEventListener('click', () => { input.value = DEFAULT_NAME; input.focus(); });
+    $('nameCancel').addEventListener('click', closeModal);
+    input.focus(); input.select();
+}
+
+// ===== 이벤트 연결 =====
+$('actions').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && !b.disabled) doAction(b.dataset.act); });
+// 스크롤(드래그) 중에 원생이 잘못 선택되지 않도록, 제자리에서 누른 경우만 선택
+const tap = { x: 0, y: 0, sy: 0, moved: false };
+$('roster').addEventListener('pointerdown', e => { tap.x = e.clientX; tap.y = e.clientY; tap.sy = window.scrollY; tap.moved = false; });
+$('roster').addEventListener('pointermove', e => { if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 8) tap.moved = true; });
+$('roster').addEventListener('pointercancel', () => { tap.moved = true; });
+$('roster').addEventListener('click', e => {
+    const b = e.target.closest('[data-stu]'); if (!b) return;
+    if (e.detail !== 0 && (tap.moved || Math.abs(window.scrollY - tap.sy) > 4)) { tap.moved = false; return; }
+    const id = Number(b.dataset.stu);
+    selected = selected === id ? null : id;
+    Sound.play('click'); renderRoster();
+    if (selected) toast(`${byId(selected).name} 선택됨 — 위의 📞 학부모 상담을 눌러요`, '', 1600);
+});
+$('teachers').addEventListener('click', e => {
+    const b = e.target.closest('[data-fire]'); if (!b) return;
+    const tc = S.teachers.find(x => x.id === Number(b.dataset.fire));
+    if (!tc || !confirm(`${tc.name} 선생님을 정말 내보낼까요? (월급 ${manwon(tc.salary)}원 절약, 평판 -2)`)) return;
+    S.teachers = S.teachers.filter(x => x !== tc); S.rep = clamp(S.rep - 2, 0, 100);
+    save(); startMonthRefresh();
+});
+$('feeSel').addEventListener('change', () => { S.fee = Number($('feeSel').value); save(); renderPlan(); Sound.play('click'); });
+$('classBtn').addEventListener('click', () => {
+    if (S.ap > 0 && !confirm(`아직 행동이 ${S.ap}번 남았어요. 그래도 수업을 시작할까요?`)) return;
+    runMonth();
+});
+$('resetBtn').addEventListener('click', () => {
+    if (!confirm('정말 처음부터 다시 시작할까요? 진행 상황이 사라집니다.')) return;
+    LESSON = null; S = newState(); save(); startMonth();
+});
+$('skipBtn').addEventListener('click', () => { if (LESSON) { LESSON.speed = 4; $('skipBtn').disabled = true; } });
+$('renameBtn').addEventListener('click', showRename);
+$('musicBtn').addEventListener('click', () => Sound.toggleMusic());
+$('sfxBtn').addEventListener('click', () => Sound.toggleSfx());
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => Sound.init()));
+document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.target instanceof HTMLInputElement) return;
+    if (e.key.toUpperCase() === 'M') Sound.toggleMusic();
+});
+
+let lastFrame = performance.now();
+function frame(now) {
+    const dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
+    lastFrame = now;
+    try { Scene.update(dt * (LESSON ? LESSON.speed : 1)); Scene.draw(); } catch (e) { console.error(e); }
+    requestAnimationFrame(frame);
+}
+
+Sound.renderButtons();
+applyName();
+if (S.over) { renderStats(); Scene.idle(S.teachers); showEnding(); } else startMonth();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
