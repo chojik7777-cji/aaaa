@@ -18,6 +18,7 @@ const rooms = new Map();
 const roomCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 const playerId = () => crypto.randomBytes(8).toString('hex');
 const clone = (x) => JSON.parse(JSON.stringify(x));
+
 const json = (res, status, data) => {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -28,6 +29,19 @@ const json = (res, status, data) => {
   });
   res.end(JSON.stringify(data));
 };
+function readDashboardPw() {
+  const candidates = [process.env.DASHBOARD_PW_FILE, '/Users/chojiks/.dashboard_pw', path.join(ROOT, 'pw')].filter(Boolean);
+  for (const f of candidates) {
+    try { if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8').trim(); } catch (_) {}
+  }
+  return process.env.DASHBOARD_PW || '1212';
+}
+function dashboardAuth(req, res, body) {
+  const ok = String((body && body.password) || '') === readDashboardPw();
+  return json(res, ok ? 200 : 403, ok ? { ok: true } : { ok: false, error: '비밀번호가 맞지 않습니다.' });
+}
+
+
 function inBounds(x,y){ return x>=0 && y>=0 && x<SIZE && y<SIZE; }
 function findWin(board, x, y, rule='renju') {
   const c = board[y][x];
@@ -113,6 +127,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, {});
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
+    if (url.pathname === '/api/dashboard-auth' && req.method === 'POST') {
+      const body = await readBody(req);
+      return dashboardAuth(req, res, body);
+    }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, game: 'omok' });
     if (url.pathname === '/api/omok/create' && req.method === 'POST') {
       const body = await readBody(req);

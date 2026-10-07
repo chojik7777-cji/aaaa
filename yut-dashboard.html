@@ -115,11 +115,24 @@
     const AUTH_KEY = 'dashboard-auth-v1';
     async function requireDashboardPassword() {
       if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
-      let expected = '1212';
-      try {
-        const res = await fetch('/pw', { cache: 'no-store' });
-        if (res.ok) expected = (await res.text()).trim();
-      } catch (e) { /* fallback */ }
+      for (let i = 0; i < 3; i++) {
+        const input = prompt('현황판 비밀번호를 입력하세요.');
+        if (input === null) break;
+        try {
+          const res = await fetch('/api/dashboard-auth', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: input })
+          });
+          if (res.ok) { sessionStorage.setItem(AUTH_KEY, 'ok'); return true; }
+        } catch (e) {
+          alert('비밀번호 확인 서버에 연결할 수 없습니다.');
+          return false;
+        }
+        alert('비밀번호가 맞지 않습니다.');
+      }
+      location.href = 'index.html';
+      return false;
+    } catch (e) { /* fallback */ }
       for (let i = 0; i < 3; i++) {
         const input = prompt('현황판 비밀번호를 입력하세요.');
         if (input === expected) {
