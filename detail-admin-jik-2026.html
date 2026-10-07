@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세부관리 - 조이이익</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .card {
+            background: white; border-radius: 20px;
+            padding: 50px 40px; max-width: 500px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+        }
+        .avatar {
+            width: 100px; height: 100px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 0 auto 24px; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 40px; color: white; font-weight: bold;
+        }
+        .name { font-size: 28px; font-weight: 700; color: #2d3748; margin-bottom: 8px; }
+        .title { font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 24px; }
+        .divider {
+            width: 60px; height: 3px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 0 auto 24px; border-radius: 2px;
+        }
+        .bio { font-size: 16px; line-height: 1.8; color: #4a5568; margin-bottom: 32px; }
+        .contact { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+        .contact a {
+            display: inline-block; padding: 10px 20px; background: #f7fafc;
+            color: #4a5568; text-decoration: none; border-radius: 10px;
+            font-size: 14px; transition: all 0.3s; border: 1px solid #e2e8f0;
+        }
+        .contact a:hover { background: #667eea; color: white; border-color: #667eea; }
+        .contact .disabled {
+            display: inline-block; padding: 10px 20px; background: #edf2f7;
+            color: #a0aec0; border-radius: 10px; font-size: 14px;
+            border: 1px solid #e2e8f0; cursor: not-allowed; user-select: none;
+        }
+        .more-links { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+        .more-links h2 { font-size: 15px; color: #4a5568; margin-bottom: 12px; }
+        .more-links a {
+            display: block; margin: 8px auto 0; padding: 10px 16px; max-width: 280px;
+            background: #fff; color: #667eea; text-decoration: none; border-radius: 10px;
+            font-size: 14px; font-weight: 600; border: 1px solid #e2e8f0; transition: all 0.3s;
+        }
+        .more-links a:hover { background: #667eea; color: white; border-color: #667eea; }
+        .footer { margin-top: 32px; font-size: 13px; color: #a0aec0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="avatar">익</div>
+        <h1 class="name">조이이익</h1>
+        <p class="title">생각과 배움을 좋아하는 사람</p>
+        <div class="divider"></div>
+        <p class="bio">
+            안녕하세요! 저는 조이이익입니다.<br>
+            생각하는 것을 좋아하고,<br>
+            새로운 것을 배우는 걸 즐깁니다.<br><br>
+            만나서 반갑습니다!!!!! 
+        </p>
+        <div class="contact">
+            <a href="mailto:chojik7777@gmail.com">이메일</a>
+            <span class="disabled" aria-disabled="true">GitHub</span>
+            <a href="omok.html">오목 게임</a>
+            <a href="omok-dashboard.html" class="dashboard-link">오목 현황</a>
+            <a href="baduk.html">바둑 게임</a>
+            <a href="baduk-dashboard.html" class="dashboard-link">바둑 현황</a>
+            <a href="yut.html">윷놀이</a>
+            <a href="yut-dashboard.html" class="dashboard-link">윷놀이 현황</a>
+            <a href="cafe.html">카페 운영 게임</a>
+            <a href="church.html">교회학교 운영 게임</a>
+            <a href="math-academy.html">수학학원 운영 게임</a>
+        </div>
+        <div class="more-links">
+            <h2>더 보기</h2>
+            <a href="https://youtu.be/5BacAuHIoQ4?si=G3ZoZCVpjbMejwNb" target="_blank" rel="noopener noreferrer">유튜브 영상</a>
+            <a href="https://m.blog.naver.com/chojeongik" target="_blank" rel="noopener noreferrer">블로그</a>
+        </div>
+        <p class="footer">made by jeongik</p>
+    </div>
+
+    <script>
+        const AUTH_KEY = 'dashboard-auth-v1';
+        async function requireDashboardPassword() {
+            if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
+            for (let i = 0; i < 3; i++) {
+                const input = prompt('현황판 비밀번호를 입력하세요.');
+                if (input === null) break;
+                try {
+                    const res = await fetch('/api/dashboard-auth', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: input })
+                    });
+                    if (res.ok) {
+                        sessionStorage.setItem(AUTH_KEY, 'ok');
+                        return true;
+                    }
+                } catch (e) {
+                    alert('비밀번호 확인 서버에 연결할 수 없습니다.');
+                    return false;
+                }
+                alert('비밀번호가 맞지 않습니다.');
+            }
+            return false;
+        }
+        document.querySelectorAll('.dashboard-link').forEach((a) => {
+            a.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (await requireDashboardPassword()) location.href = a.href;
+            });
+        });
+    </script>
+</body>
+</html>
