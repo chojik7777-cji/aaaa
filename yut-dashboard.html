@@ -111,6 +111,28 @@
   </div>
 
   <script>
+
+    const AUTH_KEY = 'dashboard-auth-v1';
+    async function requireDashboardPassword() {
+      if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
+      let expected = '1212';
+      try {
+        const res = await fetch('/pw', { cache: 'no-store' });
+        if (res.ok) expected = (await res.text()).trim();
+      } catch (e) { /* fallback */ }
+      for (let i = 0; i < 3; i++) {
+        const input = prompt('현황판 비밀번호를 입력하세요.');
+        if (input === expected) {
+          sessionStorage.setItem(AUTH_KEY, 'ok');
+          return true;
+        }
+        if (input === null) break;
+        alert('비밀번호가 맞지 않습니다.');
+      }
+      location.href = 'index.html';
+      return false;
+    }
+
     const $ = (id) => document.getElementById(id);
     const phaseClass = (room) => room.winnerName ? '종료' : room.phaseLabel;
     function timeText(ts) {
@@ -242,8 +264,7 @@
       kickConnection(btn.dataset.room, btn.dataset.target, btn);
     });
     $('refreshBtn').addEventListener('click', loadDashboard);
-    loadDashboard();
-    setInterval(loadDashboard, 2000);
+    requireDashboardPassword().then((ok) => { if (ok) { loadDashboard(); setInterval(loadDashboard, 2000); } });
   </script>
 </body>
 </html>

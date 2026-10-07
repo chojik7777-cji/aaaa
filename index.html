@@ -71,11 +71,11 @@
             <a href="mailto:chojik7777@gmail.com">이메일</a>
             <span class="disabled" aria-disabled="true">GitHub</span>
             <a href="omok.html">오목 게임</a>
-            <a href="omok-dashboard.html">오목 현황</a>
+            <a href="omok-dashboard.html" class="dashboard-link">오목 현황</a>
             <a href="baduk.html">바둑 게임</a>
-            <a href="baduk-dashboard.html">바둑 현황</a>
+            <a href="baduk-dashboard.html" class="dashboard-link">바둑 현황</a>
             <a href="yut.html">윷놀이</a>
-            <a href="yut-dashboard.html">윷놀이 현황</a>
+            <a href="yut-dashboard.html" class="dashboard-link">윷놀이 현황</a>
             <a href="cafe.html">카페 운영 게임</a>
             <a href="church.html">교회학교 운영 게임</a>
         </div>
@@ -86,5 +86,33 @@
         </div>
         <p class="footer">made by jeongik</p>
     </div>
+
+    <script>
+        const AUTH_KEY = 'dashboard-auth-v1';
+        async function requireDashboardPassword() {
+            if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
+            let expected = '1212';
+            try {
+                const res = await fetch('/pw', { cache: 'no-store' });
+                if (res.ok) expected = (await res.text()).trim();
+            } catch (e) { /* fallback */ }
+            for (let i = 0; i < 3; i++) {
+                const input = prompt('현황판 비밀번호를 입력하세요.');
+                if (input === expected) {
+                    sessionStorage.setItem(AUTH_KEY, 'ok');
+                    return true;
+                }
+                if (input === null) break;
+                alert('비밀번호가 맞지 않습니다.');
+            }
+            return false;
+        }
+        document.querySelectorAll('.dashboard-link').forEach((a) => {
+            a.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (await requireDashboardPassword()) location.href = a.href;
+            });
+        });
+    </script>
 </body>
 </html>
