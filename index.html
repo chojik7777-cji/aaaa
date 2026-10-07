@@ -78,6 +78,7 @@
             <a href="yut-dashboard.html" class="dashboard-link">윷놀이 현황</a>
             <a href="cafe.html">카페 운영 게임</a>
             <a href="church.html">교회학교 운영 게임</a>
+            <a href="math-academy.html">수학학원 운영 게임</a>
         </div>
         <div class="more-links">
             <h2>더 보기</h2>
@@ -96,7 +97,8 @@
                 if (input === null) break;
                 try {
                     const res = await fetch('/api/dashboard-auth', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ password: input })
                     });
                     if (res.ok) {
@@ -107,17 +109,6 @@
                     alert('비밀번호 확인 서버에 연결할 수 없습니다.');
                     return false;
                 }
-                alert('비밀번호가 맞지 않습니다.');
-            }
-            return false;
-        } catch (e) { /* fallback */ }
-            for (let i = 0; i < 3; i++) {
-                const input = prompt('현황판 비밀번호를 입력하세요.');
-                if (input === expected) {
-                    sessionStorage.setItem(AUTH_KEY, 'ok');
-                    return true;
-                }
-                if (input === null) break;
                 alert('비밀번호가 맞지 않습니다.');
             }
             return false;

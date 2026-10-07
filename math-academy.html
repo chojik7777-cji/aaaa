@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AI 수학학원: 60초 운영</title>
+  <style>
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;font-family:'Segoe UI','Apple SD Gothic Neo','맑은 고딕',sans-serif;background:linear-gradient(135deg,#111827 0%,#312e81 45%,#0f766e 100%);color:#172033;padding:16px}.app{max-width:1180px;margin:0 auto}.hero,.panel,.card,.report{background:rgba(255,255,255,.94);border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.22)}.hero{padding:24px;margin-bottom:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}h1{margin:0;color:#1e1b4b;font-size:30px}.sub{margin:8px 0 0;color:#475569;line-height:1.55}.btn,a.btn{border:0;border-radius:14px;padding:12px 15px;background:#4f46e5;color:#fff;font-weight:800;text-decoration:none;cursor:pointer;box-shadow:0 8px 18px rgba(79,70,229,.25)}.btn.secondary{background:#e0e7ff;color:#3730a3;box-shadow:none}.btn.warn{background:#f97316}.btn.good{background:#059669}.btn:disabled{opacity:.55;cursor:not-allowed}.screen{display:none}.screen.active{display:block}.scenario-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:18px}.scenario{border:2px solid #e5e7eb;border-radius:18px;padding:18px;background:#fff;text-align:left;cursor:pointer;transition:.2s}.scenario:hover{transform:translateY(-3px);border-color:#6366f1;box-shadow:0 12px 30px rgba(0,0,0,.12)}.scenario h2{margin:0 0 8px;color:#312e81}.scenario p{color:#475569;line-height:1.55}.tag{display:inline-block;border-radius:999px;background:#ecfeff;color:#0e7490;font-size:12px;font-weight:900;padding:5px 9px;margin-bottom:8px}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.panel{padding:18px}.stats{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:12px}.stat b{display:block;font-size:22px;color:#1e40af}.stat span{font-size:12px;color:#64748b}.bar{height:8px;background:#e2e8f0;border-radius:999px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#4f46e5);border-radius:999px}.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}.action{background:#fff;border:1px solid #dbeafe;border-radius:16px;padding:14px;text-align:left;cursor:pointer}.action:hover{border-color:#4f46e5;background:#eef2ff}.action strong{display:block;color:#1e1b4b;margin-bottom:6px}.action small{color:#64748b;line-height:1.45}.clock{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.time{font-size:34px;font-weight:900;color:#dc2626}.period{font-weight:900;color:#3730a3}.npc{display:grid;gap:10px}.msg{border-left:5px solid #4f46e5;background:#f8fafc;border-radius:14px;padding:12px}.msg b{display:block;color:#1e1b4b;margin-bottom:5px}.log{height:260px;overflow:auto;background:#0f172a;color:#dbeafe;border-radius:16px;padding:12px;font-size:13px}.log div{border-bottom:1px solid rgba(255,255,255,.08);padding:6px 0}.report{padding:22px;text-align:center}.grade{font-size:64px;font-weight:1000;color:#4f46e5}.report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:18px 0;text-align:left}.mini{background:#f8fafc;border-radius:14px;padding:12px}.mini b{color:#1e1b4b}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.notice{font-size:12px;color:#64748b;margin-top:10px}@media(max-width:800px){body{padding:10px}h1{font-size:24px}.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.actions{grid-template-columns:1fr}.time{font-size:28px}.hero,.panel{padding:14px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="hero">
+    <div class="top"><div><h1>🧮 AI 수학학원: 60초 운영</h1><p class="sub">60초 동안 수학학원 원장이 되어 수업품질, 학부모 신뢰, 학생만족, 강사에너지를 균형 있게 관리하세요. AI는 실제 API가 아닌 <b>로컬 시뮬레이션 조언자</b>입니다.</p></div><div class="toolbar"><a class="btn secondary" href="index.html">자기소개</a><button class="btn secondary" id="resetAll">저장 초기화</button></div></div>
+  </header>
+
+  <section id="start" class="screen active panel">
+    <h2>운영 콘셉트를 고르세요</h2>
+    <div class="scenario-grid" id="scenarioGrid"></div>
+    <p class="notice">자동 저장됩니다. 중간에 나갔다 와도 이어서 할 수 있습니다.</p>
+  </section>
+
+  <section id="game" class="screen">
+    <div class="grid">
+      <main class="panel">
+        <div class="top"><div class="clock"><span class="time" id="timeLeft">60</span><span class="period" id="periodText">개원 준비</span></div><div class="toolbar"><button class="btn good" id="pauseBtn">일시정지</button><button class="btn warn" id="finishBtn">하루 마감</button></div></div>
+        <div class="stats" id="stats"></div>
+        <h3>이번 교시에 할 일</h3>
+        <div class="actions" id="actions"></div>
+      </main>
+      <aside class="panel">
+        <div class="npc" id="npc"></div>
+        <h3>운영 로그</h3>
+        <div class="log" id="log"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="end" class="screen report">
+    <h2 id="reportTitle">하루 운영 리포트</h2>
+    <div class="grade" id="grade">A</div>
+    <p id="gradeText"></p>
+    <div class="report-grid" id="reportGrid"></div>
+    <div class="toolbar" style="justify-content:center"><button class="btn" id="againBtn">다시 운영하기</button><a class="btn secondary" href="index.html">자기소개로</a></div>
+  </section>
+</div>
+<script>
+const scenarios={
+  내신집중반:{tag:'안정형',desc:'시험 직전 성적 향상과 학부모 신뢰를 노립니다.',money:520,rep:55,sat:58,parent:66,energy:70,quality:62,students:24,homework:58},
+  사고력수학반:{tag:'장기성장형',desc:'깊이 있는 문제 해결력과 입소문을 키웁니다.',money:460,rep:62,sat:64,parent:55,energy:74,quality:68,students:18,homework:52},
+  AI수학코칭반:{tag:'실험형',desc:'개별 진단과 자동 피드백으로 차별화합니다.',money:430,rep:50,sat:60,parent:52,energy:67,quality:72,students:20,homework:65}
+};
+const defs={money:'운영자금',rep:'평판',sat:'학생만족',parent:'학부모신뢰',energy:'강사에너지',quality:'수업품질',students:'등록생',homework:'숙제완성'};
+const actions=[
+ {name:'문제풀이 특강',tip:'수업품질·평판 상승, 강사에너지 감소',fx:{quality:7,rep:5,energy:-8,sat:2}},
+ {name:'개별 상담',tip:'학부모신뢰 상승, 에너지 감소',fx:{parent:9,energy:-6,rep:2}},
+ {name:'숙제 피드백',tip:'숙제완성·학생만족 상승, 에너지 감소',fx:{homework:10,sat:5,energy:-7}},
+ {name:'광고/상담전화',tip:'등록생·자금 상승, 신뢰 소폭 위험',fx:{students:2,money:70,energy:-5,parent:-2}},
+ {name:'교재개편',tip:'수업품질 상승, 자금·에너지 사용',fx:{quality:10,money:-80,energy:-7,rep:2}},
+ {name:'강사휴식',tip:'에너지 회복, 단기 만족도 소폭 감소',fx:{energy:16,sat:-3,quality:-2}},
+ {name:'무료 진단테스트',tip:'상담 유입과 학부모신뢰 상승, 자금 사용',fx:{parent:6,students:1,rep:4,money:-50}},
+ {name:'상위권 클리닉',tip:'평판 크게 상승, 만족도는 난도 때문에 흔들림',fx:{rep:8,quality:5,sat:-2,energy:-6}}
+];
+const events=[
+ ['학부모 문의 폭주',{parent:4,students:1,energy:-3}],['시험 직전 결석',{sat:-4,homework:-5}],['숙제 미제출 증가',{homework:-7,parent:-2}],['성적 향상 후기',{rep:7,parent:5}],['강사 피로 누적',{energy:-8,quality:-2}],['신규 상담 예약',{students:1,money:40}],['학생 질문이 폭발적으로 늘어남',{sat:4,energy:-5,quality:2}]
+];
+let S=null,timer=null,paused=false;
+const $=id=>document.getElementById(id); const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
+function save(){localStorage.setItem('mathAcademyGame',JSON.stringify(S));}
+function load(){try{S=JSON.parse(localStorage.getItem('mathAcademyGame')||'null')}catch{S=null}}
+function newGame(name){S={scenario:name,...scenarios[name],time:60,period:0,ended:false,log:[`${name}으로 개원했습니다.`],acts:0};save();show('game');startTimer();render();}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active')}
+function applyFx(fx){for(const [k,v] of Object.entries(fx)){if(['money','students'].includes(k))S[k]=Math.max(0,S[k]+v);else S[k]=clamp(S[k]+v)}}
+function doAction(a){if(!S||S.ended||paused)return;applyFx(a.fx);S.acts++;S.log.unshift(`실행: ${a.name}`);save();render()}
+function tick(){if(!S||paused||S.ended)return;S.time--; if(S.time%5===0){S.period++; const [m,fx]=events[(S.period+S.students+S.acts)%events.length];applyFx(fx);S.log.unshift(`이벤트: ${m}`)} if(S.time<=0)endDay(); save();render();}
+function startTimer(){clearInterval(timer);timer=setInterval(tick,1000)}
+function weak(){return Object.entries({평판:S.rep,학생만족:S.sat,학부모신뢰:S.parent,강사에너지:S.energy,수업품질:S.quality,숙제완성:S.homework}).sort((a,b)=>a[1]-b[1])[0]}
+function pickActions(){const [w]=weak(); let names=['문제풀이 특강','개별 상담','숙제 피드백','강사휴식']; if(w==='평판')names=['광고/상담전화','무료 진단테스트','상위권 클리닉','문제풀이 특강']; if(w==='학부모신뢰')names=['개별 상담','무료 진단테스트','숙제 피드백','교재개편']; if(w==='강사에너지')names=['강사휴식','개별 상담','문제풀이 특강','광고/상담전화']; if(w==='수업품질')names=['교재개편','문제풀이 특강','상위권 클리닉','숙제 피드백']; return names.map(n=>actions.find(a=>a.name===n));}
+function advice(){const [w,v]=weak();return {vice:`가장 약한 지표는 ${w}(${v})입니다. 이번 교시는 ${w}을 보완하는 선택이 유리합니다.`,student:S.sat>70?'학생들이 수업 흐름을 잘 따라오고 있어요.':S.homework<50?'숙제 피드백이 부족하다는 반응이 나옵니다.':'분위기는 보통입니다. 한 번의 좋은 수업이 필요합니다.',parent:S.parent>70?'학부모 신뢰가 안정적입니다. 재등록 가능성이 높습니다.':S.parent<50?'학부모 상담과 진단 리포트가 필요합니다.':'문의는 있지만 확신까지는 조금 더 필요합니다.'}}
+function render(){if(!S)return;$('timeLeft').textContent=S.time;$('periodText').textContent=S.period?`${S.period}교시 진행 중`:'개원 준비';$('stats').innerHTML=Object.entries(defs).map(([k,n])=>`<div class="stat"><b>${k==='money'?S[k]+'만':S[k]}</b><span>${n}</span>${['money','students'].includes(k)?'':`<div class="bar"><i style="width:${S[k]}%"></i></div>`}</div>`).join('');$('actions').innerHTML=pickActions().map((a,i)=>`<button class="action" data-i="${i}"><strong>${a.name}</strong><small>${a.tip}</small></button>`).join('');document.querySelectorAll('.action').forEach((b,i)=>b.onclick=()=>doAction(pickActions()[i]));const ad=advice();$('npc').innerHTML=`<div class="msg"><b>AI 부원장 조언</b>${ad.vice}</div><div class="msg"><b>학생 반응</b>${ad.student}</div><div class="msg"><b>학부모 메시지</b>${ad.parent}</div>`;$('log').innerHTML=S.log.slice(0,40).map(x=>`<div>${x}</div>`).join('')}
+function score(){return Math.round((S.rep+S.sat+S.parent+S.energy+S.quality+S.homework)/6 + Math.min(15,S.students/2)+Math.min(10,S.money/120))}
+function endDay(){S.ended=true;clearInterval(timer);const sc=score();const grade=sc>=92?'S':sc>=82?'A':sc>=70?'B':sc>=58?'C':'D';const [risk]=weak();$('grade').textContent=grade;$('gradeText').textContent=grade==='S'?'입소문과 재등록이 동시에 터진 하루입니다.':grade==='A'?'재등록이 기대되는 안정적인 하루입니다.':grade==='B'?'운영은 괜찮지만 약한 지표 보완이 필요합니다.':'내일은 핵심 지표 하나에 집중해야 합니다.';$('reportGrid').innerHTML=`<div class="mini"><b>운영자금</b><br>${S.money}만원</div><div class="mini"><b>등록생</b><br>${S.students}명</div><div class="mini"><b>강점</b><br>${Object.entries({평판:S.rep,학생만족:S.sat,학부모신뢰:S.parent,수업품질:S.quality}).sort((a,b)=>b[1]-a[1])[0][0]}</div><div class="mini"><b>위험</b><br>${risk}</div><div class="mini"><b>AI 다음 조언</b><br>${advice().vice}</div>`;save();show('end')}
+$('scenarioGrid').innerHTML=Object.entries(scenarios).map(([n,s])=>`<button class="scenario" data-name="${n}"><span class="tag">${s.tag}</span><h2>${n}</h2><p>${s.desc}</p></button>`).join('');document.querySelectorAll('.scenario').forEach(b=>b.onclick=()=>newGame(b.dataset.name));$('pauseBtn').onclick=()=>{paused=!paused;$('pauseBtn').textContent=paused?'재개':'일시정지'};$('finishBtn').onclick=endDay;$('againBtn').onclick=()=>{localStorage.removeItem('mathAcademyGame');S=null;show('start')};$('resetAll').onclick=()=>{if(confirm('저장된 수학학원 운영게임을 초기화할까요?')){localStorage.removeItem('mathAcademyGame');location.reload()}};load();if(S){if(S.ended){show('end');endDay()}else{show('game');startTimer();render()}}
+</script>
+</body>
+</html>
