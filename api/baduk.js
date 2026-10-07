@@ -104,6 +104,42 @@ function move(room, pid, p) {
   }
   game.updatedAt = room.updatedAt = Date.now();
 }
+
+function dashboardRoom(room) {
+  const G = room.game;
+  return {
+    roomId: room.roomId,
+    playersConnected: room.players.map(Boolean),
+    blackConnected: !!room.players[0],
+    whiteConnected: !!room.players[1],
+    guestCount: room.guests.length,
+    size: G.size,
+    komi: G.komi,
+    phase: G.phase === 'play' ? '진행/대기' : G.phase === 'score' ? '계가 중' : '종료',
+    turn: G.phase === 'play' ? (G.toMove === BLACK ? '흑' : '백') : '-',
+    winner: G.result || '',
+    moveCount: G.moves.length,
+    blackCaps: G.caps[BLACK] || 0,
+    whiteCaps: G.caps[WHITE] || 0,
+    lastMove: G.moves.length ? (G.moves[G.moves.length - 1] < 0 ? '패스' : `${G.moves[G.moves.length - 1] % G.size + 1}, ${Math.floor(G.moves[G.moves.length - 1] / G.size) + 1}`) : '-',
+    lastLog: [`${G.phase === 'play' ? (G.toMove === BLACK ? '흑' : '백') + ' 차례' : G.result || G.phase}`, `착수 ${G.moves.length}수`],
+    updatedAt: room.updatedAt,
+    ageSeconds: Math.max(0, Math.round((Date.now() - room.updatedAt) / 1000)),
+  };
+}
+function dashboard() {
+  const list = [...rooms.values()].sort((a,b)=>b.updatedAt-a.updatedAt).map(dashboardRoom);
+  return {
+    ok: true,
+    now: Date.now(),
+    totalRooms: list.length,
+    activeRooms: list.filter(r => !r.winner && r.phase !== '종료').length,
+    totalPlayers: list.reduce((s,r)=>s+(r.blackConnected?1:0)+(r.whiteConnected?1:0),0),
+    totalGuests: list.reduce((s,r)=>s+r.guestCount,0),
+    rooms: list,
+  };
+}
+
 function cleanupRooms() {
   const cutoff = Date.now() - 1000 * 60 * 60 * 6;
   for (const [id, room] of rooms) if ((room.updatedAt || 0) < cutoff) rooms.delete(id);
@@ -118,6 +154,7 @@ module.exports = async function handler(req, res) {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
 
     if (action === 'health') return send(res, 200, { ok: true, rooms: rooms.size, game: 'baduk' });
+    if (action === 'dashboard') return send(res, 200, dashboard());
     if (action === 'create' && req.method === 'POST') {
       let id; do { id = roomCode(); } while (rooms.has(id));
       const pid = playerId();
