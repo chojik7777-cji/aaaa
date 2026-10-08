@@ -1,6 +1,10 @@
 {
   "rewrites": [
     { "source": "/api/baduk/:action", "destination": "/api/baduk?action=:action" },
-    { "source": "/api/omok/:action", "destination": "/api/omok?action=:action" }
+    { "source": "/api/omok/:action", "destination": "/api/omok?action=:action" },
+    { "source": "/api/yut/dashboard", "destination": "/api/yut?action=dashboard" },
+    { "source": "/api/yut/dashboard/:action", "destination": "/api/yut?action=dashboard/:action" },
+    { "source": "/api/yut/room/:action", "destination": "/api/yut?action=room/:action" },
+    { "source": "/api/yut/:action", "destination": "/api/yut?action=:action" }
   ]
 }

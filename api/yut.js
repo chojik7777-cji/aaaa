@@ -1,0 +1,467 @@
+'use strict';
+const crypto = require('crypto');
+
+const HOME = -1;
+const PATHS = {
+  OUT: [HOME, ...Array.from({ length: 19 }, (_, i) => i + 1), 0],
+  B: [5, 20, 21, 22, 23, 24, 15, 16, 17, 18, 19, 0],
+  C: [10, 25, 26, 22, 27, 28, 0],
+  D: [22, 27, 28, 0],
+};
+const NAMES = { '-1': '백도', 1: '도', 2: '개', 3: '걸', 4: '윷', 5: '모' };
+const PLAYER_DEFS = [
+  { name: '빨강', color: '#e53e3e' },
+  { name: '파랑', color: '#3182ce' },
+  { name: '초록', color: '#2f855a' },
+  { name: '노랑', color: '#d69e2e' },
+];
+globalThis.__YUT_ROOMS__ = globalThis.__YUT_ROOMS__ || new Map();
+const rooms = globalThis.__YUT_ROOMS__;
+
+
+const json = (res, status, data) => {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.end(JSON.stringify(data));
+};
+
+const clone = (x) => JSON.parse(JSON.stringify(x));
+const roomCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
+const playerId = () => crypto.randomBytes(8).toString('hex');
+const isHome = (p) => !p.done && p.path === 'OUT' && p.idx === 0;
+function nodeOf(p) {
+  if (p.done) return null;
+  const n = PATHS[p.path][p.idx];
+  return n === HOME ? null : n;
+}
+function simulate(p, r) {
+  if (p.done) return null;
+  let path = p.path, idx = p.idx;
+  if (r === -1) {
+    if (isHome(p)) return null;
+    if (path === 'OUT' && idx === 1) idx = 20;
+    else idx--;
+    if (path === 'D' && idx === 0) { path = 'C'; idx = 2; }
+    else if (path === 'B' && idx === 0) { path = 'OUT'; idx = 5; }
+    else if (path === 'C' && idx === 0) { path = 'OUT'; idx = 10; }
+    return { path, idx, done: false, node: PATHS[path][idx], trail: [PATHS[path][idx]] };
+  }
+  const n = nodeOf(p);
+  if (n === 5) { path = 'B'; idx = 0; }
+  else if (n === 10) { path = 'C'; idx = 0; }
+  else if (n === 22) { path = 'D'; idx = 0; }
+  const arr = PATHS[path];
+  const trail = [];
+  for (let s = 0; s < r; s++) {
+    idx++;
+    if (idx >= arr.length) { trail.push('exit'); return { path, idx, done: true, node: null, trail }; }
+    trail.push(arr[idx]);
+  }
+  const node = arr[idx];
+  if (node === 5) { path = 'OUT'; idx = 5; }
+  else if (node === 10) { path = 'OUT'; idx = 10; }
+  return { path, idx, done: false, node, trail };
+}
+function sources(G, pi) {
+  const pl = G.players[pi];
+  const map = new Map();
+  pl.pieces.forEach((p, i) => {
+    const n = nodeOf(p);
+    if (n !== null) { if (!map.has(n)) map.set(n, []); map.get(n).push(i); }
+  });
+  const list = [...map].map(([node, pieces]) => ({ key: 'n' + node, node, pieces }));
+  const home = pl.pieces.findIndex(isHome);
+  if (home >= 0) list.push({ key: 'home', node: null, pieces: [home] });
+  return list;
+}
+function optionsFor(G, pi, src) {
+  const lead = G.players[pi].pieces[src.pieces[0]];
+  const seen = new Set(), out = [];
+  for (const r of G.pending) {
+    if (seen.has(r)) continue;
+    seen.add(r);
+    const res = simulate(lead, r);
+    if (res) out.push({ r, src, res });
+  }
+  return out;
+}
+function allOptions(G, pi) { return sources(G, pi).flatMap((s) => optionsFor(G, pi, s)); }
+function ownerAt(G, node, exceptPi) {
+  if (node === null) return null;
+  for (let i = 0; i < G.players.length; i++) {
+    if (i === exceptPi) continue;
+    const cnt = G.players[i].pieces.filter((p) => nodeOf(p) === node).length;
+    if (cnt) return { pi: i, cnt };
+  }
+  return null;
+}
+function addLog(G, msg) { G.log.unshift(msg); G.log.length = Math.min(G.log.length, 40); }
+const who = (G, i) => G.players[i].name;
+function roll() {
+  const faces = [0, 1, 2, 3].map(() => Math.random() < 0.5);
+  const flats = faces.filter(Boolean).length;
+  let r = flats === 0 ? 5 : flats;
+  if (flats === 1 && faces[0]) r = -1;
+  return { r, faces };
+}
+function settle(G) {
+  G.selected = null;
+  if (G.winner !== null) { G.phase = 'over'; return; }
+  if (G.throwsLeft > 0) { G.phase = 'throw'; return; }
+  if (G.pending.length && !allOptions(G, G.cur).length) {
+    addLog(G, `움직일 말이 없어서 ${G.pending.map((r) => NAMES[r]).join(', ')}은(는) 버립니다.`);
+    G.pending = [];
+  }
+  if (!G.pending.length) { nextTurn(G); return; }
+  G.phase = 'move';
+}
+function nextTurn(G) {
+  G.cur = (G.cur + 1) % G.players.length;
+  G.phase = 'throw';
+  G.pending = [];
+  G.throwsLeft = 1;
+  G.selected = null;
+}
+function createGame(count, pieces) {
+  const n = Math.max(2, Math.min(4, Number(count) || 2));
+  const pc = Math.max(2, Math.min(4, Number(pieces) || 4));
+  const G = {
+    players: Array.from({ length: n }, (_, i) => ({
+      ...PLAYER_DEFS[i], ai: false,
+      pieces: Array.from({ length: pc }, () => ({ path: 'OUT', idx: 0, done: false })),
+    })),
+    cur: 0, phase: 'throw', pending: [], throwsLeft: 1,
+    selected: null, busy: false, winner: null, log: [], faces: null, lastResult: '',
+  };
+  addLog(G, `${who(G, 0)} 먼저 시작합니다.`);
+  return G;
+}
+function publicRoom(room) {
+  const teams = room.teams || room.players.map((pid) => pid ? [pid] : []);
+  return {
+    roomId: room.roomId,
+    playersConnected: room.players.map(Boolean),
+    teamMode: !!room.teamMode,
+    teamCounts: teams.map((t) => t.length),
+    spectatorCount: room.spectators ? room.spectators.length : 0,
+    guestCount: room.guests ? room.guests.length : 0,
+    canUndo: !!(room.history && room.history.length),
+    game: clone(room.game),
+    updatedAt: room.updatedAt,
+  };
+}
+function connectionLabel(pid) { return pid ? pid.slice(0, 4).toUpperCase() : ''; }
+function dashboardRoom(room) {
+  const pub = publicRoom(room);
+  const G = room.game;
+  const teamNames = G.players.map((p) => p.name);
+  const pieces = G.players.map((p) => ({
+    done: p.pieces.filter((x) => x.done).length,
+    total: p.pieces.length,
+    waiting: p.pieces.filter(isHome).length,
+    onBoard: p.pieces.filter((x) => !x.done && !isHome(x)).length,
+  }));
+  const teams = room.teams || [];
+  const connections = {
+    teams: teams.map((team, teamIndex) => team.map((pid, idx) => ({
+      id: pid,
+      label: `${teamNames[teamIndex] || `팀${teamIndex + 1}`} #${idx + 1} · ${connectionLabel(pid)}`,
+      role: 'team',
+      teamIndex,
+      primary: room.players[teamIndex] === pid,
+    }))),
+    spectators: (room.spectators || []).map((pid, idx) => ({ id: pid, label: `관전자 #${idx + 1} · ${connectionLabel(pid)}`, role: 'spectator' })),
+    guests: (room.guests || []).map((pid, idx) => ({ id: pid, label: `공동참여자 #${idx + 1} · ${connectionLabel(pid)}`, role: 'guest' })),
+  };
+  return {
+    roomId: room.roomId,
+    teamMode: pub.teamMode,
+    teamCounts: pub.teamCounts,
+    spectatorCount: pub.spectatorCount,
+    guestCount: pub.guestCount,
+    playersConnected: pub.playersConnected,
+    currentTeam: G.cur,
+    currentTeamName: teamNames[G.cur] || '',
+    phase: G.phase,
+    phaseLabel: G.phase === 'throw' ? '윷 던질 차례' : G.phase === 'move' ? '말 이동 차례' : G.phase === 'over' ? '종료' : G.phase,
+    pending: G.pending.map((r) => NAMES[r]),
+    throwsLeft: G.throwsLeft,
+    lastResult: G.lastResult,
+    winner: G.winner,
+    winnerName: G.winner === null ? '' : (teamNames[G.winner] || ''),
+    canUndo: pub.canUndo,
+    pieces,
+    connections,
+    lastLog: G.log.slice(0, 5),
+    updatedAt: room.updatedAt,
+    ageSeconds: Math.max(0, Math.round((Date.now() - room.updatedAt) / 1000)),
+  };
+}
+function teamIndexOf(room, pid) {
+  const teams = room.teams || [];
+  for (let i = 0; i < teams.length; i++) if (teams[i].includes(pid)) return i;
+  return -1;
+}
+function isSpectator(room, pid) { return !!(room.spectators || []).includes(pid); }
+function isController(room, pid) {
+  return room.players.includes(pid) || teamIndexOf(room, pid) >= 0 || !!(room.guests || []).includes(pid);
+}
+function assertParticipant(room, pid) {
+  if (!isController(room, pid) && !isSpectator(room, pid)) throw new Error('이 방의 참가자가 아닙니다.');
+}
+function assertController(room, pid) {
+  if (!isController(room, pid)) throw new Error('관전자는 조작할 수 없습니다.');
+}
+function roomConnectionCount(room) {
+  const teamCount = (room.teams || []).reduce((sum, team) => sum + team.length, 0);
+  const spectatorCount = (room.spectators || []).length;
+  const guestCount = (room.guests || []).length;
+  const legacyPlayerCount = room.teams ? 0 : (room.players || []).filter(Boolean).length;
+  return teamCount + spectatorCount + guestCount + legacyPlayerCount;
+}
+function isEmptyRoom(room) {
+  return roomConnectionCount(room) === 0;
+}
+function removeConnection(room, targetId) {
+  let removed = false;
+  if (room.teams) {
+    room.teams = room.teams.map((team, idx) => {
+      const next = team.filter((pid) => pid !== targetId);
+      if (next.length !== team.length) removed = true;
+      if (room.players[idx] === targetId) room.players[idx] = next[0] || null;
+      return next;
+    });
+  }
+  if (room.spectators) {
+    const before = room.spectators.length;
+    room.spectators = room.spectators.filter((pid) => pid !== targetId);
+    if (room.spectators.length !== before) removed = true;
+  }
+  if (room.guests) {
+    const before = room.guests.length;
+    room.guests = room.guests.filter((pid) => pid !== targetId);
+    if (room.guests.length !== before) removed = true;
+  }
+  const pi = room.players.indexOf(targetId);
+  if (pi >= 0) { room.players[pi] = null; removed = true; }
+  if (removed) {
+    addLog(room.game, `접속자 ${connectionLabel(targetId)} 님의 접속을 종료했습니다.`);
+    room.updatedAt = Date.now();
+  }
+  return removed;
+}
+function saveHistory(room) {
+  room.history = room.history || [];
+  room.history.push(clone(room.game));
+  if (room.history.length > 30) room.history.shift();
+}
+function assertTurn(room, pid) {
+  assertController(room, pid);
+  const G = room.game;
+  if (G.winner !== null) throw new Error('이미 종료된 게임입니다.');
+  let pi = room.players.indexOf(pid);
+  const ti = teamIndexOf(room, pid);
+  const legacyGuest = room.guests && room.guests.includes(pid);
+  if (ti >= 0) pi = ti;
+  if (!legacyGuest && G.cur !== pi) throw new Error('현재 내 팀 차례가 아닙니다.');
+  return legacyGuest ? G.cur : pi;
+}
+function handleThrow(room, pid) {
+  assertTurn(room, pid);
+  const G = room.game;
+  if (G.phase !== 'throw') throw new Error('지금은 윷을 던질 수 없습니다.');
+  saveHistory(room);
+  const { r, faces } = roll();
+  G.faces = faces;
+  G.throwsLeft--;
+  G.pending.push(r);
+  const bonus = r >= 4;
+  if (bonus) G.throwsLeft++;
+  G.lastResult = NAMES[r] + (bonus ? '! 한 번 더' : '');
+  addLog(G, `${who(G, G.cur)}: ${NAMES[r]}${bonus ? ' — 한 번 더 던집니다' : ''}`);
+  if (G.throwsLeft > 0) G.phase = 'throw';
+  else settle(G);
+  room.updatedAt = Date.now();
+}
+function handleMove(room, pid, body) {
+  assertTurn(room, pid);
+  const G = room.game;
+  if (G.phase !== 'move') throw new Error('지금은 말을 움직일 수 없습니다.');
+  const pi = G.cur;
+  const src = sources(G, pi).find((s) => s.key === body.srcKey);
+  if (!src) throw new Error('선택한 말이 없습니다.');
+  const opts = optionsFor(G, pi, src);
+  const opt = opts.find((o) => o.r === Number(body.r) && String(o.res.done ? 'exit' : o.res.node) === String(body.destKey));
+  if (!opt) throw new Error('선택한 이동을 할 수 없습니다.');
+  saveHistory(room);
+  const pl = G.players[pi];
+  G.pending.splice(G.pending.indexOf(opt.r), 1);
+  G.selected = null;
+  const { res } = opt;
+  for (const i of opt.src.pieces) Object.assign(pl.pieces[i], { path: res.path, idx: res.idx, done: res.done });
+  const moved = opt.src.pieces.length;
+  const label = moved > 1 ? `말 ${moved}개를 업고` : '말을';
+  if (res.done) {
+    addLog(G, `${who(G, pi)}이(가) ${NAMES[opt.r]}(으)로 ${label} 났습니다!`);
+  } else {
+    let stacked = 0;
+    pl.pieces.forEach((p, i) => {
+      if (!opt.src.pieces.includes(i) && nodeOf(p) === res.node) {
+        p.path = res.path; p.idx = res.idx; stacked++;
+      }
+    });
+    const enemy = ownerAt(G, res.node, pi);
+    if (enemy) {
+      for (const p of G.players[enemy.pi].pieces) if (nodeOf(p) === res.node) Object.assign(p, { path: 'OUT', idx: 0 });
+      G.throwsLeft++;
+      addLog(G, `${who(G, pi)}이(가) ${NAMES[opt.r]}(으)로 ${G.players[enemy.pi].name} 말 ${enemy.cnt}개를 잡았습니다! 한 번 더 던집니다.`);
+    } else if (stacked) addLog(G, `${who(G, pi)}이(가) ${NAMES[opt.r]}(으)로 말을 업었습니다.`);
+    else addLog(G, `${who(G, pi)}: ${NAMES[opt.r]}`);
+  }
+  if (pl.pieces.every((p) => p.done)) {
+    G.winner = pi;
+    addLog(G, `🎉 ${who(G, pi)}이(가) 이겼습니다!`);
+  }
+  settle(G);
+  room.updatedAt = Date.now();
+}
+
+function dashboard() {
+  const list = [...rooms.values()].map(dashboardRoom).sort((a, b) => b.updatedAt - a.updatedAt);
+  return {
+    ok: true,
+    rooms: list,
+    totalRooms: list.length,
+    totalTeamMembers: list.reduce((sum, r) => sum + (r.teamCounts || []).reduce((a, b) => a + b, 0), 0),
+    totalSpectators: list.reduce((sum, r) => sum + (r.spectatorCount || 0), 0),
+    now: Date.now(),
+  };
+}
+function cleanupRooms() {
+  const cutoff = Date.now() - 1000 * 60 * 60 * 6;
+  for (const [id, room] of rooms) if ((room.updatedAt || 0) < cutoff) rooms.delete(id);
+}
+function actionFromUrl(req) {
+  const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
+  const q = url.searchParams.get('action');
+  if (q) return { url, action: q.replace(/^\/+/, '') };
+  const parts = url.pathname.split('/').filter(Boolean);
+  const i = parts.indexOf('yut');
+  return { url, action: i >= 0 ? parts.slice(i + 1).join('/') : parts.slice(1).join('/') };
+}
+function bodyOf(req) {
+  return req.body && typeof req.body === 'object' ? req.body : {};
+}
+module.exports = async function handler(req, res) {
+  if (req.method === 'OPTIONS') return json(res, 204, {});
+  cleanupRooms();
+  try {
+    const { url, action } = actionFromUrl(req);
+    const body = bodyOf(req);
+    if (action === 'health') return json(res, 200, { ok: true, rooms: rooms.size, game: 'yut' });
+    if (action === 'dashboard') return json(res, 200, dashboard());
+    if (action === 'dashboard/kick' && req.method === 'POST') {
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      if (!body.targetId) return json(res, 400, { ok: false, error: '종료할 접속자를 선택하세요.' });
+      const removed = removeConnection(room, String(body.targetId));
+      if (!removed) return json(res, 404, { ok: false, error: '해당 접속자를 찾을 수 없습니다.' });
+      return json(res, 200, { ok: true, room: dashboardRoom(room) });
+    }
+    if (action === 'dashboard/delete-empty-room' && req.method === 'POST') {
+      const roomId = String(body.roomId || '').toUpperCase();
+      const room = rooms.get(roomId);
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      if (!isEmptyRoom(room)) return json(res, 400, { ok: false, error: '접속자가 있는 방은 삭제할 수 없습니다. 먼저 접속종료를 해주세요.' });
+      rooms.delete(roomId);
+      return json(res, 200, { ok: true, deletedRoomId: roomId, rooms: rooms.size });
+    }
+    if (action === 'room/create' && req.method === 'POST') {
+      let id; do { id = roomCode(); } while (rooms.has(id));
+      const pid = playerId();
+      const teamMode = body.teamMode !== false;
+      const game = createGame(teamMode ? 2 : body.count, body.pieces);
+      const room = { roomId: id, players: teamMode ? [pid, null] : [pid], teams: teamMode ? [[pid], []] : null, spectators: [], guests: [], history: [], teamMode, game, updatedAt: Date.now() };
+      rooms.set(id, room);
+      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: 0, role: 'team', teamIndex: 0 });
+    }
+    if (action === 'room/join' && req.method === 'POST') {
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      const pid = playerId();
+      if (room.teamMode) {
+        const requested = String(body.role || '').toLowerCase();
+        if (requested === 'spectator') {
+          room.spectators = room.spectators || [];
+          room.spectators.push(pid);
+          room.updatedAt = Date.now();
+          return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: null, role: 'spectator' });
+        }
+        const teamIndex = Math.max(0, Math.min(1, Number(body.teamIndex || 0)));
+        room.teams = room.teams || [[], []];
+        room.teams[teamIndex].push(pid);
+        if (!room.players[teamIndex]) room.players[teamIndex] = pid;
+        room.updatedAt = Date.now();
+        return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: teamIndex, role: 'team', teamIndex });
+      }
+      let idx = room.players.findIndex((x) => !x);
+      if (idx < 0) idx = room.players.length;
+      if (idx < room.game.players.length) {
+        room.players[idx] = pid;
+        room.updatedAt = Date.now();
+        return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: idx, role: 'player' });
+      }
+      room.guests = room.guests || [];
+      room.guests.push(pid);
+      room.updatedAt = Date.now();
+      return json(res, 200, { ok: true, room: publicRoom(room), playerId: pid, playerIndex: null, role: 'guest' });
+    }
+    if (action === 'room/state') {
+      const room = rooms.get(String(url.searchParams.get('roomId') || body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      const pid = url.searchParams.get('playerId') || body.playerId;
+      if (pid && !isController(room, pid) && !isSpectator(room, pid)) return json(res, 403, { ok: false, error: '대시보드에서 접속이 종료되었습니다.' });
+      return json(res, 200, { ok: true, room: publicRoom(room) });
+    }
+    if (action === 'room/throw' && req.method === 'POST') {
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      handleThrow(room, body.playerId);
+      return json(res, 200, { ok: true, room: publicRoom(room) });
+    }
+    if (action === 'room/move' && req.method === 'POST') {
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      handleMove(room, body.playerId, body);
+      return json(res, 200, { ok: true, room: publicRoom(room) });
+    }
+    if (action === 'room/undo' && req.method === 'POST') {
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      assertController(room, body.playerId);
+      if (!room.history || !room.history.length) return json(res, 400, { ok: false, error: '무를 수 있는 이전 상태가 없습니다.' });
+      room.game = room.history.pop();
+      room.game.selected = null;
+      room.game.busy = false;
+      addLog(room.game, '↩ 무르기로 직전 상태로 돌아갔습니다.');
+      room.updatedAt = Date.now();
+      return json(res, 200, { ok: true, room: publicRoom(room) });
+    }
+    if (action === 'room/reset' && req.method === 'POST') {
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      try { assertController(room, body.playerId); } catch (e) { return json(res, 403, { ok: false, error: e.message }); }
+      room.game = createGame(room.game.players.length, room.game.players[0].pieces.length);
+      room.history = [];
+      room.updatedAt = Date.now();
+      return json(res, 200, { ok: true, room: publicRoom(room) });
+    }
+    return json(res, 404, { ok: false, error: '알 수 없는 API입니다.', action });
+  } catch (e) {
+    return json(res, 400, { ok: false, error: e.message || String(e) });
+  }
+};

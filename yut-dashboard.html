@@ -211,7 +211,7 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; r
     }
     async function loadDashboard() {
       try {
-        const res = await fetch('/api/dashboard', { cache: 'no-store' });
+        const res = await fetch('/api/yut/dashboard', { cache: 'no-store' });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || '대시보드 데이터를 가져오지 못했습니다.');
         $('error').style.display = 'none';
@@ -233,7 +233,7 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; r
       if (!confirm('선택한 접속자를 종료시킬까요?')) return;
       try {
         if (btn) btn.disabled = true;
-        const res = await fetch('/api/dashboard/kick', {
+        const res = await fetch('/api/yut/dashboard/kick', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roomId, targetId })
         });
@@ -249,7 +249,7 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; r
       if (!confirm(`접속자 0명인 빈 방 ${roomId}을(를) 삭제할까요?`)) return;
       try {
         if (btn) btn.disabled = true;
-        const res = await fetch('/api/dashboard/delete-empty-room', {
+        const res = await fetch('/api/yut/dashboard/delete-empty-room', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roomId })
         });
