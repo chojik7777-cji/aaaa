@@ -181,7 +181,7 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; r
       const logs = (room.lastLog || []).map((m) => `<li>${esc(m)}</li>`).join('') || '<li>기록 없음</li>';
       const pending = room.pending && room.pending.length ? room.pending.join(', ') : '없음';
       const updated = room.ageSeconds < 20 ? `<span class="badge live">최근 ${room.ageSeconds}초 전</span>` : `<span class="badge stale">${room.ageSeconds}초 전</span>`;
-      const roomActions = `<span>${updated}</span>${isEmptyRoom ? `<button class="delete-room-btn" data-room="${esc(room.roomId)}">빈 방 삭제</button>` : ''}`;
+      const roomActions = `<span>${updated}</span><button class="delete-room-btn" data-room="${esc(room.roomId)}">${isEmptyRoom ? '빈 방 삭제' : '방 강제종료'}</button>`;
       return `
         <article class="room">
           <h2><span class="code">${esc(room.roomId)}</span><span class="room-actions">${roomActions}</span></h2>
@@ -246,10 +246,11 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; r
       }
     }
     async function deleteEmptyRoom(roomId, btn) {
-      if (!confirm(`접속자 0명인 빈 방 ${roomId}을(를) 삭제할까요?`)) return;
+      const force = btn && btn.textContent.includes('강제종료');
+      if (!confirm(force ? `방 ${roomId}을(를) 강제종료할까요? 접속 중인 사용자도 모두 방에서 나가집니다.` : `접속자 0명인 빈 방 ${roomId}을(를) 삭제할까요?`)) return;
       try {
         if (btn) btn.disabled = true;
-        const res = await fetch('/api/yut/dashboard/delete-empty-room', {
+        const res = await fetch(force ? '/api/yut/dashboard/delete-room' : '/api/yut/dashboard/delete-empty-room', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roomId })
         });

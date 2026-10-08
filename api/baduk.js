@@ -81,6 +81,17 @@ function publicRoom(room) {
     updatedAt: room.updatedAt,
   };
 }
+function connectionLabel(pid) { return pid ? pid.slice(0, 4).toUpperCase() : ''; }
+function removeConnection(room, targetId) {
+  let removed = false;
+  const pi = room.players.indexOf(targetId);
+  if (pi >= 0) { room.players[pi] = null; removed = true; }
+  const beforeGuests = room.guests.length;
+  room.guests = room.guests.filter((pid) => pid !== targetId);
+  if (room.guests.length !== beforeGuests) removed = true;
+  if (removed) { room.updatedAt = room.game.updatedAt = Date.now(); }
+  return removed;
+}
 function assertTurn(room, pid) {
   const pi = room.players.indexOf(pid);
   const guest = room.guests.includes(pid);
@@ -113,6 +124,10 @@ function dashboardRoom(room) {
     blackConnected: !!room.players[0],
     whiteConnected: !!room.players[1],
     guestCount: room.guests.length,
+    connections: {
+      players: room.players.map((pid, idx) => pid ? ({ id: pid, label: `${idx === 0 ? '흑' : '백'} 플레이어 · ${connectionLabel(pid)}`, role: 'player', playerIndex: idx }) : null).filter(Boolean),
+      guests: room.guests.map((pid, idx) => ({ id: pid, label: `공동참여자 #${idx + 1} · ${connectionLabel(pid)}`, role: 'guest' })),
+    },
     size: G.size,
     komi: G.komi,
     phase: G.phase === 'play' ? '진행/대기' : G.phase === 'score' ? '계가 중' : '종료',
@@ -155,6 +170,20 @@ module.exports = async function handler(req, res) {
 
     if (action === 'health') return send(res, 200, { ok: true, rooms: rooms.size, game: 'baduk' });
     if (action === 'dashboard') return send(res, 200, dashboard());
+    if ((action === 'dashboard/kick' || action === 'kick') && req.method === 'POST') {
+      const room = rooms.get(String(body.roomId || '').toUpperCase());
+      if (!room) return send(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      if (!body.targetId) return send(res, 400, { ok: false, error: '종료할 접속자를 선택하세요.' });
+      const removed = removeConnection(room, String(body.targetId));
+      if (!removed) return send(res, 404, { ok: false, error: '해당 접속자를 찾을 수 없습니다.' });
+      return send(res, 200, { ok: true, room: dashboardRoom(room) });
+    }
+    if ((action === 'dashboard/delete-room' || action === 'delete-room') && req.method === 'POST') {
+      const roomId = String(body.roomId || '').toUpperCase();
+      if (!rooms.has(roomId)) return send(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      rooms.delete(roomId);
+      return send(res, 200, { ok: true, deletedRoomId: roomId, rooms: rooms.size });
+    }
     if (action === 'create' && req.method === 'POST') {
       let id; do { id = roomCode(); } while (rooms.has(id));
       const pid = playerId();

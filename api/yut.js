@@ -380,6 +380,12 @@ module.exports = async function handler(req, res) {
       rooms.delete(roomId);
       return json(res, 200, { ok: true, deletedRoomId: roomId, rooms: rooms.size });
     }
+    if (action === 'dashboard/delete-room' && req.method === 'POST') {
+      const roomId = String(body.roomId || '').toUpperCase();
+      if (!rooms.has(roomId)) return json(res, 404, { ok: false, error: '방을 찾을 수 없습니다.' });
+      rooms.delete(roomId);
+      return json(res, 200, { ok: true, deletedRoomId: roomId, rooms: rooms.size });
+    }
     if (action === 'room/create' && req.method === 'POST') {
       let id; do { id = roomCode(); } while (rooms.has(id));
       const pid = playerId();

@@ -1,6 +1,8 @@
 {
   "rewrites": [
+    { "source": "/api/baduk/dashboard/:action", "destination": "/api/baduk?action=dashboard/:action" },
     { "source": "/api/baduk/:action", "destination": "/api/baduk?action=:action" },
+    { "source": "/api/omok/dashboard/:action", "destination": "/api/omok?action=dashboard/:action" },
     { "source": "/api/omok/:action", "destination": "/api/omok?action=:action" },
     { "source": "/api/yut/dashboard", "destination": "/api/yut?action=dashboard" },
     { "source": "/api/yut/dashboard/:action", "destination": "/api/yut?action=dashboard/:action" },
