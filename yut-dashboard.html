@@ -90,7 +90,7 @@
         </div>
         <div class="links">
           <a class="btn" href="yut.html">윷놀이로 이동</a>
-          <a class="btn" href="index.html">자기소개</a>
+          <a class="btn" href="intro.html">자기소개</a>
           <button id="refreshBtn" type="button">새로고침</button>
         </div>
       </div>
@@ -124,7 +124,7 @@
     if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
     const left = lockMinutesLeft();
     if (left) { alert(`비밀번호를 ${MAX_FAILS}번 틀려서 이 기기에서는 입력이 잠겨 있어요.
-${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; return false; }
+${left}분 뒤에 다시 시도해 주세요.`); location.href = 'intro.html'; return false; }
     for (let i = 0; i < 3; i++) {
     const input = prompt('현황판 비밀번호를 입력하세요.');
     if (input === null) break;
@@ -135,10 +135,10 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; r
     if (res.status !== 403) { alert('비밀번호를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'); return false; }
     const v = readLock(); v.fails += 1; v.last = Date.now();
     if (v.fails >= MAX_FAILS) { writeLock({ fails: 0, until: v.last + LOCK_MS, last: v.last }); alert(`비밀번호를 ${MAX_FAILS}번 틀렸어요.
-이 기기에서는 1시간 동안 비밀번호를 입력할 수 없어요.`); location.href = 'index.html'; return false; }
+이 기기에서는 1시간 동안 비밀번호를 입력할 수 없어요.`); location.href = 'intro.html'; return false; }
     writeLock(v); alert(`비밀번호가 맞지 않습니다. (남은 기회 ${MAX_FAILS - v.fails}번)`);
     }
-    location.href = 'index.html';
+    location.href = 'intro.html';
     return false;
     }
     const $ = (id) => document.getElementById(id);
