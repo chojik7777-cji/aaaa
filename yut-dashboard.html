@@ -113,67 +113,34 @@
   <script>
 
     const AUTH_KEY = 'dashboard-auth-v1';
-    // 비밀번호를 5번 틀리면 이 기기(브라우저)에서는 1시간 동안 입력을 막아요.
-    // 잠금 기록은 localStorage에 남아서 새로고침·창 닫기·다른 현황 페이지에서도 유지돼요.
-    const LOCK_KEY = 'dashboard-auth-lock-v1', MAX_FAILS = 5, LOCK_MS = 60 * 60 * 1000;
-    function readLock() {
-        const empty = { fails: 0, until: 0, last: 0 };
-        try {
-            const v = JSON.parse(localStorage.getItem(LOCK_KEY)) || {};
-            if (!v.last || Date.now() - v.last > LOCK_MS) return empty; // 마지막 실패 후 1시간이 지나면 초기화
-            return { fails: v.fails || 0, until: v.until || 0, last: v.last };
-        } catch (e) { return empty; }
-    }
-    function writeLock(v) { try { localStorage.setItem(LOCK_KEY, JSON.stringify(v)); } catch (e) { /* 저장 불가 */ } }
+    const LOCK_KEY = 'dashboard-auth-lock-v1';
+    const MAX_FAILS = 5;
+    const LOCK_MS = 60 * 60 * 1000;
+    function readLock() { const empty = { fails: 0, until: 0, last: 0 }; try { const v = JSON.parse(localStorage.getItem(LOCK_KEY)) || {}; if (!v.last || Date.now() - v.last > LOCK_MS) return empty; return { fails: v.fails || 0, until: v.until || 0, last: v.last }; } catch (e) { return empty; } }
+    function writeLock(v) { try { localStorage.setItem(LOCK_KEY, JSON.stringify(v)); } catch (e) {} }
+    function clearLock() { writeLock({ fails: 0, until: 0, last: 0 }); }
     function lockMinutesLeft() { const v = readLock(); return v.until > Date.now() ? Math.ceil((v.until - Date.now()) / 60000) : 0; }
-    async function checkDashboardPassword() {
-        if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
-        const left = lockMinutesLeft();
-        if (left) {
-            alert(`비밀번호를 ${MAX_FAILS}번 틀려서 이 기기에서는 입력이 잠겨 있어요.\n${left}분 뒤에 다시 시도해 주세요.`);
-            return false;
-        }
-        for (let i = 0; i < 3; i++) {
-            const input = prompt('현황판 비밀번호를 입력하세요.');
-            if (input === null) break;
-            let res;
-            try {
-                res = await fetch('/api/dashboard-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: input })
-                });
-            } catch (e) {
-                alert('비밀번호 확인 서버에 연결할 수 없습니다.');
-                return false;
-            }
-            if (res.ok) {
-                sessionStorage.setItem(AUTH_KEY, 'ok');
-                writeLock({ fails: 0, until: 0, last: 0 });
-                return true;
-            }
-            if (res.status !== 403) { // 서버 오류는 틀린 횟수로 세지 않아요
-                alert('비밀번호를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
-                return false;
-            }
-            const v = readLock();
-            v.fails++; v.last = Date.now();
-            if (v.fails >= MAX_FAILS) {
-                writeLock({ fails: 0, until: v.last + LOCK_MS, last: v.last });
-                alert(`비밀번호를 ${MAX_FAILS}번 틀렸어요.\n이 기기에서는 1시간 동안 비밀번호를 입력할 수 없어요.`);
-                return false;
-            }
-            writeLock(v);
-            alert(`비밀번호가 맞지 않습니다. (남은 기회 ${MAX_FAILS - v.fails}번)`);
-        }
-        return false;
-    }
     async function requireDashboardPassword() {
-        if (await checkDashboardPassword()) return true;
-        location.href = 'index.html';
-        return false;
+    if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
+    const left = lockMinutesLeft();
+    if (left) { alert(`비밀번호를 ${MAX_FAILS}번 틀려서 이 기기에서는 입력이 잠겨 있어요.
+${left}분 뒤에 다시 시도해 주세요.`); location.href = 'index.html'; return false; }
+    for (let i = 0; i < 3; i++) {
+    const input = prompt('현황판 비밀번호를 입력하세요.');
+    if (input === null) break;
+    let res;
+    try { res = await fetch('/api/dashboard-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input }) }); }
+    catch (e) { alert('비밀번호 확인 서버에 연결할 수 없습니다.'); return false; }
+    if (res.ok) { sessionStorage.setItem(AUTH_KEY, 'ok'); clearLock(); return true; }
+    if (res.status !== 403) { alert('비밀번호를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'); return false; }
+    const v = readLock(); v.fails += 1; v.last = Date.now();
+    if (v.fails >= MAX_FAILS) { writeLock({ fails: 0, until: v.last + LOCK_MS, last: v.last }); alert(`비밀번호를 ${MAX_FAILS}번 틀렸어요.
+이 기기에서는 1시간 동안 비밀번호를 입력할 수 없어요.`); location.href = 'index.html'; return false; }
+    writeLock(v); alert(`비밀번호가 맞지 않습니다. (남은 기회 ${MAX_FAILS - v.fails}번)`);
     }
-
+    location.href = 'index.html';
+    return false;
+    }
     const $ = (id) => document.getElementById(id);
     const phaseClass = (room) => room.winnerName ? '종료' : room.phaseLabel;
     function timeText(ts) {
