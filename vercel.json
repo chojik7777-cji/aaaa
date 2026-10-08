@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/note2/:action", "destination": "/api/note2?action=:action" },
     { "source": "/api/note/:action", "destination": "/api/note?action=:action" },
     { "source": "/api/baduk/dashboard/:action", "destination": "/api/baduk?action=dashboard/:action" },
     { "source": "/api/baduk/:action", "destination": "/api/baduk?action=:action" },
