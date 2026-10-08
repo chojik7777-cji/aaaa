@@ -73,10 +73,12 @@
         .chips { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #4a5568; margin-top: 8px; }
         .chips span { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 3px 10px; }
 
-        .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+        .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+        .stu-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: stretch; }
         .stu {
             border: 2px solid #e2e8f0; border-radius: 12px; padding: 8px 10px; background: white;
             display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-align: left; color: #2d3748;
+            min-width: 0;
         }
         button.stu:hover { border-color: #a3bffa; background: white; color: #2d3748; }
         .stu.sel { border-color: #667eea; background: #f0f4ff; box-shadow: 0 0 0 3px rgba(102,126,234,0.2); }
@@ -84,6 +86,9 @@
         .stu .nm { font-weight: 700; font-size: 14px; white-space: nowrap; }
         .stu .gr { color: #718096; font-size: 11px; }
         .stu .tags { min-height: 15px; color: #718096; font-size: 11px; }
+        .stu-consult { border-radius: 12px; padding: 6px 8px; min-width: 54px; font-size: 11px; line-height: 1.25; background: #fffaf0; border: 1px solid #fbd38d; color: #744210; font-weight: 800; }
+        .stu-consult:hover:not(:disabled) { background: #dd6b20; color: white; border-color: #dd6b20; }
+        .stu-consult.done { background: #edf2f7; border-color: #cbd5e0; color: #718096; }
         .bar { display: flex; align-items: center; gap: 6px; }
         .bar i { font-style: normal; width: 34px; color: #718096; font-size: 11px; }
         .bar div { flex: 1; height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
@@ -1164,11 +1169,20 @@ function renderRoster() {
         if (s.concern && s.concern.known) tags.push('😟 고민 있음');
         if (S.consulted && S.consulted.includes(s.id)) tags.push('📞 상담 완료');
         if (s.sat < 40) tags.push('⚠️ 그만둘 수도');
-        return `<button class="stu ${selected === s.id ? 'sel' : ''}" data-stu="${s.id}">
-            <div class="top"><span class="nm">${s.name}</span><span class="gr">${s.grade} · ${s.months}개월째</span></div>
-            <div class="bar"><i>실력</i><div><b style="width:${s.skill}%;background:#48bb78"></b></div></div>
-            <div class="bar"><i>만족</i><div><b style="width:${s.sat}%;background:#f687b3"></b></div></div>
-            <div class="tags">${tags.join(' · ')}</div></button>`;
+        const consulted = S.consulted && S.consulted.includes(s.id);
+        const consultWhy = whyBlocked('consult');
+        const disabled = consulted || !!consultWhy;
+        const consultLabel = consulted ? '상담<br>완료' : '학부모<br>면담';
+        const consultTitle = consulted ? '이번 달에 이미 상담했습니다.' : (consultWhy ? consultWhy : `${s.name} 학부모면담`);
+        return `<div class="stu-card">
+            <button class="stu ${selected === s.id ? 'sel' : ''}" data-stu="${s.id}" type="button">
+                <div class="top"><span class="nm">${s.name}</span><span class="gr">${s.grade} · ${s.months}개월째</span></div>
+                <div class="bar"><i>실력</i><div><b style="width:${s.skill}%;background:#48bb78"></b></div></div>
+                <div class="bar"><i>만족</i><div><b style="width:${s.sat}%;background:#f687b3"></b></div></div>
+                <div class="tags">${tags.join(' · ')}</div>
+            </button>
+            <button class="stu-consult ${consulted ? 'done' : ''}" data-consult="${s.id}" type="button" title="${consultTitle}" ${disabled ? 'disabled' : ''}>${consultLabel}</button>
+        </div>`;
     }).join('');
 }
 
@@ -1612,12 +1626,20 @@ $('roster').addEventListener('pointerdown', e => { tap.x = e.clientX; tap.y = e.
 $('roster').addEventListener('pointermove', e => { if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 8) tap.moved = true; });
 $('roster').addEventListener('pointercancel', () => { tap.moved = true; });
 $('roster').addEventListener('click', e => {
+    const consultBtn = e.target.closest('[data-consult]');
+    if (consultBtn) {
+        if (e.detail !== 0 && (tap.moved || Math.abs(window.scrollY - tap.sy) > 4)) { tap.moved = false; return; }
+        selected = Number(consultBtn.dataset.consult);
+        Sound.play('click');
+        doAction('consult');
+        return;
+    }
     const b = e.target.closest('[data-stu]'); if (!b) return;
     if (e.detail !== 0 && (tap.moved || Math.abs(window.scrollY - tap.sy) > 4)) { tap.moved = false; return; }
     const id = Number(b.dataset.stu);
     selected = selected === id ? null : id;
     Sound.play('click'); renderRoster();
-    if (selected) toast(`${byId(selected).name} 선택됨 — 위의 📞 학부모 상담을 눌러요`, '', 1600);
+    if (selected) toast(`${byId(selected).name} 선택됨 — 옆의 📞 학부모면담을 눌러요`, '', 1600);
 });
 $('teachers').addEventListener('click', e => {
     const b = e.target.closest('[data-fire]'); if (!b) return;
