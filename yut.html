@@ -890,7 +890,12 @@
                 body: JSON.stringify(data || {}),
             });
             const json = await res.json();
-            if (!json.ok) throw new Error(json.error || '서버 오류');
+            if (!json.ok) {
+                if ((res.status === 403 || res.status === 404) && NET.active && NET.roomId && data && String(data.roomId || '').toUpperCase() === NET.roomId) {
+                    handleOnlineRoomClosed(json.error);
+                }
+                throw new Error(json.error || '서버 오류');
+            }
             return json;
         }
         function applyNet(payload) {
@@ -908,6 +913,19 @@
             document.getElementById('roomInfo').textContent = `방 코드: ${NET.roomId} · ${counts} · 팀을 선택해서 입장하세요.`;
             render();
         }
+        function handleOnlineRoomClosed(reason) {
+            if (!NET.active && !NET.roomId) return;
+            clearInterval(NET.timer);
+            NET.active = false;
+            NET.roomId = null;
+            NET.playerId = null;
+            NET.playerIndex = null;
+            NET.role = 'team';
+            NET.teamCounts = [];
+            NET.spectatorCount = 0;
+            alert((reason && !reason.includes('방을 찾을 수 없습니다')) ? reason : '관리자가 이 방을 강제종료했습니다. 처음 화면으로 돌아갑니다.');
+            location.href = 'yut.html';
+        }
         function startPolling() {
             clearInterval(NET.timer);
             NET.timer = setInterval(async () => {
@@ -917,12 +935,7 @@
                     const res = await fetch(stateUrl, { cache: 'no-store' });
                     const json = await res.json();
                     if (json.ok) applyNet(json);
-                    else if (res.status === 403) {
-                        clearInterval(NET.timer);
-                        NET.active = false;
-                        alert(json.error || '접속이 종료되었습니다.');
-                        location.href = 'yut.html';
-                    }
+                    else if (res.status === 403 || res.status === 404) handleOnlineRoomClosed(json.error);
                 } catch (e) { console.warn(e); }
             }, 900);
         }

@@ -890,7 +890,12 @@ function settings() {
 async function api(path, data) {
     const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
     const json = await res.json();
-    if (!json.ok) throw new Error(json.error || '서버 오류');
+    if (!json.ok) {
+        if ((res.status === 403 || res.status === 404) && NET.active && NET.roomId && data && String(data.roomId || '').toUpperCase() === NET.roomId) {
+            handleOnlineRoomClosed(json.error);
+        }
+        throw new Error(json.error || '서버 오류');
+    }
     return json;
 }
 function applyNet(payload) {
@@ -903,6 +908,17 @@ function applyNet(payload) {
     syncControls(); hideScoreUI(); render();
     if (G.phase === 'score') { $('playActions').hidden = true; $('scoreActions').hidden = false; }
 }
+function handleOnlineRoomClosed(reason) {
+    if (!NET.active && !NET.roomId) return;
+    clearInterval(NET.timer);
+    NET.active = false;
+    NET.roomId = null;
+    NET.playerId = null;
+    NET.playerIndex = null;
+    NET.guestCount = 0;
+    alert((reason && !reason.includes('방을 찾을 수 없습니다')) ? reason : '관리자가 이 방을 강제종료했습니다. 처음 화면으로 돌아갑니다.');
+    location.href = 'baduk.html';
+}
 function startPolling() {
     clearInterval(NET.timer);
     NET.timer = setInterval(async () => {
@@ -911,6 +927,7 @@ function startPolling() {
             const res = await fetch(`/api/baduk/state?roomId=${encodeURIComponent(NET.roomId)}`, { cache: 'no-store' });
             const json = await res.json();
             if (json.ok) applyNet(json);
+            else if (res.status === 403 || res.status === 404) handleOnlineRoomClosed(json.error);
         } catch (e) { console.warn(e); }
     }, 900);
 }
