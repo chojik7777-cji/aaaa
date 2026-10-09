@@ -111,8 +111,10 @@
         .chip { display: inline-block; background: white; border: 1px solid #fbd38d; border-radius: 999px; padding: 0 8px; margin: 2px; font-size: 13px; }
         .guess { font-size: 12px; color: #2f855a; font-weight: 600; min-height: 16px; }
         .row { display: flex; gap: 6px; flex-wrap: wrap; }
-        #autoBtn { width: 100%; font-weight: 600; }
+        .mode-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+        .mode-row button { font-weight: 600; }
         #autoBtn.on { background: #38a169; color: white; border-color: #38a169; }
+        #speedBtn.fast { background: #ed8936; color: white; border-color: #ed8936; }
         .hint { font-size: 12px; color: #718096; margin-top: 10px; line-height: 1.6; text-align: center; }
 
         .toast-wrap { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 20; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
@@ -223,11 +225,14 @@
                     <button id="trashBtn" title="단축키: X 또는 Backspace">🗑️ 버리기</button>
                     <button id="pauseBtn" title="단축키: P">⏸️ 일시정지</button>
                 </div>
-                <button id="autoBtn" title="단축키: A">🤖 자동 모드 꺼짐</button>
+                <div class="mode-row">
+                    <button id="autoBtn" title="단축키: A">🤖 자동 모드 꺼짐</button>
+                    <button id="speedBtn" title="누를 때마다 1배 → 1.5배 → 2배 → 3배 → 1배">⏩ 1배속</button>
+                </div>
             </div>
         </div>
         <p class="hint">재료를 눌러 컵에 담고 → 주문과 같아지면 <b>손님 카드를 눌러 서빙</b>하세요.<br>
-            키보드: 숫자 <b>1~9</b> 재료 · <b>Q W E R T</b> 손님에게 서빙 · <b>X</b> 버리기 · <b>P</b> 일시정지 · <b>A</b> 자동 제조</p>
+            키보드: 숫자 <b>1~9</b> 재료 · <b>Q W E R T</b> 손님에게 서빙 · <b>X</b> 버리기 · <b>P</b> 일시정지 · <b>A</b> 자동 제조 · <b>S</b> 배속 변경</p>
 
         <details class="recipes" open>
             <summary>📖 레시피 북</summary>
@@ -250,6 +255,7 @@ const GOAL = 1000000;
 const SAVE_KEY = 'cafe-game-save-v1';
 const ALBA_WAGE = 25000;
 const FLYER_COST = 10000;
+const SPEED_LEVELS = [1, 1.5, 2, 3];
 
 const INGS = {
     shot:   { name: '에스프레소', icon: '☕', stock: true },
@@ -316,7 +322,7 @@ function newState() {
         stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, cake: 0 },
         unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, cake: false },
         up: { machine: 0, seats: 0, interior: 0 },
-        priceLevel: 1, alba: false, flyer: false, auto: false,
+        priceLevel: 1, alba: false, flyer: false, auto: false, speed: 1,
         weather: rollWeather(), won: false,
     };
 }
@@ -1650,6 +1656,7 @@ function startDay() {
     $('play').hidden = false;
     $('pauseBtn').textContent = '⏸️ 일시정지';
     renderAutoBtn();
+    renderSpeedBtn();
     buildIngs();
     buildCounter();
     renderCup();
@@ -1757,10 +1764,11 @@ function spawnRate() {
 let lastFrame = performance.now();
 function frame(now) {
     const dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
+    const gameDt = dt * (G && !G.paused && !G.over ? (S.speed || 1) : 1);
     lastFrame = now;
     try {
-        if (G && !G.over && !G.paused) tick(dt);
-        if (!G || !G.paused) Scene.update(dt);
+        if (G && !G.over && !G.paused) tick(gameDt);
+        if (!G || !G.paused) Scene.update(gameDt);
         Scene.draw();
     } catch (e) { console.error(e); }
     requestAnimationFrame(frame);
@@ -1901,6 +1909,13 @@ function renderAutoBtn() {
     b.textContent = S.auto ? '🤖 자동 모드 켜짐' : '🤖 자동 모드 꺼짐';
     b.classList.toggle('on', S.auto);
 }
+function renderSpeedBtn() {
+    const b = $('speedBtn');
+    if (!b) return;
+    const sp = S.speed || 1;
+    b.textContent = `⏩ ${sp}배속`;
+    b.classList.toggle('fast', sp > 1);
+}
 function toggleAuto() {
     S.auto = !S.auto;
     save();
@@ -1908,6 +1923,15 @@ function toggleAuto() {
     Sound.play('click');
     toast(S.auto ? '🤖 자동 모드: 급한 손님부터 알아서 만들어 서빙해요' : '🤖 자동 모드를 껐어요');
     if (G) { G.autoTarget = null; G.autoTimer = 0.3; }
+}
+function toggleSpeed() {
+    const current = S.speed || 1;
+    const idx = SPEED_LEVELS.indexOf(current);
+    S.speed = SPEED_LEVELS[(idx + 1) % SPEED_LEVELS.length];
+    save();
+    renderSpeedBtn();
+    Sound.play('click');
+    toast(`⏩ 영업 속도 ${S.speed}배속`);
 }
 
 function albaServe() {
@@ -2042,6 +2066,7 @@ $('counter').addEventListener('click', e => {
 $('trashBtn').addEventListener('click', trashCup);
 $('pauseBtn').addEventListener('click', togglePause);
 $('autoBtn').addEventListener('click', toggleAuto);
+$('speedBtn').addEventListener('click', toggleSpeed);
 
 $('scene').addEventListener('click', e => {
     if (!G || G.over) return;
@@ -2069,6 +2094,8 @@ document.addEventListener('keydown', e => {
         trashCup();
     } else if (key === 'A') {
         toggleAuto();
+    } else if (key === 'S') {
+        toggleSpeed();
     } else if (key === 'P' || e.key === 'Escape') {
         togglePause();
     } else return;
