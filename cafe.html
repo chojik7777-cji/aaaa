@@ -61,6 +61,26 @@
         .start-row { display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
         .start-row .primary { padding: 12px 28px; font-size: 16px; }
 
+        .finance-chart { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; background: #f8fafc; }
+        .finance-chart .head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .finance-chart .title { font-weight: 800; font-size: 14px; color: #4a5568; }
+        .finance-chart .legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: #718096; }
+        .finance-chart .legend span::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
+        .finance-chart .legend .rev::before { background: #48bb78; }
+        .finance-chart .legend .cost::before { background: #f56565; }
+        .finance-chart .legend .profit::before { background: #667eea; }
+        .finance-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 8px; align-items: end; min-height: 118px; }
+        .finance-day { display: grid; grid-template-rows: 1fr auto auto; gap: 4px; min-width: 0; }
+        .finance-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; align-items: end; height: 84px; border-bottom: 1px solid #cbd5e0; }
+        .finance-cols i { display: block; border-radius: 4px 4px 0 0; min-height: 2px; }
+        .finance-cols .rev { background: #48bb78; }
+        .finance-cols .cost { background: #f56565; }
+        .finance-cols .profit { background: #667eea; }
+        .finance-cols .loss { background: #805ad5; }
+        .finance-day .d { font-size: 11px; text-align: center; color: #718096; white-space: nowrap; }
+        .finance-day .p { font-size: 11px; text-align: center; font-weight: 700; white-space: nowrap; }
+        .finance-empty { font-size: 13px; color: #718096; line-height: 1.6; }
+
         /* 영업 화면 */
         .timebar { height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden; margin: 12px 0 4px; }
         .timebar div { height: 100%; background: linear-gradient(90deg, #f6ad55, #ed64a6); width: 0; }
@@ -187,6 +207,8 @@
     <!-- 준비 화면 -->
     <section id="prep">
         <div class="forecast" id="forecast"></div>
+
+        <div id="financeChart"></div>
 
         <h2>🛒 재료 구매</h2>
         <div class="shop" id="shopStock"></div>
@@ -322,7 +344,7 @@ function newState() {
         stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, cake: 0 },
         unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, cake: false },
         up: { machine: 0, seats: 0, interior: 0 },
-        priceLevel: 1, alba: false, flyer: false, auto: false, speed: 1,
+        priceLevel: 1, alba: false, flyer: false, auto: false, speed: 1, history: [],
         weather: rollWeather(), won: false,
     };
 }
@@ -341,6 +363,7 @@ function load() {
                     stock: Object.assign(base.stock, s.stock || {}),
                     unlocked: Object.assign(base.unlocked, s.unlocked || {}),
                     up: Object.assign(base.up, s.up || {}),
+                    history: Array.isArray(s.history) ? s.history : [],
                 });
             }
         }
@@ -1550,6 +1573,7 @@ function renderPrep() {
     const w = WEATHERS[S.weather];
     $('forecast').innerHTML = `<b>${S.day}일차 일기예보</b>: ${w.icon} ${w.name} — ${w.text}<br>
         오늘 마감 후 임대료 <b>${won(rent())}</b>이 나갑니다.`;
+    renderFinanceChart();
 
     // 재료
     $('shopStock').innerHTML = Object.keys(PACKS).filter(ingAvailable).map(k => {
@@ -1603,6 +1627,35 @@ function renderPrep() {
             <span>📣 <b>전단지 돌리기</b> — 오늘 손님 +40% (${won(FLYER_COST)}, 즉시 지불)</span>
             <button data-opt="flyer" ${S.flyer || S.money < FLYER_COST ? 'disabled' : ''}>${S.flyer ? '배포 완료 ✓' : '돌리기'}</button>
         </div>`;
+}
+
+function renderFinanceChart() {
+    const box = $('financeChart');
+    const hist = (S.history || []).slice(-7);
+    if (!hist.length) {
+        box.innerHTML = `<div class="finance-chart"><div class="head"><div class="title">📊 일별 수익·비용 차트</div></div>
+            <div class="finance-empty">하루 영업을 마치면 최근 7일의 수익·비용·순이익이 막대그래프로 표시됩니다.</div></div>`;
+        return;
+    }
+    const max = Math.max(1, ...hist.flatMap(h => [h.income || 0, h.cost || 0, Math.abs(h.profit || 0)]));
+    const hgt = n => Math.max(2, Math.round(Math.abs(n) / max * 84));
+    box.innerHTML = `<div class="finance-chart">
+        <div class="head">
+            <div class="title">📊 일별 수익·비용 차트</div>
+            <div class="legend"><span class="rev">수익</span><span class="cost">비용</span><span class="profit">순이익</span></div>
+        </div>
+        <div class="finance-bars">
+            ${hist.map(h => `<div class="finance-day" title="${h.day}일차 · 수익 ${won(h.income || 0)} · 비용 ${won(h.cost || 0)} · 순이익 ${won(h.profit || 0)}">
+                <div class="finance-cols">
+                    <i class="rev" style="height:${hgt(h.income || 0)}px"></i>
+                    <i class="cost" style="height:${hgt(h.cost || 0)}px"></i>
+                    <i class="${(h.profit || 0) >= 0 ? 'profit' : 'loss'}" style="height:${hgt(h.profit || 0)}px"></i>
+                </div>
+                <div class="d">${h.day}일</div>
+                <div class="p ${(h.profit || 0) >= 0 ? 'plus' : 'minus'}">${(h.profit || 0) >= 0 ? '+' : ''}${Math.round((h.profit || 0) / 1000)}천</div>
+            </div>`).join('')}
+        </div>
+    </div>`;
 }
 
 $('prep').addEventListener('click', e => {
@@ -2118,6 +2171,14 @@ function endDay() {
         return sum + Math.max(0, G.stockStart[k] - S.stock[k]) * (p.cost / p.qty);
     }, 0);
     const profit = G.revenue + G.tips - r - wage - used;
+    const income = G.revenue + G.tips;
+    const cost = r + wage + used;
+    S.history = (S.history || []).filter(h => h.day !== S.day).concat({
+        day: S.day,
+        income: Math.round(income),
+        cost: Math.round(cost),
+        profit: Math.round(profit),
+    }).slice(-30);
 
     const rows = [
         ['☕ 음료 매출', G.revenue, 'plus'],
