@@ -227,7 +227,7 @@
             </div>
         </div>
         <p class="hint">재료를 눌러 컵에 담고 → 주문과 같아지면 <b>손님 카드를 눌러 서빙</b>하세요.<br>
-            키보드: 숫자 <b>1~8</b> 재료 · <b>Q W E R T</b> 손님에게 서빙 · <b>X</b> 버리기 · <b>P</b> 일시정지 · <b>A</b> 자동 제조</p>
+            키보드: 숫자 <b>1~9</b> 재료 · <b>Q W E R T</b> 손님에게 서빙 · <b>X</b> 버리기 · <b>P</b> 일시정지 · <b>A</b> 자동 제조</p>
 
         <details class="recipes" open>
             <summary>📖 레시피 북</summary>
@@ -259,9 +259,10 @@ const INGS = {
     syrup:  { name: '바닐라시럽', icon: '🍯', stock: true, need: 'vanilla' },
     choco:  { name: '초코',      icon: '🍫', stock: true, need: 'mocha' },
     matcha: { name: '녹차가루',   icon: '🍵', stock: true, need: 'greentea' },
+    ginseng:{ name: '홍삼진액',   icon: '🫚', stock: true, need: 'ginsenglatte' },
     cake:   { name: '케이크',     icon: '🍰', stock: true, need: 'cake' },
 };
-const ING_ORDER = ['shot', 'water', 'milk', 'ice', 'syrup', 'choco', 'matcha', 'cake'];
+const ING_ORDER = ['shot', 'water', 'milk', 'ice', 'syrup', 'choco', 'matcha', 'ginseng', 'cake'];
 
 const PACKS = {
     shot:   { qty: 10, cost: 5000 },
@@ -269,6 +270,7 @@ const PACKS = {
     syrup:  { qty: 10, cost: 3000 },
     choco:  { qty: 10, cost: 4000 },
     matcha: { qty: 10, cost: 5000 },
+    ginseng:{ qty: 10, cost: 8000 },
     cake:   { qty: 5,  cost: 10000 },
 };
 
@@ -278,6 +280,7 @@ const MENU = {
     vanilla:   { name: '바닐라라떼', base: { shot: 1, milk: 1, syrup: 1 }, price: 4500, coffee: true, unlock: 20000 },
     mocha:     { name: '카페모카',   base: { shot: 1, milk: 1, choco: 1 }, price: 5000, coffee: true, unlock: 30000 },
     greentea:  { name: '녹차라떼',   base: { matcha: 1, milk: 1 }, price: 4500, coffee: false, unlock: 30000 },
+    ginsenglatte: { name: '홍삼라떼', base: { ginseng: 1, milk: 1 }, price: 6500, coffee: false, unlock: 50000 },
 };
 const CAKE = { name: '조각 케이크', price: 5500, unlock: 40000 };
 
@@ -310,8 +313,8 @@ const SLOT_KEYS = ['Q', 'W', 'E', 'R', 'T'];
 function newState() {
     return {
         day: 1, money: 50000, rep: 30,
-        stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, cake: 0 },
-        unlocked: { vanilla: false, mocha: false, greentea: false, cake: false },
+        stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, cake: 0 },
+        unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, cake: false },
         up: { machine: 0, seats: 0, interior: 0 },
         priceLevel: 1, alba: false, flyer: false, auto: false,
         weather: rollWeather(), won: false,
@@ -326,7 +329,14 @@ function load() {
         const raw = localStorage.getItem(SAVE_KEY);
         if (raw) {
             const s = JSON.parse(raw);
-            if (s && typeof s.day === 'number') return Object.assign(newState(), s);
+            if (s && typeof s.day === 'number') {
+                const base = newState();
+                return Object.assign(base, s, {
+                    stock: Object.assign(base.stock, s.stock || {}),
+                    unlocked: Object.assign(base.unlocked, s.unlocked || {}),
+                    up: Object.assign(base.up, s.up || {}),
+                });
+            }
         }
     } catch (e) { /* 저장소 사용 불가 */ }
     return newState();
@@ -664,7 +674,7 @@ const Scene = (() => {
     const W = 720, H = 330;
     const FLOOR_Y = 172, CTOP = 200, CBOT = 262, QY = 318, DOORX = 58, WORKER_Y = 214;
     const MACHINE_X = 668;
-    const STATION = { shot: 626, water: 612, ice: 568, milk: 524, syrup: 474, choco: 474, matcha: 474, cake: 412 };
+    const STATION = { shot: 626, water: 612, ice: 568, milk: 524, syrup: 474, choco: 474, matcha: 474, ginseng: 474, cake: 412 };
     const TABLE_POS = [[118, 236], [250, 236], [118, 300], [250, 300]];
     const SKINS = ['#f6d2b8', '#eab58f', '#c98e64', '#8d5a3b', '#f3c9a0'];
     const HAIRS = ['#2d2320', '#5a3825', '#a0522d', '#d8b36a', '#1b1b1b', '#9e9e9e', '#7a2e3a'];
@@ -677,8 +687,8 @@ const Scene = (() => {
                    '#b59f7b', '#8d7b68', '#2b2b2b', '#6b705c', '#dcd3c3', '#7f4f24', '#495057'];
     const SHOES = ['#222222', '#f8f9fa', '#8b5e3c', '#e63946', '#1d3557', '#adb5bd', '#5c4033'];
     const TOPS = ['tee', 'stripe', 'hoodie', 'jacket', 'check', 'sweater', 'shirt', 'dress'];
-    const LIQUID = { shot: '#3b2314', water: '#cfe8f7', milk: '#f7f1e8', syrup: '#e0b050', choco: '#4a2a18', matcha: '#7fb24a' };
-    const DRINK_COLOR = { americano: '#3b2314', latte: '#c69c6d', vanilla: '#dcb67f', mocha: '#5a3322', greentea: '#8cbf5a' };
+    const LIQUID = { shot: '#3b2314', water: '#cfe8f7', milk: '#f7f1e8', syrup: '#e0b050', choco: '#4a2a18', matcha: '#7fb24a', ginseng: '#8f3f2f' };
+    const DRINK_COLOR = { americano: '#3b2314', latte: '#c69c6d', vanilla: '#dcb67f', mocha: '#5a3322', greentea: '#8cbf5a', ginsenglatte: '#b36a52' };
     const INTERIOR_WALL = ['#f1e3cf', '#efdcc2', '#e9d6bb'];
 
     const cvs = $('scene'), c = cvs.getContext('2d');
@@ -1165,7 +1175,7 @@ const Scene = (() => {
             c.fillStyle = '#adb5bd'; c.fillRect(STATION.cake - 22, CTOP - 5, 44, 2);
         }
         // 시럽/파우더 병
-        const bottles = [['vanilla', '#e0b050'], ['mocha', '#4a2a18'], ['greentea', '#7fb24a']].filter(([k]) => S.unlocked[k]);
+        const bottles = [['vanilla', '#e0b050'], ['mocha', '#4a2a18'], ['greentea', '#7fb24a'], ['ginsenglatte', '#8f3f2f']].filter(([k]) => S.unlocked[k]);
         bottles.forEach(([, col], i) => {
             const bx = STATION.syrup - (bottles.length - 1) * 7 + i * 14;
             c.fillStyle = col; rr(bx - 5, CTOP - 26, 10, 22, 3); c.fill();
@@ -2048,7 +2058,7 @@ document.addEventListener('keydown', e => {
     if (e.key.toUpperCase() === 'M' && !(e.target instanceof HTMLInputElement)) { Sound.toggleMusic(); return; }
     if (!G || G.over) return;
     const key = e.key.toUpperCase();
-    if (/^[1-8]$/.test(key)) {
+    if (/^[1-9]$/.test(key)) {
         const k = G.ingKeys[Number(key) - 1];
         if (k) addIng(k);
     } else if (SLOT_KEYS.includes(key)) {
