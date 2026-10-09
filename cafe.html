@@ -69,16 +69,16 @@
         .finance-chart .legend .rev::before { background: #48bb78; }
         .finance-chart .legend .cost::before { background: #f56565; }
         .finance-chart .legend .profit::before { background: #667eea; }
-        .finance-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 8px; align-items: end; min-height: 118px; }
-        .finance-day { display: grid; grid-template-rows: 1fr auto auto; gap: 4px; min-width: 0; }
-        .finance-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; align-items: end; height: 84px; border-bottom: 1px solid #cbd5e0; }
-        .finance-cols i { display: block; border-radius: 4px 4px 0 0; min-height: 2px; }
-        .finance-cols .rev { background: #48bb78; }
-        .finance-cols .cost { background: #f56565; }
-        .finance-cols .profit { background: #667eea; }
-        .finance-cols .loss { background: #805ad5; }
-        .finance-day .d { font-size: 11px; text-align: center; color: #718096; white-space: nowrap; }
-        .finance-day .p { font-size: 11px; text-align: center; font-weight: 700; white-space: nowrap; }
+        .finance-line { width: 100%; height: 168px; display: block; overflow: visible; }
+        .finance-line .grid { stroke: #e2e8f0; stroke-width: 1; }
+        .finance-line .zero { stroke: #a0aec0; stroke-width: 1.4; stroke-dasharray: 4 4; }
+        .finance-line .rev { stroke: #48bb78; }
+        .finance-line .cost { stroke: #f56565; }
+        .finance-line .profit { stroke: #667eea; }
+        .finance-line .loss-dot { fill: #805ad5; }
+        .finance-line .axis-label { fill: #718096; font-size: 11px; }
+        .finance-line .value-label { fill: #4a5568; font-size: 10px; font-weight: 700; }
+        .finance-note { margin-top: 4px; font-size: 11px; color: #718096; text-align: center; }
         .finance-empty { font-size: 13px; color: #718096; line-height: 1.6; }
 
         /* 영업 화면 */
@@ -1633,28 +1633,45 @@ function renderFinanceChart() {
     const box = $('financeChart');
     const hist = (S.history || []).slice(-7);
     if (!hist.length) {
-        box.innerHTML = `<div class="finance-chart"><div class="head"><div class="title">📊 일별 수익·비용 차트</div></div>
-            <div class="finance-empty">하루 영업을 마치면 최근 7일의 수익·비용·순이익이 막대그래프로 표시됩니다.</div></div>`;
+        box.innerHTML = `<div class="finance-chart"><div class="head"><div class="title">📈 일별 수익·비용 꺾은선</div></div>
+            <div class="finance-empty">하루 영업을 마치면 최근 7일의 수익·비용·순이익이 꺾은선 그래프로 표시됩니다.</div></div>`;
         return;
     }
-    const max = Math.max(1, ...hist.flatMap(h => [h.income || 0, h.cost || 0, Math.abs(h.profit || 0)]));
-    const hgt = n => Math.max(2, Math.round(Math.abs(n) / max * 84));
+    const W = 320, H = 168, padL = 34, padR = 12, padT = 16, padB = 28;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const vals = hist.flatMap(h => [h.income || 0, h.cost || 0, h.profit || 0]);
+    let minV = Math.min(0, ...vals), maxV = Math.max(1, ...vals);
+    if (minV === maxV) { minV -= 1; maxV += 1; }
+    const x = i => padL + (hist.length === 1 ? plotW / 2 : i * plotW / (hist.length - 1));
+    const y = v => padT + (maxV - v) / (maxV - minV) * plotH;
+    const pts = key => hist.map((h, i) => `${x(i).toFixed(1)},${y(h[key] || 0).toFixed(1)}`).join(' ');
+    const axis = n => `${Math.round(n / 1000)}천`;
+    const profitLabel = n => `${n >= 0 ? '+' : ''}${Math.round(n / 1000)}천`;
+    const dots = (key, color) => hist.map((h, i) => {
+        const v = h[key] || 0;
+        return `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.3" fill="${key === 'profit' && v < 0 ? '#805ad5' : color}"><title>${h.day}일차 · ${key === 'income' ? '수익' : key === 'cost' ? '비용' : '순이익'} ${won(v)}</title></circle>`;
+    }).join('');
     box.innerHTML = `<div class="finance-chart">
         <div class="head">
-            <div class="title">📊 일별 수익·비용 차트</div>
+            <div class="title">📈 일별 수익·비용 꺾은선</div>
             <div class="legend"><span class="rev">수익</span><span class="cost">비용</span><span class="profit">순이익</span></div>
         </div>
-        <div class="finance-bars">
-            ${hist.map(h => `<div class="finance-day" title="${h.day}일차 · 수익 ${won(h.income || 0)} · 비용 ${won(h.cost || 0)} · 순이익 ${won(h.profit || 0)}">
-                <div class="finance-cols">
-                    <i class="rev" style="height:${hgt(h.income || 0)}px"></i>
-                    <i class="cost" style="height:${hgt(h.cost || 0)}px"></i>
-                    <i class="${(h.profit || 0) >= 0 ? 'profit' : 'loss'}" style="height:${hgt(h.profit || 0)}px"></i>
-                </div>
-                <div class="d">${h.day}일</div>
-                <div class="p ${(h.profit || 0) >= 0 ? 'plus' : 'minus'}">${(h.profit || 0) >= 0 ? '+' : ''}${Math.round((h.profit || 0) / 1000)}천</div>
-            </div>`).join('')}
-        </div>
+        <svg class="finance-line" viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 ${hist.length}일 수익 비용 순이익 꺾은선 그래프">
+            <line class="grid" x1="${padL}" y1="${padT}" x2="${W - padR}" y2="${padT}" />
+            <line class="grid" x1="${padL}" y1="${padT + plotH / 2}" x2="${W - padR}" y2="${padT + plotH / 2}" />
+            <line class="grid" x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" />
+            <line class="zero" x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W - padR}" y2="${y(0).toFixed(1)}" />
+            <text class="axis-label" x="2" y="${padT + 4}">${axis(maxV)}</text>
+            <text class="axis-label" x="2" y="${y(0).toFixed(1)}">0</text>
+            <text class="axis-label" x="2" y="${padT + plotH}">${axis(minV)}</text>
+            <polyline class="rev" points="${pts('income')}" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline class="cost" points="${pts('cost')}" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline class="profit" points="${pts('profit')}" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            ${dots('income', '#48bb78')}${dots('cost', '#f56565')}${dots('profit', '#667eea')}
+            ${hist.map((h, i) => `<text class="axis-label" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${h.day}일</text>`).join('')}
+            ${hist.map((h, i) => `<text class="value-label" x="${x(i).toFixed(1)}" y="${Math.max(10, y(h.profit || 0) - 8).toFixed(1)}" text-anchor="middle">${profitLabel(h.profit || 0)}</text>`).join('')}
+        </svg>
+        <div class="finance-note">점에 마우스를 올리면 정확한 금액을 볼 수 있어요.</div>
     </div>`;
 }
 
