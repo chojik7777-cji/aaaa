@@ -822,17 +822,17 @@ const Sound = (() => {
     }
     function setTrack(trackKey) {
         if (!YT_TRACKS[trackKey]) return;
-        if (pref.track === trackKey) {
-            if (pref.music) { init(true); startMusic(); }
-            return;
-        }
         const wasOn = pref.music;
         pref.track = trackKey;
+        pref.music = false;
         savePref();
         stopMusic();
-        if (wasOn) { pref.music = true; init(true); startMusic(); }
+        pref.music = true;
+        savePref();
+        init(true);
+        startMusic();
         renderButtons();
-        toast('🎵 배경음악을 ' + currentTrack().name + '로 바꿨어요');
+        toast(wasOn ? '🎵 배경음악을 ' + currentTrack().name + '로 다시 켰어요' : '🎵 배경음악을 ' + currentTrack().name + '로 켰어요');
     }
     function startMusicFromGesture(target) {
         if (!pref.music) return;
