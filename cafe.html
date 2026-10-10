@@ -180,7 +180,17 @@
         .audio-row button.off { background: #edf2f7; color: #a0aec0; }
         .track-btn { padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #edf2f7; color: #4a5568; }
         .track-btn.on { background: #2b6cb0; color: #fff; box-shadow: 0 3px 8px rgba(43,108,176,.22); }
-        .yt-music-frame { position: absolute; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; border: 0; }
+        .yt-music-frame {
+            display: none;
+            width: min(320px, 100%);
+            height: 180px;
+            margin: 8px 0 0 auto;
+            border: 0;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+            background: #111;
+        }
+        .yt-music-frame.on { display: block; }
         #scene {
             display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
             border-radius: 14px; background: #f1e3cf; cursor: pointer;
@@ -667,8 +677,9 @@ const Sound = (() => {
         if (!ytLoaded) {
             const id = currentTrack().id;
             const origin = encodeURIComponent(location.origin);
+            if (pref.music) f.classList.add('on');
             f.onload = () => { if (pref.music) cueYoutubePlay(); };
-            f.src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&loop=1&playlist=${id}&controls=0&playsinline=1&rel=0&origin=${origin}`;
+            f.src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&loop=1&playlist=${id}&controls=1&playsinline=1&rel=0&origin=${origin}`;
             ytLoaded = true;
         }
         cueYoutubePlay();
@@ -804,7 +815,7 @@ const Sound = (() => {
         ytCommand('pauseVideo');
         ytCommand('stopVideo');
         const f = ytFrame();
-        if (f) f.src = 'about:blank';
+        if (f) { f.src = 'about:blank'; f.classList.remove('on'); }
         ytLoaded = false;
     }
     function duck(on) {
@@ -819,6 +830,8 @@ const Sound = (() => {
             const b = $(id);
             if (b) b.classList.toggle('on', b.dataset.track === track);
         });
+        const f = ytFrame();
+        if (f) f.classList.toggle('on', pref.music);
         m.textContent = pref.music ? '🎵 유튜브 음악 켜짐' : '🎵 유튜브 음악 꺼짐';
         s.textContent = pref.sfx ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
         m.classList.toggle('off', !pref.music);
