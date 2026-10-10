@@ -175,9 +175,11 @@
         .modal .row { justify-content: center; margin-top: 14px; }
         .footer { margin-top: 18px; font-size: 13px; text-align: center; color: #a0aec0; letter-spacing: 0.3px; }
 
-        .audio-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+        .audio-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; margin-top: 10px; }
         .audio-row button { padding: 6px 10px; font-size: 12px; }
         .audio-row button.off { background: #edf2f7; color: #a0aec0; }
+        .audio-row .yt-toggle { display: none; background: #fff7ed; color: #9a3412; }
+        .audio-row .yt-toggle.on { display: inline-block; }
         .track-btn { padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #edf2f7; color: #4a5568; }
         .track-btn.on { background: #2b6cb0; color: #fff; box-shadow: 0 3px 8px rgba(43,108,176,.22); }
         .yt-music-frame {
@@ -191,6 +193,7 @@
             background: #111;
         }
         .yt-music-frame.on { display: block; }
+        .yt-music-frame.collapsed { display: none; }
         #scene {
             display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
             border-radius: 14px; background: #f1e3cf; cursor: pointer;
@@ -222,6 +225,7 @@
         <button class="track-btn" id="bgm1Btn" data-track="cafe1">BGM 1</button>
         <button class="track-btn" id="bgm2Btn" data-track="cafe2">BGM 2</button>
         <button id="musicBtn" title="단축키: M">🎵 음악</button>
+        <button class="yt-toggle" id="ytViewBtn">유튜브화면 접기</button>
         <button id="sfxBtn">🔊 효과음</button>
     </div>
     <iframe id="ytMusic" class="yt-music-frame" title="카페 배경음악" allow="autoplay; encrypted-media" loading="lazy"></iframe>
@@ -508,7 +512,7 @@ const Sound = (() => {
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
 
     let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
-    let ytLoaded = false, ytStartTimers = [];
+    let ytLoaded = false, ytStartTimers = [], ytCollapsed = false;
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const rnd = (a, b) => a + Math.random() * (b - a);
 
@@ -815,7 +819,7 @@ const Sound = (() => {
         ytCommand('pauseVideo');
         ytCommand('stopVideo');
         const f = ytFrame();
-        if (f) { f.src = 'about:blank'; f.classList.remove('on'); }
+        if (f) { f.src = 'about:blank'; f.classList.remove('on', 'collapsed'); }
         ytLoaded = false;
     }
     function duck(on) {
@@ -824,14 +828,21 @@ const Sound = (() => {
     }
 
     function renderButtons() {
-        const m = $('musicBtn'), s = $('sfxBtn');
+        const m = $('musicBtn'), s = $('sfxBtn'), y = $('ytViewBtn');
         const track = currentTrack() && pref.track;
         ['bgm1Btn', 'bgm2Btn'].forEach(id => {
             const b = $(id);
             if (b) b.classList.toggle('on', b.dataset.track === track);
         });
         const f = ytFrame();
-        if (f) f.classList.toggle('on', pref.music);
+        if (f) {
+            f.classList.toggle('on', pref.music);
+            f.classList.toggle('collapsed', pref.music && ytCollapsed);
+        }
+        if (y) {
+            y.classList.toggle('on', pref.music);
+            y.textContent = ytCollapsed ? '유튜브화면 펴기' : '유튜브화면 접기';
+        }
         m.textContent = pref.music ? '🎵 유튜브 음악 켜짐' : '🎵 유튜브 음악 꺼짐';
         s.textContent = pref.sfx ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
         m.classList.toggle('off', !pref.music);
@@ -839,7 +850,7 @@ const Sound = (() => {
     }
     function toggleMusic() {
         pref.music = !pref.music; savePref();
-        if (pref.music) { init(true); startMusic(); } else stopMusic();
+        if (pref.music) { ytCollapsed = false; init(true); startMusic(); } else stopMusic();
         renderButtons();
     }
     function toggleSfx() {
@@ -851,6 +862,7 @@ const Sound = (() => {
         if (!YT_TRACKS[trackKey]) return;
         const wasOn = pref.music;
         pref.track = trackKey;
+        ytCollapsed = false;
         pref.music = false;
         savePref();
         stopMusic();
@@ -861,14 +873,20 @@ const Sound = (() => {
         renderButtons();
         toast(wasOn ? '🎵 배경음악을 ' + currentTrack().name + '로 다시 켰어요' : '🎵 배경음악을 ' + currentTrack().name + '로 켰어요');
     }
+    function toggleYoutubeView() {
+        if (!pref.music) return;
+        ytCollapsed = !ytCollapsed;
+        renderButtons();
+        toast(ytCollapsed ? '유튜브 화면을 접었어요' : '유튜브 화면을 펼쳤어요');
+    }
     function startMusicFromGesture(target) {
         if (!pref.music) return;
-        if (target && target.closest && target.closest('#sfxBtn, #musicBtn, .track-btn')) return;
+        if (target && target.closest && target.closest('#sfxBtn, #musicBtn, #ytViewBtn, .track-btn')) return;
         init(true);
         startMusic();
     }
 
-    return { init, play, ingredient, duck, toggleMusic, toggleSfx, setTrack, startMusicFromGesture, renderButtons };
+    return { init, play, ingredient, duck, toggleMusic, toggleSfx, setTrack, toggleYoutubeView, startMusicFromGesture, renderButtons };
 })();
 
 // ===== 매장 장면 (캔버스 애니메이션) =====
@@ -2350,6 +2368,7 @@ $('scene').addEventListener('click', e => {
     if (slot >= 0) serve(slot);
 });
 $('musicBtn').addEventListener('click', () => Sound.toggleMusic());
+$('ytViewBtn').addEventListener('click', () => Sound.toggleYoutubeView());
 $('sfxBtn').addEventListener('click', () => Sound.toggleSfx());
 $('bgm1Btn').addEventListener('click', () => Sound.setTrack('cafe1'));
 $('bgm2Btn').addEventListener('click', () => Sound.setTrack('cafe2'));
