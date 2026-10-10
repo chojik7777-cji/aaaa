@@ -178,7 +178,8 @@
         .audio-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
         .audio-row button { padding: 6px 10px; font-size: 12px; }
         .audio-row button.off { background: #edf2f7; color: #a0aec0; }
-        .audio-row select { border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 8px; font: inherit; font-size: 12px; color: #4a5568; background: #f7fafc; max-width: 190px; }
+        .track-btn { padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #edf2f7; color: #4a5568; }
+        .track-btn.on { background: #2b6cb0; color: #fff; box-shadow: 0 3px 8px rgba(43,108,176,.22); }
         .yt-music-frame { position: absolute; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; border: 0; }
         #scene {
             display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
@@ -208,10 +209,8 @@
     </div>
 
     <div class="audio-row">
-        <select id="musicSelect" title="유튜브 배경음악 선택">
-            <option value="cafe1">BGM 1</option>
-            <option value="cafe2">BGM 2</option>
-        </select>
+        <button class="track-btn" id="bgm1Btn" data-track="cafe1">BGM 1</button>
+        <button class="track-btn" id="bgm2Btn" data-track="cafe2">BGM 2</button>
         <button id="musicBtn" title="단축키: M">🎵 음악</button>
         <button id="sfxBtn">🔊 효과음</button>
     </div>
@@ -803,8 +802,12 @@ const Sound = (() => {
     }
 
     function renderButtons() {
-        const m = $('musicBtn'), s = $('sfxBtn'), sel = $('musicSelect');
-        if (sel) sel.value = currentTrack() && pref.track;
+        const m = $('musicBtn'), s = $('sfxBtn');
+        const track = currentTrack() && pref.track;
+        ['bgm1Btn', 'bgm2Btn'].forEach(id => {
+            const b = $(id);
+            if (b) b.classList.toggle('on', b.dataset.track === track);
+        });
         m.textContent = pref.music ? '🎵 유튜브 음악 켜짐' : '🎵 유튜브 음악 꺼짐';
         s.textContent = pref.sfx ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
         m.classList.toggle('off', !pref.music);
@@ -836,7 +839,7 @@ const Sound = (() => {
     }
     function startMusicFromGesture(target) {
         if (!pref.music) return;
-        if (target && target.closest && target.closest('#sfxBtn, #musicBtn')) return;
+        if (target && target.closest && target.closest('#sfxBtn, #musicBtn, .track-btn')) return;
         init(true);
         startMusic();
     }
@@ -2324,7 +2327,8 @@ $('scene').addEventListener('click', e => {
 });
 $('musicBtn').addEventListener('click', () => Sound.toggleMusic());
 $('sfxBtn').addEventListener('click', () => Sound.toggleSfx());
-$('musicSelect').addEventListener('change', e => Sound.setTrack(e.target.value));
+$('bgm1Btn').addEventListener('click', () => Sound.setTrack('cafe1'));
+$('bgm2Btn').addEventListener('click', () => Sound.setTrack('cafe2'));
 // 브라우저 정책상 유튜브 BGM은 첫 사용자 동작 이후에만 안정적으로 시작됩니다.
 // 단, 효과음 버튼은 효과음만 제어해야 하므로 BGM 시작 트리거에서 제외합니다.
 document.addEventListener('pointerdown', e => Sound.startMusicFromGesture(e.target));
