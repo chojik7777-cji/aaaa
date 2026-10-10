@@ -291,12 +291,18 @@ const INGS = {
     matcha: { name: '녹차가루',   icon: '🍵', stock: true, need: 'greentea' },
     ginseng:{ name: '홍삼진액',   icon: '🫚', stock: true, need: 'ginsenglatte' },
     fruit:  { name: '쥬스과일',   icon: '🧃', stock: true, need: 'juice' },
+    honey:  { name: '꿀',        icon: '🍯', stock: true, need: 'honeyamericano' },
+    caramel:{ name: '카라멜소스', icon: '🍮', stock: true, need: 'caramelmacchiato' },
+    whitechoco:{ name: '화이트초코', icon: '🤍', stock: true, need: 'whitemocha' },
+    coldbrew:{ name: '콜드브루원액', icon: '🧋', stock: true, need: 'coldbrew' },
+    hojicha:{ name: '호지차가루', icon: '🍂', stock: true, need: 'hojicha' },
+    strawberry:{ name: '딸기', icon: '🍓', stock: true, need: 'strawberrymilk' },
     bread:  { name: '빵',        icon: '🥐', stock: true, need: 'bread' },
     cookie: { name: '쿠키',      icon: '🍪', stock: true, need: 'cookie' },
     tart:   { name: '타르트',     icon: '🥧', stock: true, need: 'tart' },
     cake:   { name: '케이크',     icon: '🍰', stock: true, need: 'cake' },
 };
-const ING_ORDER = ['shot', 'water', 'milk', 'ice', 'syrup', 'choco', 'matcha', 'ginseng', 'fruit', 'bread', 'cookie', 'tart', 'cake'];
+const ING_ORDER = ['shot', 'water', 'milk', 'ice', 'syrup', 'choco', 'matcha', 'ginseng', 'fruit', 'honey', 'caramel', 'whitechoco', 'coldbrew', 'hojicha', 'strawberry', 'bread', 'cookie', 'tart', 'cake'];
 
 const PACKS = {
     shot:   { qty: 10, cost: 5000 },
@@ -306,6 +312,12 @@ const PACKS = {
     matcha: { qty: 10, cost: 5000 },
     ginseng:{ qty: 10, cost: 8000 },
     fruit:  { qty: 10, cost: 7000 },
+    honey:  { qty: 10, cost: 5000 },
+    caramel:{ qty: 10, cost: 5000 },
+    whitechoco:{ qty: 10, cost: 6000 },
+    coldbrew:{ qty: 10, cost: 9000 },
+    hojicha:{ qty: 10, cost: 7000 },
+    strawberry:{ qty: 10, cost: 8000 },
     bread:  { qty: 8,  cost: 8000 },
     cookie: { qty: 10, cost: 6000 },
     tart:   { qty: 6,  cost: 9000 },
@@ -320,6 +332,14 @@ const MENU = {
     greentea:  { name: '녹차라떼',   base: { matcha: 1, milk: 1 }, price: 4500, coffee: false, unlock: 30000 },
     ginsenglatte: { name: '홍삼라떼', base: { ginseng: 1, milk: 1 }, price: 6500, coffee: false, unlock: 50000 },
     juice:    { name: '쥬스',      base: { fruit: 1, ice: 1 }, price: 5000, coffee: false, unlock: 25000, noTemp: true },
+    honeyamericano: { name: '허니 아메리카노', base: { shot: 1, water: 1, honey: 1 }, price: 4500, coffee: true, unlock: 28000 },
+    caramelmacchiato: { name: '카라멜 마키아토', base: { shot: 1, milk: 1, caramel: 1 }, price: 5500, coffee: true, unlock: 38000 },
+    whitemocha: { name: '화이트 초코 모카', base: { shot: 1, milk: 1, whitechoco: 1 }, price: 5700, coffee: true, unlock: 42000 },
+    sweetmilk: { name: '스위트 밀크 커피', base: { shot: 1, milk: 1, syrup: 1 }, price: 5200, coffee: true, unlock: 32000 },
+    coldbrew: { name: '콜드브루', base: { coldbrew: 1, ice: 1 }, price: 5100, coffee: true, unlock: 45000, noTemp: true },
+    vanillacoldbrew: { name: '바닐라 크림 콜드브루', base: { coldbrew: 1, milk: 1, syrup: 1, ice: 1 }, price: 6000, coffee: true, unlock: 52000, noTemp: true },
+    hojicha: { name: '호지차', base: { hojicha: 1, milk: 1 }, price: 5200, coffee: false, unlock: 36000 },
+    strawberrymilk: { name: '딸기라떼', base: { strawberry: 1, milk: 1, ice: 1 }, price: 6500, coffee: false, unlock: 48000, noTemp: true },
 };
 const FOODS = {
     bread:  { name: '빵',        icon: '🥐', price: 3500, unlock: 20000 },
@@ -358,8 +378,8 @@ const SLOT_KEYS = ['Q', 'W', 'E', 'R', 'T'];
 function newState() {
     return {
         day: 1, money: 50000, rep: 30,
-        stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, fruit: 0, bread: 0, cookie: 0, tart: 0, cake: 0 },
-        unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, juice: false, bread: false, cookie: false, tart: false, cake: false },
+        stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, fruit: 0, honey: 0, caramel: 0, whitechoco: 0, coldbrew: 0, hojicha: 0, strawberry: 0, bread: 0, cookie: 0, tart: 0, cake: 0 },
+        unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, juice: false, honeyamericano: false, caramelmacchiato: false, whitemocha: false, sweetmilk: false, coldbrew: false, vanillacoldbrew: false, hojicha: false, strawberrymilk: false, bread: false, cookie: false, tart: false, cake: false },
         up: { machine: 0, seats: 0, interior: 0 },
         priceLevel: 1, alba: false, flyer: false, auto: false, speed: 1, history: [],
         weather: rollWeather(), won: false,
@@ -411,7 +431,11 @@ function toast(msg, cls = '') {
     setTimeout(() => el.remove(), 1800);
     while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
 }
-const ingAvailable = k => !INGS[k].need || S.unlocked[INGS[k].need];
+const ingAvailable = k => {
+    const ing = INGS[k];
+    if (!ing.need || S.unlocked[ing.need]) return true;
+    return Object.keys(MENU).some(m => S.unlocked[m] && MENU[m].base[k]);
+};
 const menuAvailable = k => !MENU[k].unlock || S.unlocked[k];
 const rent = () => 15000 + 5000 * S.up.seats;
 
@@ -550,7 +574,7 @@ const Sound = (() => {
         close: t => [784, 659, 523, 392].forEach((f, i) => tone(f, t + i * 0.14, 0.5, { type: 'triangle', vol: 0.06 })),
         pause: t => tone(660, t, 0.1, { vol: 0.05 }),
     };
-    const ING_SFX = { water: ['pour'], milk: ['steam'], ice: ['ice'], syrup: ['syrup'], choco: ['powder'], matcha: ['powder'], fruit: ['pour'], bread: ['plate'], cookie: ['plate'], tart: ['plate'], cake: ['plate'] };
+    const ING_SFX = { water: ['pour'], milk: ['steam'], ice: ['ice'], syrup: ['syrup'], choco: ['powder'], matcha: ['powder'], fruit: ['pour'], honey: ['syrup'], caramel: ['syrup'], whitechoco: ['powder'], coldbrew: ['pour'], hojicha: ['powder'], strawberry: ['pour'], bread: ['plate'], cookie: ['plate'], tart: ['plate'], cake: ['plate'] };
 
     function play(name, ...args) {
         if (!ctx || !pref.sfx || !SFX[name]) return;
@@ -749,7 +773,7 @@ const Scene = (() => {
     const W = 720, H = 330;
     const FLOOR_Y = 172, CTOP = 200, CBOT = 262, QY = 318, DOORX = 58, WORKER_Y = 214;
     const MACHINE_X = 668;
-    const STATION = { shot: 626, water: 612, ice: 568, milk: 524, syrup: 474, choco: 474, matcha: 474, ginseng: 474, fruit: 474, bread: 412, cookie: 412, tart: 412, cake: 412 };
+    const STATION = { shot: 626, water: 612, ice: 568, milk: 524, syrup: 474, choco: 474, matcha: 474, ginseng: 474, fruit: 474, honey: 474, caramel: 474, whitechoco: 474, coldbrew: 474, hojicha: 474, strawberry: 474, bread: 412, cookie: 412, tart: 412, cake: 412 };
     const TABLE_POS = [[118, 236], [250, 236], [118, 300], [250, 300]];
     const SKINS = ['#f6d2b8', '#eab58f', '#c98e64', '#8d5a3b', '#f3c9a0'];
     const HAIRS = ['#2d2320', '#5a3825', '#a0522d', '#d8b36a', '#1b1b1b', '#9e9e9e', '#7a2e3a'];
@@ -762,8 +786,8 @@ const Scene = (() => {
                    '#b59f7b', '#8d7b68', '#2b2b2b', '#6b705c', '#dcd3c3', '#7f4f24', '#495057'];
     const SHOES = ['#222222', '#f8f9fa', '#8b5e3c', '#e63946', '#1d3557', '#adb5bd', '#5c4033'];
     const TOPS = ['tee', 'stripe', 'hoodie', 'jacket', 'check', 'sweater', 'shirt', 'dress'];
-    const LIQUID = { shot: '#3b2314', water: '#cfe8f7', milk: '#f7f1e8', syrup: '#e0b050', choco: '#4a2a18', matcha: '#7fb24a', ginseng: '#8f3f2f', fruit: '#f59f00' };
-    const DRINK_COLOR = { americano: '#3b2314', latte: '#c69c6d', vanilla: '#dcb67f', mocha: '#5a3322', greentea: '#8cbf5a', ginsenglatte: '#b36a52', juice: '#f59f00' };
+    const LIQUID = { shot: '#3b2314', water: '#cfe8f7', milk: '#f7f1e8', syrup: '#e0b050', choco: '#4a2a18', matcha: '#7fb24a', ginseng: '#8f3f2f', fruit: '#f59f00', honey: '#d69e2e', caramel: '#b7791f', whitechoco: '#fff7df', coldbrew: '#2b1a12', hojicha: '#9c6b30', strawberry: '#e83e70' };
+    const DRINK_COLOR = { americano: '#3b2314', latte: '#c69c6d', vanilla: '#dcb67f', mocha: '#5a3322', greentea: '#8cbf5a', ginsenglatte: '#b36a52', juice: '#f59f00', honeyamericano: '#7a4a22', caramelmacchiato: '#b9824b', whitemocha: '#ead7b7', sweetmilk: '#d2a26f', coldbrew: '#2b1a12', vanillacoldbrew: '#8a5a35', hojicha: '#a06c35', strawberrymilk: '#f28bb0' };
     const INTERIOR_WALL = ['#f1e3cf', '#efdcc2', '#e9d6bb'];
 
     const cvs = $('scene'), c = cvs.getContext('2d');
@@ -874,6 +898,12 @@ const Scene = (() => {
         else if (k === 'matcha') drops('#7fb24a', 10);
         else if (k === 'ginseng') drops('#8f3f2f', 9);
         else if (k === 'fruit') drops('#f59f00', 9);
+        else if (k === 'honey') drops('#d69e2e', 7);
+        else if (k === 'caramel') drops('#b7791f', 7);
+        else if (k === 'whitechoco') drops('#fff7df', 7);
+        else if (k === 'coldbrew') drops('#2b1a12', 10);
+        else if (k === 'hojicha') drops('#9c6b30', 9);
+        else if (k === 'strawberry') drops('#e83e70', 9);
         else if (['bread', 'cookie', 'tart', 'cake'].includes(k)) sparkle(cx - 16, CTOP - 12);
     }
     function brewDone() {
