@@ -491,8 +491,11 @@ const Sound = (() => {
         cafe1: { id: 'mlcUz7aAB7A', name: 'BGM 1' },
         cafe2: { id: '5BacAuHIoQ4', name: 'BGM 2' },
     };
-    const pref = { music: true, sfx: true, track: 'cafe1' };
+    const pref = { music: false, sfx: true, track: 'cafe1' };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
+    // 유튜브는 브라우저 정책상 첫 로드 자동재생이 불안정하므로, 화면을 열 때는 항상 꺼짐으로 시작합니다.
+    // 사용자가 '유튜브 음악 꺼짐' 버튼을 직접 눌러 켜면 그 클릭 동작으로 바로 재생을 시작합니다.
+    pref.music = false;
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
 
     let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
