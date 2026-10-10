@@ -831,8 +831,14 @@ const Sound = (() => {
         renderButtons();
         toast('🎵 배경음악을 ' + currentTrack().name + '로 바꿨어요');
     }
+    function startMusicFromGesture(target) {
+        if (!pref.music) return;
+        if (target && target.closest && target.closest('#sfxBtn, #musicBtn')) return;
+        init(true);
+        startMusic();
+    }
 
-    return { init, play, ingredient, duck, toggleMusic, toggleSfx, setTrack, renderButtons };
+    return { init, play, ingredient, duck, toggleMusic, toggleSfx, setTrack, startMusicFromGesture, renderButtons };
 })();
 
 // ===== 매장 장면 (캔버스 애니메이션) =====
@@ -2316,8 +2322,13 @@ $('scene').addEventListener('click', e => {
 $('musicBtn').addEventListener('click', () => Sound.toggleMusic());
 $('sfxBtn').addEventListener('click', () => Sound.toggleSfx());
 $('musicSelect').addEventListener('change', e => Sound.setTrack(e.target.value));
-// 브라우저 정책상 소리는 첫 클릭/키 입력 이후에만 켤 수 있음
-['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => Sound.init()));
+// 브라우저 정책상 유튜브 BGM은 첫 사용자 동작 이후에만 안정적으로 시작됩니다.
+// 단, 효과음 버튼은 효과음만 제어해야 하므로 BGM 시작 트리거에서 제외합니다.
+document.addEventListener('pointerdown', e => Sound.startMusicFromGesture(e.target));
+document.addEventListener('keydown', e => {
+    Sound.init(false);
+    if (e.key.toUpperCase() !== 'M') Sound.startMusicFromGesture(e.target);
+});
 
 document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
