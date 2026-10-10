@@ -254,7 +254,7 @@
             </div>
         </div>
         <p class="hint">재료를 눌러 컵에 담고 → 주문과 같아지면 <b>손님 카드를 눌러 서빙</b>하세요.<br>
-            키보드: 숫자 <b>1~9</b> 재료 · <b>Q W E R T</b> 손님에게 서빙 · <b>X</b> 버리기 · <b>P</b> 일시정지 · <b>A</b> 자동 제조 · <b>S</b> 배속 변경</p>
+            키보드: 숫자 <b>1~9</b> 주요 재료 · 추가 재료는 클릭 · <b>Q W E R T</b> 손님에게 서빙 · <b>X</b> 버리기 · <b>P</b> 일시정지 · <b>A</b> 자동 제조 · <b>S</b> 배속 변경</p>
 
         <details class="recipes" open>
             <summary>📖 레시피 북</summary>
@@ -288,9 +288,13 @@ const INGS = {
     choco:  { name: '초코',      icon: '🍫', stock: true, need: 'mocha' },
     matcha: { name: '녹차가루',   icon: '🍵', stock: true, need: 'greentea' },
     ginseng:{ name: '홍삼진액',   icon: '🫚', stock: true, need: 'ginsenglatte' },
+    fruit:  { name: '쥬스과일',   icon: '🧃', stock: true, need: 'juice' },
+    bread:  { name: '빵',        icon: '🥐', stock: true, need: 'bread' },
+    cookie: { name: '쿠키',      icon: '🍪', stock: true, need: 'cookie' },
+    tart:   { name: '타르트',     icon: '🥧', stock: true, need: 'tart' },
     cake:   { name: '케이크',     icon: '🍰', stock: true, need: 'cake' },
 };
-const ING_ORDER = ['shot', 'water', 'milk', 'ice', 'syrup', 'choco', 'matcha', 'ginseng', 'cake'];
+const ING_ORDER = ['shot', 'water', 'milk', 'ice', 'syrup', 'choco', 'matcha', 'ginseng', 'fruit', 'bread', 'cookie', 'tart', 'cake'];
 
 const PACKS = {
     shot:   { qty: 10, cost: 5000 },
@@ -299,6 +303,10 @@ const PACKS = {
     choco:  { qty: 10, cost: 4000 },
     matcha: { qty: 10, cost: 5000 },
     ginseng:{ qty: 10, cost: 8000 },
+    fruit:  { qty: 10, cost: 7000 },
+    bread:  { qty: 8,  cost: 8000 },
+    cookie: { qty: 10, cost: 6000 },
+    tart:   { qty: 6,  cost: 9000 },
     cake:   { qty: 5,  cost: 10000 },
 };
 
@@ -309,8 +317,15 @@ const MENU = {
     mocha:     { name: '카페모카',   base: { shot: 1, milk: 1, choco: 1 }, price: 5000, coffee: true, unlock: 30000 },
     greentea:  { name: '녹차라떼',   base: { matcha: 1, milk: 1 }, price: 4500, coffee: false, unlock: 30000 },
     ginsenglatte: { name: '홍삼라떼', base: { ginseng: 1, milk: 1 }, price: 6500, coffee: false, unlock: 50000 },
+    juice:    { name: '쥬스',      base: { fruit: 1, ice: 1 }, price: 5000, coffee: false, unlock: 25000, noTemp: true },
 };
-const CAKE = { name: '조각 케이크', price: 5500, unlock: 40000 };
+const FOODS = {
+    bread:  { name: '빵',        icon: '🥐', price: 3500, unlock: 20000 },
+    cookie: { name: '쿠키',      icon: '🍪', price: 2500, unlock: 18000 },
+    tart:   { name: '타르트',     icon: '🥧', price: 4500, unlock: 30000 },
+    cake:   { name: '조각 케이크', icon: '🍰', price: 5500, unlock: 40000 },
+};
+const CAKE = FOODS.cake;
 
 const UPGRADES = {
     machine:  { name: '에스프레소 머신', icon: '⚙️', costs: [40000, 90000], vals: [1.6, 1.0, 0.5],
@@ -341,8 +356,8 @@ const SLOT_KEYS = ['Q', 'W', 'E', 'R', 'T'];
 function newState() {
     return {
         day: 1, money: 50000, rep: 30,
-        stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, cake: 0 },
-        unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, cake: false },
+        stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, fruit: 0, bread: 0, cookie: 0, tart: 0, cake: 0 },
+        unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, juice: false, bread: false, cookie: false, tart: false, cake: false },
         up: { machine: 0, seats: 0, interior: 0 },
         priceLevel: 1, alba: false, flyer: false, auto: false, speed: 1, history: [],
         weather: rollWeather(), won: false,
@@ -531,7 +546,7 @@ const Sound = (() => {
         close: t => [784, 659, 523, 392].forEach((f, i) => tone(f, t + i * 0.14, 0.5, { type: 'triangle', vol: 0.06 })),
         pause: t => tone(660, t, 0.1, { vol: 0.05 }),
     };
-    const ING_SFX = { water: ['pour'], milk: ['steam'], ice: ['ice'], syrup: ['syrup'], choco: ['powder'], matcha: ['powder'], cake: ['plate'] };
+    const ING_SFX = { water: ['pour'], milk: ['steam'], ice: ['ice'], syrup: ['syrup'], choco: ['powder'], matcha: ['powder'], fruit: ['pour'], bread: ['plate'], cookie: ['plate'], tart: ['plate'], cake: ['plate'] };
 
     function play(name, ...args) {
         if (!ctx || !pref.sfx || !SFX[name]) return;
@@ -703,7 +718,7 @@ const Scene = (() => {
     const W = 720, H = 330;
     const FLOOR_Y = 172, CTOP = 200, CBOT = 262, QY = 318, DOORX = 58, WORKER_Y = 214;
     const MACHINE_X = 668;
-    const STATION = { shot: 626, water: 612, ice: 568, milk: 524, syrup: 474, choco: 474, matcha: 474, ginseng: 474, cake: 412 };
+    const STATION = { shot: 626, water: 612, ice: 568, milk: 524, syrup: 474, choco: 474, matcha: 474, ginseng: 474, fruit: 474, bread: 412, cookie: 412, tart: 412, cake: 412 };
     const TABLE_POS = [[118, 236], [250, 236], [118, 300], [250, 300]];
     const SKINS = ['#f6d2b8', '#eab58f', '#c98e64', '#8d5a3b', '#f3c9a0'];
     const HAIRS = ['#2d2320', '#5a3825', '#a0522d', '#d8b36a', '#1b1b1b', '#9e9e9e', '#7a2e3a'];
@@ -716,8 +731,8 @@ const Scene = (() => {
                    '#b59f7b', '#8d7b68', '#2b2b2b', '#6b705c', '#dcd3c3', '#7f4f24', '#495057'];
     const SHOES = ['#222222', '#f8f9fa', '#8b5e3c', '#e63946', '#1d3557', '#adb5bd', '#5c4033'];
     const TOPS = ['tee', 'stripe', 'hoodie', 'jacket', 'check', 'sweater', 'shirt', 'dress'];
-    const LIQUID = { shot: '#3b2314', water: '#cfe8f7', milk: '#f7f1e8', syrup: '#e0b050', choco: '#4a2a18', matcha: '#7fb24a', ginseng: '#8f3f2f' };
-    const DRINK_COLOR = { americano: '#3b2314', latte: '#c69c6d', vanilla: '#dcb67f', mocha: '#5a3322', greentea: '#8cbf5a', ginsenglatte: '#b36a52' };
+    const LIQUID = { shot: '#3b2314', water: '#cfe8f7', milk: '#f7f1e8', syrup: '#e0b050', choco: '#4a2a18', matcha: '#7fb24a', ginseng: '#8f3f2f', fruit: '#f59f00' };
+    const DRINK_COLOR = { americano: '#3b2314', latte: '#c69c6d', vanilla: '#dcb67f', mocha: '#5a3322', greentea: '#8cbf5a', ginsenglatte: '#b36a52', juice: '#f59f00' };
     const INTERIOR_WALL = ['#f1e3cf', '#efdcc2', '#e9d6bb'];
 
     const cvs = $('scene'), c = cvs.getContext('2d');
@@ -826,7 +841,9 @@ const Scene = (() => {
         else if (k === 'syrup') drops('#e0b050', 7);
         else if (k === 'choco') drops('#4a2a18', 10);
         else if (k === 'matcha') drops('#7fb24a', 10);
-        else if (k === 'cake') sparkle(cx - 16, CTOP - 12);
+        else if (k === 'ginseng') drops('#8f3f2f', 9);
+        else if (k === 'fruit') drops('#f59f00', 9);
+        else if (['bread', 'cookie', 'tart', 'cake'].includes(k)) sparkle(cx - 16, CTOP - 12);
     }
     function brewDone() {
         for (let i = 0; i < 8; i++) puff(MACHINE_X + rnd(-10, 10), CTOP - 52);
@@ -841,7 +858,7 @@ const Scene = (() => {
         const w = byAlba ? alba : barista;
         w.tx = Math.max(380, Math.min(700, slotX(slot))); w.pending = null; w.arm = 0.4;
         const o = p.gc.order;
-        flying.push({ x0: cupX(w), y0: CTOP - 14, p, k: 0, drink: { color: DRINK_COLOR[o.key], iced: !!o.req.ice, cake: o.cake } });
+        flying.push({ x0: cupX(w), y0: CTOP - 14, p, k: 0, drink: { color: DRINK_COLOR[o.key], iced: !!o.req.ice, foodKey: o.foodKey } });
         floatText('+' + won(amount), p.x, p.y - 100, '#2f855a');
         if (tip) floatText('팁 +' + won(tip), p.x, p.y - 84, '#d69e2e');
     }
@@ -1069,11 +1086,11 @@ const Scene = (() => {
         c.font = 'bold 12px sans-serif'; c.fillText('☕ MENU', x + w / 2, y + 6);
         c.font = '10px sans-serif'; c.textAlign = 'left';
         const items = Object.keys(MENU).filter(menuAvailable).map(k => [MENU[k].name, MENU[k].price]);
-        if (S.unlocked.cake) items.push(['케이크', CAKE.price]);
-        items.slice(0, 6).forEach(([n, p], i) => {
-            c.fillStyle = '#f1f1e6'; c.fillText(n, x + 10, y + 24 + i * 11);
+        Object.keys(FOODS).filter(k => S.unlocked[k]).forEach(k => items.push([FOODS[k].name, FOODS[k].price]));
+        items.slice(0, 8).forEach(([n, p], i) => {
+            c.fillStyle = '#f1f1e6'; c.fillText(n, x + 10, y + 23 + i * 9);
             c.fillStyle = '#ffd166'; c.textAlign = 'right';
-            c.fillText((round100(p * PRICE_LEVELS[S.priceLevel].mul) / 1000).toFixed(1), x + w - 10, y + 24 + i * 11);
+            c.fillText((round100(p * PRICE_LEVELS[S.priceLevel].mul) / 1000).toFixed(1), x + w - 10, y + 23 + i * 9);
             c.textAlign = 'left';
         });
     }
@@ -1159,10 +1176,25 @@ const Scene = (() => {
         c.fillStyle = '#e63946'; ell(0, -13, 2.5, 2.5); c.fill();
         c.restore();
     }
+    function drawFoodItem(k, x, yb, s) {
+        if (k === 'cake') { drawCake(x, yb, s); return; }
+        c.save(); c.translate(x, yb); c.scale(s, s);
+        if (k === 'bread') {
+            c.fillStyle = '#d69e2e'; ell(0, -6, 10, 6); c.fill();
+            c.strokeStyle = 'rgba(120,70,20,0.45)'; c.beginPath(); c.moveTo(-5, -10); c.lineTo(-2, -3); c.moveTo(2, -11); c.lineTo(5, -4); c.stroke();
+        } else if (k === 'cookie') {
+            c.fillStyle = '#b7791f'; ell(0, -7, 8, 8); c.fill();
+            c.fillStyle = '#4a2a18'; for (const [dx, dy] of [[-3,-9],[2,-6],[0,-12]]) ell(dx, dy, 1.4, 1.4), c.fill();
+        } else if (k === 'tart') {
+            c.fillStyle = '#c0843a'; c.beginPath(); c.moveTo(-9, -2); c.lineTo(9, -2); c.lineTo(6, -12); c.lineTo(-6, -12); c.closePath(); c.fill();
+            c.fillStyle = '#f6ad55'; ell(0, -10, 6, 3); c.fill();
+        }
+        c.restore();
+    }
     function drawWorkingCup() {
         if (!G || G.over) return;
         const x = cupX(barista), yb = CTOP - 2;
-        const layers = ['syrup', 'choco', 'matcha', 'shot', 'milk', 'water'].filter(k => G.cup[k]);
+        const layers = ['syrup', 'choco', 'matcha', 'ginseng', 'fruit', 'shot', 'milk', 'water'].filter(k => G.cup[k]);
         c.save();
         c.beginPath(); c.moveTo(x - 9, yb - 26); c.lineTo(x + 9, yb - 26); c.lineTo(x + 7, yb); c.lineTo(x - 7, yb); c.closePath();
         c.fillStyle = 'rgba(255,255,255,0.55)'; c.fill();
@@ -1178,7 +1210,8 @@ const Scene = (() => {
         c.restore();
         c.strokeStyle = 'rgba(60,40,30,0.55)'; c.stroke();
         c.restore();
-        if (G.cup.cake) for (let i = 0; i < G.cup.cake; i++) drawCake(x - 22 - i * 4, yb, 0.9);
+        const foodBits = ['bread', 'cookie', 'tart', 'cake'].flatMap(k => Array(G.cup[k] || 0).fill(k));
+        foodBits.forEach((k, i) => drawFoodItem(k, x - 22 - i * 5, yb, 0.9));
     }
 
     function drawCounter() {
@@ -1195,16 +1228,16 @@ const Scene = (() => {
         // 계산대
         c.fillStyle = '#495057'; rr(352, CTOP - 22, 30, 18, 3); c.fill();
         c.fillStyle = '#a5d8ff'; c.fillRect(356, CTOP - 19, 22, 8);
-        // 케이크 진열장
-        if (S.unlocked.cake) {
-            c.fillStyle = 'rgba(210,235,250,0.45)'; c.beginPath(); c.arc(STATION.cake, CTOP - 4, 20, Math.PI, 0); c.fill();
+        // 베이커리 진열장
+        const openFoods = Object.keys(FOODS).filter(k => S.unlocked[k]);
+        if (openFoods.length) {
+            c.fillStyle = 'rgba(210,235,250,0.45)'; c.beginPath(); c.arc(STATION.cake, CTOP - 4, 24, Math.PI, 0); c.fill();
             c.strokeStyle = 'rgba(120,150,170,0.7)'; c.stroke();
-            const n = Math.min(3, S.stock.cake);
-            for (let i = 0; i < n; i++) drawCake(STATION.cake - 10 + i * 10, CTOP - 5, 0.8);
-            c.fillStyle = '#adb5bd'; c.fillRect(STATION.cake - 22, CTOP - 5, 44, 2);
+            openFoods.slice(0, 4).forEach((k, i) => drawFoodItem(k, STATION.cake - 15 + i * 10, CTOP - 5, 0.78));
+            c.fillStyle = '#adb5bd'; c.fillRect(STATION.cake - 26, CTOP - 5, 52, 2);
         }
-        // 시럽/파우더 병
-        const bottles = [['vanilla', '#e0b050'], ['mocha', '#4a2a18'], ['greentea', '#7fb24a'], ['ginsenglatte', '#8f3f2f']].filter(([k]) => S.unlocked[k]);
+        // 시럽/파우더/쥬스 병
+        const bottles = [['vanilla', '#e0b050'], ['mocha', '#4a2a18'], ['greentea', '#7fb24a'], ['ginsenglatte', '#8f3f2f'], ['juice', '#f59f00']].filter(([k]) => S.unlocked[k]);
         bottles.forEach(([, col], i) => {
             const bx = STATION.syrup - (bottles.length - 1) * 7 + i * 14;
             c.fillStyle = col; rr(bx - 5, CTOP - 26, 10, 22, 3); c.fill();
@@ -1255,7 +1288,7 @@ const Scene = (() => {
         if (tb.who && tb.who.state === 'seated' && tb.who.hold) {
             const d = tb.who.hold;
             drawCupShape(x - 8, y - 31, 0.75, d.color, d.iced, !d.iced);
-            if (d.cake) drawCake(x + 10, y - 30, 0.8);
+            if (d.foodKey) drawFoodItem(d.foodKey, x + 10, y - 30, 0.8);
         }
     }
     function drawChair(x, y) {
@@ -1412,7 +1445,7 @@ const Scene = (() => {
         }
         if (p.hold && !seated) {
             drawCupShape(17, -30 + dy, 0.7, p.hold.color, p.hold.iced, !p.hold.iced);
-            if (p.hold.cake) drawCake(-17, -30 + dy, 0.7);
+            if (p.hold.foodKey) drawFoodItem(p.hold.foodKey, -17, -30 + dy, 0.7);
         }
         // 머리
         const hy = -72 + dy;
@@ -1466,13 +1499,13 @@ const Scene = (() => {
         }
         if (!(p.state === 'enter' || p.state === 'wait') || !p.gc) return;
         const o = p.gc.order;
-        const bw = o.cake ? 52 : 40, bx = hx - bw / 2, by = hy - 38;
+        const bw = o.foodKey ? 52 : 40, bx = hx - bw / 2, by = hy - 38;
         c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,0.15)';
         rr(bx, by, bw, 30, 8); c.fill(); c.stroke();
         c.beginPath(); c.moveTo(hx - 5, by + 30); c.lineTo(hx, by + 37); c.lineTo(hx + 5, by + 30); c.fill();
-        drawCupShape(o.cake ? hx - 10 : hx - 2, by + 26, 0.9, DRINK_COLOR[o.key], !!o.req.ice, !o.req.ice);
-        if (o.req.shot === 2) { c.fillStyle = '#4a2a18'; c.font = 'bold 9px sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText('+1', (o.cake ? hx - 3 : hx + 5), by + 3); }
-        if (o.cake) drawCake(hx + 13, by + 25, 0.9);
+        drawCupShape(o.foodKey ? hx - 10 : hx - 2, by + 26, 0.9, DRINK_COLOR[o.key], !!o.req.ice, !o.req.ice);
+        if (o.req.shot === 2) { c.fillStyle = '#4a2a18'; c.font = 'bold 9px sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText('+1', (o.foodKey ? hx - 3 : hx + 5), by + 3); }
+        if (o.foodKey) drawFoodItem(o.foodKey, hx + 13, by + 25, 0.9);
         c.fillStyle = '#a0aec0'; c.font = 'bold 9px sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
         c.fillText(SLOT_KEYS[p.slot] || '', bx + 4, by + 3);
         // 인내심 바
@@ -1594,10 +1627,13 @@ function renderPrep() {
             : `<div class="item"><div class="t">${m.name}</div><div class="d">${recipe}<br>판매가 ${won(m.price)}</div>
                <button data-unlock="${k}" ${S.money < m.unlock ? 'disabled' : ''}>개발하기 ${won(m.unlock)}</button></div>`;
     });
-    menuItems.push(S.unlocked.cake
-        ? `<div class="item done"><div class="t">🍰 ${CAKE.name}</div><div class="d">음료와 함께 주문돼요<br>판매가 ${won(CAKE.price)}</div><button disabled>✅ 판매 중</button></div>`
-        : `<div class="item"><div class="t">🍰 ${CAKE.name}</div><div class="d">음료와 함께 주문돼요<br>판매가 ${won(CAKE.price)}</div>
-           <button data-unlock="cake" ${S.money < CAKE.unlock ? 'disabled' : ''}>들여놓기 ${won(CAKE.unlock)}</button></div>`);
+    Object.keys(FOODS).forEach(k => {
+        const f = FOODS[k];
+        menuItems.push(S.unlocked[k]
+            ? `<div class="item done"><div class="t">${f.icon} ${f.name}</div><div class="d">음료와 함께 주문돼요<br>판매가 ${won(f.price)}</div><button disabled>✅ 판매 중</button></div>`
+            : `<div class="item"><div class="t">${f.icon} ${f.name}</div><div class="d">음료와 함께 주문돼요<br>판매가 ${won(f.price)}</div>
+               <button data-unlock="${k}" ${S.money < f.unlock ? 'disabled' : ''}>들여놓기 ${won(f.unlock)}</button></div>`);
+    });
     $('shopMenu').innerHTML = menuItems.join('');
 
     // 업그레이드
@@ -1683,8 +1719,8 @@ $('prep').addEventListener('click', e => {
         const p = PACKS[d.buy];
         if (S.money >= p.cost) { S.money -= p.cost; S.stock[d.buy] += p.qty; Sound.play('buy'); }
     } else if (d.unlock) {
-        const cost = d.unlock === 'cake' ? CAKE.unlock : MENU[d.unlock].unlock;
-        if (S.money >= cost) {
+        const cost = MENU[d.unlock]?.unlock ?? FOODS[d.unlock]?.unlock;
+        if (cost && S.money >= cost) {
             S.money -= cost; S.unlocked[d.unlock] = true;
             const ingKey = Object.keys(INGS).find(i => INGS[i].need === d.unlock);
             if (ingKey) S.stock[ingKey] += PACKS[ingKey].qty; // 개발 기념 재료 1묶음 증정
@@ -1740,7 +1776,7 @@ function buildIngs() {
     const keys = ING_ORDER.filter(ingAvailable);
     $('ings').innerHTML = keys.map((k, i) => `
         <button class="ing" data-ing="${k}">
-            <span class="kb">${i + 1}</span>
+            <span class="kb">${i < 9 ? i + 1 : '클릭'}</span>
             <span class="ic">${INGS[k].icon}</span>
             <span class="nm">${INGS[k].name}</span>
             <span class="cnt" id="cnt-${k}"></span>
@@ -1772,8 +1808,9 @@ function renderRecipes() {
         const m = MENU[k];
         return `<b>${m.name}</b> = ${Object.keys(m.base).map(i => INGS[i].icon + INGS[i].name).join(' + ')}`;
     });
+    const foodLines = Object.keys(FOODS).filter(k => S.unlocked[k]).map(k => `<b>+${FOODS[k].icon}${FOODS[k].name}</b> 주문은 ${INGS[k].icon}${INGS[k].name}도 함께 담아 서빙`);
     lines.push('<b>아이스</b> 음료는 🧊얼음 추가 · <b>샷추가</b>는 ☕ 한 번 더');
-    if (S.unlocked.cake) lines.push('<b>+🍰</b> 주문은 케이크도 함께 담아 서빙');
+    lines.push(...foodLines);
     $('recipeList').innerHTML = lines.join('<br>');
 }
 
@@ -1782,18 +1819,20 @@ function makeOrder() {
     const keys = Object.keys(MENU).filter(menuAvailable);
     const k = keys[Math.floor(Math.random() * keys.length)];
     const m = MENU[k];
-    const iced = Math.random() < w.ice;
+    const iced = !m.noTemp && Math.random() < w.ice;
     const extra = m.coffee && Math.random() < 0.15;
-    const cake = S.unlocked.cake && Math.random() < 0.25;
+    const foodKeys = Object.keys(FOODS).filter(k => S.unlocked[k]);
+    const foodKey = foodKeys.length && Math.random() < 0.3 ? foodKeys[Math.floor(Math.random() * foodKeys.length)] : null;
     const req = { ...m.base };
     if (iced) req.ice = 1;
     if (extra) req.shot = 2;
-    if (cake) req.cake = 1;
+    if (foodKey) req[foodKey] = 1;
     let price = m.price + (iced ? 500 : 0) + (extra ? 500 : 0);
     price = round100(price * PRICE_LEVELS[S.priceLevel].mul);
-    const cakePrice = cake ? round100(CAKE.price * PRICE_LEVELS[S.priceLevel].mul) : 0;
-    const label = (iced ? '아이스 ' : '따뜻한 ') + m.name + (extra ? ' (샷추가)' : '');
-    return { key: k, req, price: price + cakePrice, label, cake };
+    const food = foodKey ? FOODS[foodKey] : null;
+    const foodPrice = food ? round100(food.price * PRICE_LEVELS[S.priceLevel].mul) : 0;
+    const label = (m.noTemp ? '' : (iced ? '아이스 ' : '따뜻한 ')) + m.name + (extra ? ' (샷추가)' : '');
+    return { key: k, req, price: price + foodPrice, label, foodKey, foodName: food?.name || '', foodIcon: food?.icon || '', cake: foodKey === 'cake' };
 }
 
 function spawnCustomer() {
@@ -1818,7 +1857,7 @@ function drawCustomer(i) {
     slot.innerHTML = `
         <span class="key">${SLOT_KEYS[i]}</span>
         <div class="face">${c.face}</div>
-        <div class="order">${c.order.label}${c.order.cake ? '<br>+ 🍰케이크' : ''}</div>
+        <div class="order">${c.order.label}${c.order.foodName ? `<br>+ ${c.order.foodIcon}${c.order.foodName}` : ''}</div>
         <div class="price">${won(c.order.price)}</div>
         <div class="pbar"><div id="pb-${i}"></div></div>`;
 }
