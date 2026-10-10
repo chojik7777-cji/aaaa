@@ -22,6 +22,13 @@
         h1 { font-size: 26px; text-align: center; margin-bottom: 4px; }
         .sub { text-align: center; font-size: 13px; color: #718096; margin-bottom: 14px; }
         h2 { font-size: 16px; color: #4a5568; margin: 18px 0 8px; }
+        .prep-section { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff; overflow: hidden; }
+        .prep-section > summary { list-style: none; cursor: pointer; padding: 12px 14px; font-size: 16px; font-weight: 800; color: #4a5568; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .prep-section > summary::-webkit-details-marker { display: none; }
+        .prep-section > summary::after { content: '접기 ▲'; font-size: 12px; color: #718096; font-weight: 700; }
+        .prep-section:not([open]) > summary::after { content: '펴기 ▼'; }
+        .prep-section .section-body { padding: 0 12px 12px; }
+        .prep-section:not([open]) { background: #f8fafc; }
         button {
             font-family: inherit; font-size: 14px; cursor: pointer;
             padding: 8px 12px; border-radius: 10px; border: 1px solid #e2e8f0;
@@ -61,7 +68,7 @@
         .start-row { display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
         .start-row .primary { padding: 12px 28px; font-size: 16px; }
 
-        .finance-chart { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; background: #f8fafc; }
+        .finance-chart { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; background: #f8fafc; }
         .finance-chart .head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; }
         .finance-chart .title { font-weight: 800; font-size: 14px; color: #4a5568; }
         .finance-chart .legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: #718096; }
@@ -210,22 +217,35 @@
     <section id="prep">
         <div class="forecast" id="forecast"></div>
 
-        <div id="financeChart"></div>
+        <details class="prep-section" data-section="finance" open>
+            <summary>📈 일별 수익·비용</summary>
+            <div class="section-body" id="financeChart"></div>
+        </details>
 
-        <h2>🛒 재료 구매</h2>
-        <div class="shop" id="shopStock"></div>
+        <details class="prep-section" data-section="stock" open>
+            <summary>🛒 재료 구매</summary>
+            <div class="section-body"><div class="shop" id="shopStock"></div></div>
+        </details>
 
-        <h2>📋 메뉴 개발</h2>
-        <div class="shop" id="shopMenu"></div>
+        <details class="prep-section" data-section="menu" open>
+            <summary>📋 메뉴 개발</summary>
+            <div class="section-body"><div class="shop" id="shopMenu"></div></div>
+        </details>
 
-        <h2>🔧 가게 업그레이드</h2>
-        <div class="shop" id="shopUpg"></div>
+        <details class="prep-section" data-section="upgrade" open>
+            <summary>🔧 가게 업그레이드</summary>
+            <div class="section-body"><div class="shop" id="shopUpg"></div></div>
+        </details>
 
-        <h2>💸 오늘의 가격 정책</h2>
-        <div class="seg" id="priceSeg"></div>
+        <details class="prep-section" data-section="price" open>
+            <summary>💸 오늘의 가격 정책</summary>
+            <div class="section-body"><div class="seg" id="priceSeg"></div></div>
+        </details>
 
-        <h2>📣 오늘의 운영</h2>
-        <div class="toggles" id="dailyOpts"></div>
+        <details class="prep-section" data-section="daily" open>
+            <summary>📣 오늘의 운영</summary>
+            <div class="section-body"><div class="toggles" id="dailyOpts"></div></div>
+        </details>
 
         <div class="start-row">
             <button class="primary" id="openBtn">🔔 영업 시작</button>
@@ -277,6 +297,7 @@
 const DAY_LEN = 90;            // 하루 영업 시간(초)
 const GOAL = 1000000;
 const SAVE_KEY = 'cafe-game-save-v1';
+const SECTION_KEY = 'cafe-game-sections-v1';
 const ALBA_WAGE = 25000;
 const FLYER_COST = 10000;
 const SPEED_LEVELS = [1, 1.5, 2, 3, 10];
@@ -409,6 +430,24 @@ function load() {
 }
 function save() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ }
+}
+
+function loadSectionPrefs() {
+    try { return JSON.parse(localStorage.getItem(SECTION_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveSectionPrefs(prefs) {
+    try { localStorage.setItem(SECTION_KEY, JSON.stringify(prefs)); } catch (e) { /* 무시 */ }
+}
+function applySectionPrefs() {
+    const prefs = loadSectionPrefs();
+    document.querySelectorAll('.prep-section[data-section]').forEach(el => {
+        if (Object.prototype.hasOwnProperty.call(prefs, el.dataset.section)) el.open = !!prefs[el.dataset.section];
+    });
+}
+function rememberSectionState(el) {
+    const prefs = loadSectionPrefs();
+    prefs[el.dataset.section] = el.open;
+    saveSectionPrefs(prefs);
 }
 
 let S = load();
@@ -1800,6 +1839,9 @@ $('prep').addEventListener('click', e => {
     save();
     renderPrep();
 });
+document.querySelectorAll('.prep-section[data-section]').forEach(el => {
+    el.addEventListener('toggle', () => rememberSectionState(el));
+});
 
 $('resetBtn').addEventListener('click', () => {
     if (!confirm('정말 처음부터 다시 시작할까요? 진행 상황이 사라집니다.')) return;
@@ -2403,6 +2445,7 @@ window.addEventListener('resize', () => {
 });
 
 Sound.renderButtons();
+applySectionPrefs();
 renderPrep();
 requestAnimationFrame(frame);
 </script>
