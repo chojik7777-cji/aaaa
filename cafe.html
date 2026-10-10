@@ -425,7 +425,7 @@ const Sound = (() => {
 
     let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
     const YT_MUSIC_ID = 'mlcUz7aAB7A';
-    let ytLoaded = false;
+    let ytLoaded = false, ytStartTimer = null;
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const rnd = (a, b) => a + Math.random() * (b - a);
 
@@ -572,12 +572,17 @@ const Sound = (() => {
     function ensureYoutubeMusic() {
         const f = ytFrame();
         if (!f) return;
+        clearTimeout(ytStartTimer);
         if (!ytLoaded) {
             const origin = encodeURIComponent(location.origin);
             f.src = `https://www.youtube.com/embed/${YT_MUSIC_ID}?enablejsapi=1&autoplay=1&loop=1&playlist=${YT_MUSIC_ID}&controls=0&playsinline=1&rel=0&origin=${origin}`;
             ytLoaded = true;
         }
-        setTimeout(() => { ytCommand('setVolume', [80]); ytCommand('playVideo'); }, 500);
+        ytStartTimer = setTimeout(() => {
+            if (!pref.music) return;
+            ytCommand('setVolume', [80]);
+            ytCommand('playVideo');
+        }, 500);
     }
 
     // --- 예전 내장 배경음악 합성기: 효과음용 AudioContext와 독립, 현재 BGM에는 사용하지 않음 ---
@@ -706,7 +711,12 @@ const Sound = (() => {
     function stopMusic() {
         clearInterval(musicTimer); musicTimer = null;
         if (ctx) musicBus.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
+        clearTimeout(ytStartTimer); ytStartTimer = null;
         ytCommand('pauseVideo');
+        ytCommand('stopVideo');
+        const f = ytFrame();
+        if (f) f.src = 'about:blank';
+        ytLoaded = false;
     }
     function duck(on) {
         if (ctx && musicTimer) musicBus.gain.setTargetAtTime(on ? MUSIC_VOL * 0.3 : MUSIC_VOL, ctx.currentTime, 0.2);
