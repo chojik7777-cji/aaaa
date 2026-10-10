@@ -500,7 +500,7 @@ const Sound = (() => {
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const rnd = (a, b) => a + Math.random() * (b - a);
 
-    function init() {
+    function init(startBg = false) {
         if (!ctx) {
             try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
             master = ctx.createGain(); master.gain.value = 0.9;
@@ -524,7 +524,7 @@ const Sound = (() => {
             for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
         }
         if (ctx.state === 'suspended') ctx.resume();
-        if (pref.music) startMusic();
+        if (startBg && pref.music) startMusic();
     }
 
     // --- 기본 음원 ---
@@ -809,22 +809,25 @@ const Sound = (() => {
     }
     function toggleMusic() {
         pref.music = !pref.music; savePref();
-        if (pref.music) { init(); startMusic(); } else stopMusic();
+        if (pref.music) { init(true); startMusic(); } else stopMusic();
         renderButtons();
     }
     function toggleSfx() {
         pref.sfx = !pref.sfx; savePref();
-        init(); renderButtons();
+        init(false); renderButtons();
         play('click');
     }
     function setTrack(trackKey) {
         if (!YT_TRACKS[trackKey]) return;
-        if (pref.track === trackKey) return;
+        if (pref.track === trackKey) {
+            if (pref.music) { init(true); startMusic(); }
+            return;
+        }
         const wasOn = pref.music;
         pref.track = trackKey;
         savePref();
         stopMusic();
-        if (wasOn) { pref.music = true; init(); startMusic(); }
+        if (wasOn) { pref.music = true; init(true); startMusic(); }
         renderButtons();
         toast('🎵 배경음악을 ' + currentTrack().name + '로 바꿨어요');
     }
