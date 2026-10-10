@@ -860,18 +860,13 @@ const Sound = (() => {
     }
     function setTrack(trackKey) {
         if (!YT_TRACKS[trackKey]) return;
-        const wasOn = pref.music;
         pref.track = trackKey;
         ytCollapsed = false;
         pref.music = false;
         savePref();
         stopMusic();
-        pref.music = true;
-        savePref();
-        init(true);
-        startMusic();
         renderButtons();
-        toast(wasOn ? '🎵 배경음악을 ' + currentTrack().name + '로 다시 켰어요' : '🎵 배경음악을 ' + currentTrack().name + '로 켰어요');
+        toast('🎵 ' + currentTrack().name + ' 선택됨 · 유튜브 음악은 꺼짐 상태예요');
     }
     function toggleYoutubeView() {
         if (!pref.music) return;
