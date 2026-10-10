@@ -498,7 +498,7 @@ const Sound = (() => {
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
 
     let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
-    let ytLoaded = false, ytStartTimer = null;
+    let ytLoaded = false, ytStartTimers = [];
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const rnd = (a, b) => a + Math.random() * (b - a);
 
@@ -646,21 +646,32 @@ const Sound = (() => {
         if (!f || !f.contentWindow || !ytLoaded) return;
         f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), 'https://www.youtube.com');
     }
+    function clearYoutubeStartTimers() {
+        ytStartTimers.forEach(t => clearTimeout(t));
+        ytStartTimers = [];
+    }
+    function cueYoutubePlay() {
+        clearYoutubeStartTimers();
+        [250, 800, 1600, 2800].forEach(delay => {
+            ytStartTimers.push(setTimeout(() => {
+                if (!pref.music) return;
+                ytCommand('setVolume', [80]);
+                ytCommand('playVideo');
+            }, delay));
+        });
+    }
     function ensureYoutubeMusic() {
         const f = ytFrame();
         if (!f) return;
-        clearTimeout(ytStartTimer);
+        clearYoutubeStartTimers();
         if (!ytLoaded) {
             const id = currentTrack().id;
             const origin = encodeURIComponent(location.origin);
+            f.onload = () => { if (pref.music) cueYoutubePlay(); };
             f.src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&loop=1&playlist=${id}&controls=0&playsinline=1&rel=0&origin=${origin}`;
             ytLoaded = true;
         }
-        ytStartTimer = setTimeout(() => {
-            if (!pref.music) return;
-            ytCommand('setVolume', [80]);
-            ytCommand('playVideo');
-        }, 500);
+        cueYoutubePlay();
     }
 
     // --- 예전 내장 배경음악 합성기: 효과음용 AudioContext와 독립, 현재 BGM에는 사용하지 않음 ---
@@ -789,7 +800,7 @@ const Sound = (() => {
     function stopMusic() {
         clearInterval(musicTimer); musicTimer = null;
         if (ctx) musicBus.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
-        clearTimeout(ytStartTimer); ytStartTimer = null;
+        clearYoutubeStartTimers();
         ytCommand('pauseVideo');
         ytCommand('stopVideo');
         const f = ytFrame();
