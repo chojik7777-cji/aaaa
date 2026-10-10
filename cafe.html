@@ -171,6 +171,7 @@
         .audio-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
         .audio-row button { padding: 5px 10px; font-size: 13px; }
         .audio-row button.off { opacity: 0.55; }
+        .yt-music-frame { position: absolute; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; border: 0; }
         #scene {
             display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
             border-radius: 14px; background: #f1e3cf; cursor: pointer;
@@ -202,6 +203,7 @@
         <button id="musicBtn" title="단축키: M">🎵 음악</button>
         <button id="sfxBtn">🔊 효과음</button>
     </div>
+    <iframe id="ytMusic" class="yt-music-frame" title="카페 배경음악" allow="autoplay; encrypted-media" loading="lazy"></iframe>
     <canvas id="scene" width="720" height="330" aria-label="카페 매장 내부 모습. 영업 중에는 손님을 눌러서 서빙할 수도 있어요."></canvas>
 
     <!-- 준비 화면 -->
@@ -422,6 +424,8 @@ const Sound = (() => {
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
 
     let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
+    const YT_MUSIC_ID = 'mlcUz7aAB7A';
+    let ytLoaded = false;
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const rnd = (a, b) => a + Math.random() * (b - a);
 
@@ -557,7 +561,26 @@ const Sound = (() => {
         (ING_SFX[k] || ['click']).forEach(n => play(n));
     }
 
-    // --- 배경음악: 보사노바 (나일론 기타 + 베이스 + 셰이커/림 + 플루트) ---
+    // --- 배경음악: 유튜브 임베드 플레이어 ---
+    // 유튜브 음원을 직접 다운로드/재배포하지 않고 공식 iframe으로 재생합니다.
+    function ytFrame() { return $('ytMusic'); }
+    function ytCommand(func, args = []) {
+        const f = ytFrame();
+        if (!f || !f.contentWindow || !ytLoaded) return;
+        f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), 'https://www.youtube.com');
+    }
+    function ensureYoutubeMusic() {
+        const f = ytFrame();
+        if (!f) return;
+        if (!ytLoaded) {
+            const origin = encodeURIComponent(location.origin);
+            f.src = `https://www.youtube.com/embed/${YT_MUSIC_ID}?enablejsapi=1&autoplay=1&loop=1&playlist=${YT_MUSIC_ID}&controls=0&playsinline=1&rel=0&origin=${origin}`;
+            ytLoaded = true;
+        }
+        setTimeout(() => { ytCommand('setVolume', [80]); ytCommand('playVideo'); }, 500);
+    }
+
+    // --- 예전 내장 배경음악 합성기: 효과음용 AudioContext와 독립, 현재 BGM에는 사용하지 않음 ---
     // 16마디 진행 (F장조): [베이스, 기타 보이싱...] (MIDI)
     const CHORDS = [
         [41, 57, 64, 67, 72], // Fmaj9
@@ -678,23 +701,21 @@ const Sound = (() => {
         }
     }
     function startMusic() {
-        if (musicTimer || !ctx) return;
-        step = 0; played = 0; mel.until = 0; nextTime = ctx.currentTime + 0.1;
-        musicBus.gain.cancelScheduledValues(ctx.currentTime);
-        musicBus.gain.setValueAtTime(MUSIC_VOL, ctx.currentTime);
-        musicTimer = setInterval(schedule, 60);
+        ensureYoutubeMusic();
     }
     function stopMusic() {
         clearInterval(musicTimer); musicTimer = null;
         if (ctx) musicBus.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
+        ytCommand('pauseVideo');
     }
     function duck(on) {
         if (ctx && musicTimer) musicBus.gain.setTargetAtTime(on ? MUSIC_VOL * 0.3 : MUSIC_VOL, ctx.currentTime, 0.2);
+        ytCommand('setVolume', [on ? 25 : 80]);
     }
 
     function renderButtons() {
         const m = $('musicBtn'), s = $('sfxBtn');
-        m.textContent = pref.music ? '🎵 음악 켜짐' : '🎵 음악 꺼짐';
+        m.textContent = pref.music ? '🎵 유튜브 음악 켜짐' : '🎵 유튜브 음악 꺼짐';
         s.textContent = pref.sfx ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
         m.classList.toggle('off', !pref.music);
         s.classList.toggle('off', !pref.sfx);
