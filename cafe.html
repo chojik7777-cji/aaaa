@@ -180,18 +180,19 @@
         .audio-row button.off { background: #edf2f7; color: #a0aec0; }
         .track-btn { padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #edf2f7; color: #4a5568; }
         .track-btn.on { background: #2b6cb0; color: #fff; box-shadow: 0 3px 8px rgba(43,108,176,.22); }
+        .yt-panel { display: none; margin-top: 10px; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 22px rgba(0,0,0,0.18); background: #111827; }
+        .yt-panel.on { display: block; }
+        .yt-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: #1f2937; color: #f7fafc; font-size: 12px; font-weight: 700; }
+        .yt-panel-head button { padding: 4px 8px; font-size: 12px; border-radius: 8px; background: #edf2f7; color: #2d3748; }
         .yt-music-frame {
-            display: none;
+            display: block;
             width: 100%;
             aspect-ratio: 16 / 9;
             max-height: 360px;
-            margin-top: 10px;
             border: 0;
-            border-radius: 14px;
-            box-shadow: 0 8px 22px rgba(0,0,0,0.18);
             background: #111827;
         }
-        .yt-music-frame.on { display: block; }
+        .yt-panel.folded .yt-music-frame { display: none; }
         #scene {
             display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
             border-radius: 14px; background: #f1e3cf; cursor: pointer;
@@ -222,10 +223,17 @@
     <div class="audio-row">
         <button class="track-btn" id="bgm1Btn" data-track="cafe1">BGM 1</button>
         <button class="track-btn" id="bgm2Btn" data-track="cafe2">BGM 2</button>
+        <button class="track-btn" id="bgm3Btn" data-track="cafe3">BGM 3</button>
         <button id="musicBtn" title="단축키: M">🎵 음악</button>
         <button id="sfxBtn">🔊 효과음</button>
     </div>
-    <iframe id="ytMusic" class="yt-music-frame" title="카페 배경음악" allow="autoplay; encrypted-media" loading="lazy"></iframe>
+    <div id="ytPanel" class="yt-panel">
+        <div class="yt-panel-head">
+            <span>유튜브 음악 화면</span>
+            <button id="ytFoldBtn" type="button">접기 ▲</button>
+        </div>
+        <iframe id="ytMusic" class="yt-music-frame" title="카페 배경음악" allow="autoplay; encrypted-media" loading="lazy"></iframe>
+    </div>
     <audio id="bgmAudio" preload="auto" loop></audio>
     <canvas id="scene" width="720" height="330" aria-label="카페 매장 내부 모습. 영업 중에는 손님을 눌러서 서빙할 수도 있어요."></canvas>
 
@@ -501,14 +509,16 @@ const Sound = (() => {
     const YT_TRACKS = {
         cafe1: { type: 'youtube', id: 'mlcUz7aAB7A', name: 'BGM 1' },
         cafe2: { type: 'youtube', id: '5BacAuHIoQ4', name: 'BGM 2' },
+        cafe3: { type: 'audio', src: 'downloads/my_god_piano.mp3', name: 'BGM 3' },
     };
-    const pref = { music: false, sfx: true, track: null };
+    const pref = { music: true, sfx: true, track: 'cafe3' };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
-    // 첫 시작 상태는 BGM1/BGM2 모두 미선택 + 유튜브 화면 숨김입니다.
-    // BGM 버튼을 누르면 해당 유튜브 화면을 보이게 하고 즉시 재생합니다.
+    // 첫 시작 상태는 BGM3(my_god_piano.mp3) 선택 + 재생 시도입니다.
+    // 브라우저가 자동재생을 막으면 첫 클릭/터치 때 BGM3가 다시 재생됩니다.
+    // BGM1/BGM2 버튼을 누르면 해당 유튜브 화면을 보이게 하고 즉시 재생합니다.
     // '유튜브뮤직꺼짐' 버튼은 현재 재생/선택을 모두 끕니다.
-    pref.music = false;
-    pref.track = null;
+    pref.music = true;
+    pref.track = 'cafe3';
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
 
     let ctx = null, master, musicBus, sfxBus, noiseBuf, musicTimer = null;
@@ -649,6 +659,7 @@ const Sound = (() => {
     }
 
     // --- 배경음악: 보이는 유튜브 임베드 플레이어 ---
+    function ytPanel() { return $('ytPanel'); }
     function ytFrame() { return $('ytMusic'); }
     function bgmAudio() { return $('bgmAudio'); }
     function currentTrack() {
@@ -682,7 +693,10 @@ const Sound = (() => {
         const id = track.id;
         const origin = encodeURIComponent(location.origin);
         const src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&loop=1&playlist=${id}&controls=1&playsinline=1&rel=0&origin=${origin}`;
-        f.classList.add('on');
+        const panel = ytPanel();
+        if (panel) { panel.classList.add('on'); panel.classList.remove('folded'); }
+        const foldBtn = $('ytFoldBtn');
+        if (foldBtn) foldBtn.textContent = '접기 ▲';
         if (f.src !== src) {
             f.onload = () => { if (pref.music) cueYoutubePlay(); };
             f.src = src;
@@ -694,13 +708,14 @@ const Sound = (() => {
         const a = bgmAudio();
         const track = currentTrack();
         if (!a || !track || track.type !== 'audio') return;
+        stopYoutubeMusicOnly();
         const target = new URL(track.src, location.href).href;
         if (a.src !== target) a.src = track.src;
         a.volume = MUSIC_VOL;
         a.loop = true;
         a.currentTime = a.currentTime || 0;
         const p = a.play();
-        if (p && p.catch) p.catch(() => toast('🎵 브라우저가 자동 재생을 막았어요. 음악 버튼을 한 번 더 눌러주세요'));
+        if (p && p.catch) p.catch(() => { /* 첫 사용자 동작에서 다시 시도 */ });
     }
 
     // --- 예전 내장 배경음악 합성기: 효과음용 AudioContext와 독립, 현재 BGM에는 사용하지 않음 ---
@@ -826,8 +841,12 @@ const Sound = (() => {
     function startMusic() {
         const track = currentTrack();
         if (!track) return;
-        stopAudioMusicOnly();
-        ensureYoutubeMusic();
+        if (track.type === 'audio') {
+            ensureAudioMusic();
+        } else {
+            stopAudioMusicOnly();
+            ensureYoutubeMusic();
+        }
     }
     function stopAudioMusicOnly() {
         const a = bgmAudio();
@@ -841,7 +860,11 @@ const Sound = (() => {
         ytCommand('pauseVideo');
         ytCommand('stopVideo');
         const f = ytFrame();
-        if (f) { f.src = 'about:blank'; f.classList.remove('on'); }
+        if (f) f.src = 'about:blank';
+        const panel = ytPanel();
+        if (panel) panel.classList.remove('on', 'folded');
+        const foldBtn = $('ytFoldBtn');
+        if (foldBtn) foldBtn.textContent = '접기 ▲';
         ytLoaded = false;
     }
     function stopMusic() {
@@ -860,7 +883,7 @@ const Sound = (() => {
     function renderButtons() {
         const m = $('musicBtn'), s = $('sfxBtn');
         const track = currentTrack() ? pref.track : null;
-        ['bgm1Btn', 'bgm2Btn'].forEach(id => {
+        ['bgm1Btn', 'bgm2Btn', 'bgm3Btn'].forEach(id => {
             const b = $(id);
             if (b) b.classList.toggle('on', b.dataset.track === track);
         });
@@ -890,7 +913,7 @@ const Sound = (() => {
         init(true);
         startMusic();
         renderButtons();
-        toast('🎵 ' + YT_TRACKS[trackKey].name + ' 유튜브 화면을 재생해요');
+        toast('🎵 ' + YT_TRACKS[trackKey].name + (YT_TRACKS[trackKey].type === 'youtube' ? ' 유튜브 화면을 재생해요' : ' 음악을 재생해요'));
     }
     function startMusicFromGesture(target) {
         if (!pref.music) return;
@@ -898,8 +921,15 @@ const Sound = (() => {
         init(true);
         startMusic();
     }
+    function toggleYoutubeFold() {
+        const panel = ytPanel();
+        const btn = $('ytFoldBtn');
+        if (!panel) return;
+        const folded = panel.classList.toggle('folded');
+        if (btn) btn.textContent = folded ? '펴기 ▼' : '접기 ▲';
+    }
 
-    return { init, play, ingredient, duck, toggleMusic, toggleSfx, setTrack, startMusicFromGesture, renderButtons };
+    return { init, play, ingredient, duck, toggleMusic, toggleSfx, setTrack, startMusicFromGesture, renderButtons, startMusic, toggleYoutubeFold };
 })();
 
 // ===== 매장 장면 (캔버스 애니메이션) =====
@@ -2384,6 +2414,8 @@ $('musicBtn').addEventListener('click', () => Sound.toggleMusic());
 $('sfxBtn').addEventListener('click', () => Sound.toggleSfx());
 $('bgm1Btn').addEventListener('click', () => Sound.setTrack('cafe1'));
 $('bgm2Btn').addEventListener('click', () => Sound.setTrack('cafe2'));
+$('bgm3Btn').addEventListener('click', () => Sound.setTrack('cafe3'));
+$('ytFoldBtn').addEventListener('click', () => Sound.toggleYoutubeFold());
 // 브라우저 정책상 유튜브 BGM은 첫 사용자 동작 이후에만 안정적으로 시작됩니다.
 // 단, 효과음 버튼은 효과음만 제어해야 하므로 BGM 시작 트리거에서 제외합니다.
 document.addEventListener('pointerdown', e => Sound.startMusicFromGesture(e.target));
@@ -2550,6 +2582,7 @@ Sound.renderButtons();
 applySectionPrefs();
 renderPrep();
 requestAnimationFrame(frame);
+Sound.startMusic();
 </script>
 </body>
 </html>
