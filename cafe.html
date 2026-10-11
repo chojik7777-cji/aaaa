@@ -498,7 +498,7 @@ const Sound = (() => {
     const MUSIC_VOL = 0.8;
     const YT_TRACKS = {
         cafe1: { type: 'audio', src: 'downloads/my_god_piano.mp3', name: 'BGM 1' },
-        cafe2: { type: 'youtube', id: '5BacAuHIoQ4', name: 'BGM 2' },
+        cafe2: { type: 'audio', src: 'downloads/새출발의함성.mp3', name: 'BGM 2' },
     };
     const pref = { music: false, sfx: true, track: null };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
