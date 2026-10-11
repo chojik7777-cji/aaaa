@@ -509,11 +509,11 @@ const Sound = (() => {
     const YT_TRACKS = {
         cafe1: { type: 'youtube', id: 'mlcUz7aAB7A', name: 'BGM 1' },
         cafe2: { type: 'youtube', id: '5BacAuHIoQ4', name: 'BGM 2' },
-        cafe3: { type: 'audio', src: 'downloads/my_god_piano.mp3', name: 'BGM 3' },
+        cafe3: { type: 'audio', src: 'downloads/piano.mp3', name: 'BGM 3' },
     };
     const pref = { music: true, sfx: true, track: 'cafe3' };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
-    // 첫 시작 상태는 BGM3(my_god_piano.mp3) 선택 + 재생 시도입니다.
+    // 첫 시작 상태는 BGM3(piano.mp3) 선택 + 재생 시도입니다.
     // 브라우저가 자동재생을 막으면 첫 클릭/터치 때 BGM3가 다시 재생됩니다.
     // BGM1/BGM2 버튼을 누르면 해당 유튜브 화면을 보이게 하고 즉시 재생합니다.
     // '유튜브뮤직꺼짐' 버튼은 현재 재생/선택을 모두 끕니다.
