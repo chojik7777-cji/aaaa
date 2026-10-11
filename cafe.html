@@ -156,8 +156,9 @@
         .modal-bg { position: fixed; inset: 0; background: rgba(26,32,44,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
         .modal { background: white; border-radius: 18px; padding: 24px; max-width: 440px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
         .modal h4 { font-size: 15px; color: #4a5568; margin: 16px 0 6px; }
+        .stock-report-scroll { max-height: 220px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
         .stock-report { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
-        .stock-report th { font-size: 12px; color: #718096; font-weight: 600; padding: 4px; border-bottom: 2px solid #e2e8f0; text-align: right; }
+        .stock-report th { position: sticky; top: 0; z-index: 1; background: #f7fafc; font-size: 12px; color: #718096; font-weight: 600; padding: 4px; border-bottom: 2px solid #e2e8f0; text-align: right; }
         .stock-report td { padding: 5px 4px; border-bottom: 1px solid #edf2f7; text-align: right; }
         .stock-report th:first-child, .stock-report td:first-child { text-align: left; }
         .stock-report .left { font-weight: 700; }
@@ -2563,10 +2564,12 @@ function stockReport() {
         </tr>`;
     }).join('');
     return `<h4>📦 오늘의 재고 변동</h4>
-        <table class="stock-report">
-            <tr><th>재료</th><th>시작</th><th>판매</th><th>버림</th><th>남음</th><th>변동</th></tr>
-            ${rows}
-        </table>
+        <div class="stock-report-scroll" aria-label="오늘의 재고 변동 스크롤 영역">
+            <table class="stock-report">
+                <tr><th>재료</th><th>시작</th><th>판매</th><th>버림</th><th>남음</th><th>변동</th></tr>
+                ${rows}
+            </table>
+        </div>
         <p class="stock-note">${warn.length
             ? '⚠️ ' + warn.join(', ') + ' — 내일 영업 전에 재료를 사 두세요. (⚠️ 남은 양이 오늘 쓴 양보다 적거나 2개 이하)'
             : '재고가 넉넉해요. 👍'}</p>`;
