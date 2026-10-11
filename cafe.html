@@ -140,6 +140,9 @@
         .row { display: flex; gap: 6px; flex-wrap: wrap; }
         .mode-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
         .mode-row button { font-weight: 600; }
+        .recommend-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7fafc; }
+        .recommend-info { font-size: 12px; color: #4a5568; line-height: 1.5; }
+        .recommend-info b { color: #2b6cb0; }
         #autoBtn.on { background: #38a169; color: white; border-color: #38a169; }
         #speedBtn.fast { background: #ed8936; color: white; border-color: #ed8936; }
         .hint { font-size: 12px; color: #718096; margin-top: 10px; line-height: 1.6; text-align: center; }
@@ -249,7 +252,13 @@
 
         <details class="prep-section" data-section="stock" open>
             <summary>🛒 재료 구매</summary>
-            <div class="section-body"><div class="shop" id="shopStock"></div></div>
+            <div class="section-body">
+                <div class="recommend-row">
+                    <div class="recommend-info" id="stockRecommendInfo">최근 판매 기록을 확인 중입니다.</div>
+                    <button data-recommend-stock="1">재료구매추천</button>
+                </div>
+                <div class="shop" id="shopStock"></div>
+            </div>
         </details>
 
         <details class="prep-section" data-section="menu" open>
@@ -1842,6 +1851,7 @@ function renderPrep() {
     renderFinanceChart();
 
     // 재료
+    renderStockRecommendation();
     $('shopStock').innerHTML = Object.keys(PACKS).filter(ingAvailable).map(k => {
         const p = PACKS[k], ing = INGS[k];
         return `<div class="item">
@@ -1898,6 +1908,62 @@ function renderPrep() {
         </div>`;
 }
 
+function recentStockHistory() {
+    return (S.history || []).filter(h => h.stockUsed && typeof h.stockUsed === 'object').slice(-3);
+}
+function stockRecommendations() {
+    const hist = recentStockHistory();
+    if (!hist.length) return { hist, recs: [] };
+    const recs = Object.keys(PACKS).filter(ingAvailable).map(k => {
+        const sold3 = hist.reduce((sum, h) => sum + Number(h.stockUsed?.[k] || 0), 0);
+        const avg = sold3 / hist.length;
+        const target = Math.ceil(avg * 1.5);
+        const need = Math.max(0, target - (S.stock[k] || 0));
+        const p = PACKS[k];
+        const packs = need > 0 && (S.stock[k] || 0) < avg ? Math.ceil(need / p.qty) : 0;
+        return { key: k, avg, target, need, packs, buyQty: packs * p.qty, cost: packs * p.cost };
+    }).filter(r => r.packs > 0)
+      .sort((a, b) => ((S.stock[a.key] || 0) / Math.max(1, a.avg)) - ((S.stock[b.key] || 0) / Math.max(1, b.avg)) || b.cost - a.cost);
+    return { hist, recs };
+}
+function renderStockRecommendation() {
+    const info = $('stockRecommendInfo');
+    if (!info) return;
+    const { hist, recs } = stockRecommendations();
+    if (!hist.length) {
+        info.innerHTML = '최근 3일 재료별 판매 기록이 아직 없어요. 하루 마감 후부터 추천이 계산됩니다.';
+        return;
+    }
+    if (!recs.length) {
+        info.innerHTML = `최근 <b>${hist.length}일</b> 평균판매량 기준으로 부족한 재료가 없습니다.`;
+        return;
+    }
+    const total = recs.reduce((sum, r) => sum + r.cost, 0);
+    const names = recs.slice(0, 3).map(r => `${INGS[r.key].name} +${r.buyQty}`).join(', ');
+    info.innerHTML = `최근 <b>${hist.length}일</b> 평균판매량 기준 부족 재료를 <b>1.5배 목표</b>까지 추천: ${names}${recs.length > 3 ? ' 외 ' + (recs.length - 3) + '개' : ''} · 예상 ${won(total)}`;
+}
+function buyRecommendedStock() {
+    const { hist, recs } = stockRecommendations();
+    if (!hist.length) { toast('최근 3일 판매 기록이 아직 없어요', 'bad'); return; }
+    if (!recs.length) { toast('추천 구매가 필요한 재료가 없어요', 'good'); return; }
+    let bought = [], skipped = 0;
+    recs.forEach(r => {
+        let packs = r.packs;
+        const p = PACKS[r.key];
+        while (packs > 0 && S.money >= p.cost) {
+            S.money -= p.cost;
+            S.stock[r.key] += p.qty;
+            packs--;
+        }
+        const done = r.packs - packs;
+        if (done) bought.push(`${INGS[r.key].name} +${done * p.qty}`);
+        if (packs) skipped++;
+    });
+    if (!bought.length) { toast('자금이 부족해서 추천 구매를 못 했어요', 'bad'); return; }
+    toast('추천 구매 완료: ' + bought.slice(0, 3).join(', ') + (bought.length > 3 ? ' 외 ' + (bought.length - 3) + '개' : '') + (skipped ? ' · 일부 자금 부족' : ''), skipped ? 'bad' : 'good');
+    Sound.play('buy');
+}
+
 function renderFinanceChart() {
     const box = $('financeChart');
     const hist = (S.history || []).slice(-7);
@@ -1951,6 +2017,8 @@ $('prep').addEventListener('click', e => {
     if (d.buy) {
         const p = PACKS[d.buy];
         if (S.money >= p.cost) { S.money -= p.cost; S.stock[d.buy] += p.qty; Sound.play('buy'); }
+    } else if (d.recommendStock) {
+        buyRecommendedStock();
     } else if (d.unlock) {
         const cost = MENU[d.unlock]?.unlock ?? FOODS[d.unlock]?.unlock;
         if (cost && S.money >= cost) {
@@ -2474,11 +2542,16 @@ function endDay() {
     const profit = G.revenue + G.tips - r - wage - used;
     const income = G.revenue + G.tips;
     const cost = r + wage + used;
+    const stockUsed = Object.keys(PACKS).reduce((acc, k) => {
+        acc[k] = Math.max(0, (G.stockStart[k] || 0) - (S.stock[k] || 0) - (G.wasted[k] || 0));
+        return acc;
+    }, {});
     S.history = (S.history || []).filter(h => h.day !== S.day).concat({
         day: S.day,
         income: Math.round(income),
         cost: Math.round(cost),
         profit: Math.round(profit),
+        stockUsed,
     }).slice(-30);
 
     const rows = [
