@@ -181,15 +181,17 @@
         .track-btn { padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #edf2f7; color: #4a5568; }
         .track-btn.on { background: #2b6cb0; color: #fff; box-shadow: 0 3px 8px rgba(43,108,176,.22); }
         .yt-music-frame {
-            position: absolute;
-            left: -9999px;
-            top: auto;
-            width: 1px;
-            height: 1px;
-            opacity: 0.01;
-            pointer-events: none;
+            display: none;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            max-height: 360px;
+            margin-top: 10px;
             border: 0;
+            border-radius: 14px;
+            box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+            background: #111827;
         }
+        .yt-music-frame.on { display: block; }
         #scene {
             display: block; width: 100%; aspect-ratio: 720 / 330; margin-top: 8px;
             border-radius: 14px; background: #f1e3cf; cursor: pointer;
@@ -497,14 +499,14 @@ const Sound = (() => {
     const PREF_KEY = 'cafe-game-audio-v1';
     const MUSIC_VOL = 0.8;
     const YT_TRACKS = {
-        cafe1: { type: 'audio', src: 'downloads/my_god_piano.mp3', name: 'BGM 1' },
-        cafe2: { type: 'audio', src: 'downloads/새출발의함성.mp3', name: 'BGM 2' },
+        cafe1: { type: 'youtube', id: 'mlcUz7aAB7A', name: 'BGM 1' },
+        cafe2: { type: 'youtube', id: '5BacAuHIoQ4', name: 'BGM 2' },
     };
     const pref = { music: false, sfx: true, track: null };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY)) || {}); } catch (e) { /* 기본값 */ }
-    // 유튜브는 브라우저 정책상 첫 로드 자동재생이 불안정하므로, 화면을 열 때는 항상 꺼짐으로 시작합니다.
-    // 첫 시작 상태는 BGM1/BGM2 모두 미선택 + 유튜브 음악 꺼짐입니다.
-    // 사용자가 BGM을 고른 뒤 '유튜브 음악 꺼짐' 버튼을 직접 눌러 켜면 그 클릭 동작으로 바로 재생을 시작합니다.
+    // 첫 시작 상태는 BGM1/BGM2 모두 미선택 + 유튜브 화면 숨김입니다.
+    // BGM 버튼을 누르면 해당 유튜브 화면을 보이게 하고 즉시 재생합니다.
+    // '유튜브뮤직꺼짐' 버튼은 현재 재생/선택을 모두 끕니다.
     pref.music = false;
     pref.track = null;
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (e) { /* 무시 */ } };
@@ -646,7 +648,7 @@ const Sound = (() => {
         (ING_SFX[k] || ['click']).forEach(n => play(n));
     }
 
-    // --- 배경음악: 로컬 MP3 + 유튜브 임베드 플레이어 ---
+    // --- 배경음악: 보이는 유튜브 임베드 플레이어 ---
     function ytFrame() { return $('ytMusic'); }
     function bgmAudio() { return $('bgmAudio'); }
     function currentTrack() {
@@ -677,11 +679,13 @@ const Sound = (() => {
         const track = currentTrack();
         if (!track || track.type !== 'youtube') return;
         clearYoutubeStartTimers();
-        if (!ytLoaded) {
-            const id = track.id;
-            const origin = encodeURIComponent(location.origin);
+        const id = track.id;
+        const origin = encodeURIComponent(location.origin);
+        const src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&loop=1&playlist=${id}&controls=1&playsinline=1&rel=0&origin=${origin}`;
+        f.classList.add('on');
+        if (f.src !== src) {
             f.onload = () => { if (pref.music) cueYoutubePlay(); };
-            f.src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&loop=1&playlist=${id}&controls=0&playsinline=1&rel=0&origin=${origin}`;
+            f.src = src;
             ytLoaded = true;
         }
         cueYoutubePlay();
@@ -822,13 +826,8 @@ const Sound = (() => {
     function startMusic() {
         const track = currentTrack();
         if (!track) return;
-        if (track.type === 'audio') {
-            stopYoutubeMusicOnly();
-            ensureAudioMusic();
-        } else {
-            stopAudioMusicOnly();
-            ensureYoutubeMusic();
-        }
+        stopAudioMusicOnly();
+        ensureYoutubeMusic();
     }
     function stopAudioMusicOnly() {
         const a = bgmAudio();
@@ -842,7 +841,7 @@ const Sound = (() => {
         ytCommand('pauseVideo');
         ytCommand('stopVideo');
         const f = ytFrame();
-        if (f) f.src = 'about:blank';
+        if (f) { f.src = 'about:blank'; f.classList.remove('on'); }
         ytLoaded = false;
     }
     function stopMusic() {
@@ -865,19 +864,17 @@ const Sound = (() => {
             const b = $(id);
             if (b) b.classList.toggle('on', b.dataset.track === track);
         });
-        m.textContent = pref.music ? '🎵 유튜브 음악 켜짐' : '🎵 유튜브 음악 꺼짐';
+        m.textContent = '🎵 유튜브뮤직꺼짐';
         s.textContent = pref.sfx ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
         m.classList.toggle('off', !pref.music);
         s.classList.toggle('off', !pref.sfx);
     }
     function toggleMusic() {
-        if (!pref.music && !currentTrack()) {
-            toast('🎵 먼저 BGM 1 또는 BGM 2를 선택해주세요');
-            renderButtons();
-            return;
-        }
-        pref.music = !pref.music; savePref();
-        if (pref.music) { init(true); startMusic(); } else stopMusic();
+        pref.music = false;
+        pref.track = null;
+        savePref();
+        stopMusic();
+        toast('🎵 유튜브 음악을 모두 껐어요');
         renderButtons();
     }
     function toggleSfx() {
@@ -888,11 +885,12 @@ const Sound = (() => {
     function setTrack(trackKey) {
         if (!YT_TRACKS[trackKey]) return;
         pref.track = trackKey;
-        pref.music = false;
+        pref.music = true;
         savePref();
-        stopMusic();
+        init(true);
+        startMusic();
         renderButtons();
-        toast('🎵 ' + YT_TRACKS[trackKey].name + ' 선택됨 · 유튜브 음악은 꺼짐 상태예요');
+        toast('🎵 ' + YT_TRACKS[trackKey].name + ' 유튜브 화면을 재생해요');
     }
     function startMusicFromGesture(target) {
         if (!pref.music) return;
