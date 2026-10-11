@@ -684,7 +684,7 @@ const Sound = (() => {
             }, delay));
         });
     }
-    function ensureYoutubeMusic() {
+    function ensureYoutubeMusic(preserveFold = false) {
         const f = ytFrame();
         if (!f) return;
         const track = currentTrack();
@@ -694,9 +694,13 @@ const Sound = (() => {
         const origin = encodeURIComponent(location.origin);
         const src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&loop=1&playlist=${id}&controls=1&playsinline=1&rel=0&origin=${origin}`;
         const panel = ytPanel();
-        if (panel) { panel.classList.add('on'); panel.classList.remove('folded'); }
+        const wasFolded = !!panel && panel.classList.contains('folded');
+        if (panel) {
+            panel.classList.add('on');
+            if (!preserveFold) panel.classList.remove('folded');
+        }
         const foldBtn = $('ytFoldBtn');
-        if (foldBtn) foldBtn.textContent = '접기 ▲';
+        if (foldBtn) foldBtn.textContent = preserveFold && wasFolded ? '펴기 ▼' : '접기 ▲';
         if (f.src !== src) {
             f.onload = () => { if (pref.music) cueYoutubePlay(); };
             f.src = src;
@@ -838,14 +842,14 @@ const Sound = (() => {
             played++;
         }
     }
-    function startMusic() {
+    function startMusic(preserveFold = false) {
         const track = currentTrack();
         if (!track) return;
         if (track.type === 'audio') {
             ensureAudioMusic();
         } else {
             stopAudioMusicOnly();
-            ensureYoutubeMusic();
+            ensureYoutubeMusic(preserveFold);
         }
     }
     function stopAudioMusicOnly() {
@@ -917,9 +921,12 @@ const Sound = (() => {
     }
     function startMusicFromGesture(target) {
         if (!pref.music) return;
-        if (target && target.closest && target.closest('#sfxBtn, #musicBtn, .track-btn')) return;
+        if (target && target.closest && target.closest('#sfxBtn, #musicBtn, .track-btn, #ytFoldBtn, .yt-panel')) return;
+        const panel = ytPanel();
+        // 스크롤/드래그 같은 일반 제스처가 접어 둔 유튜브 화면을 다시 펼치지 않게 합니다.
+        if (panel && panel.classList.contains('folded')) return;
         init(true);
-        startMusic();
+        startMusic(true);
     }
     function toggleYoutubeFold() {
         const panel = ytPanel();
