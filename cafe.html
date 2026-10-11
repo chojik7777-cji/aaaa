@@ -140,7 +140,10 @@
         .row { display: flex; gap: 6px; flex-wrap: wrap; }
         .mode-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
         .mode-row button { font-weight: 600; }
-        .recommend-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7fafc; }
+        .recommend-row { display: grid; grid-template-columns: 1fr; gap: 8px; align-items: center; margin-bottom: 10px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7fafc; }
+        .recommend-settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 6px; align-items: end; }
+        .recommend-settings label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #718096; font-weight: 700; }
+        .recommend-settings select, .recommend-settings input { min-width: 0; padding: 7px 8px; border: 1px solid #cbd5e0; border-radius: 8px; font: inherit; font-size: 13px; }
         .recommend-info { font-size: 12px; color: #4a5568; line-height: 1.5; }
         .recommend-info b { color: #2b6cb0; }
         #autoBtn.on { background: #38a169; color: white; border-color: #38a169; }
@@ -255,7 +258,21 @@
             <div class="section-body">
                 <div class="recommend-row">
                     <div class="recommend-info" id="stockRecommendInfo">최근 판매 기록을 확인 중입니다.</div>
-                    <button data-recommend-stock="1">재료구매추천</button>
+                    <div class="recommend-settings">
+                        <label>기준
+                            <select id="recommendBasis" data-recommend-setting="basis">
+                                <option value="avg">최근3일평균</option>
+                                <option value="max">최근3일최대</option>
+                            </select>
+                        </label>
+                        <label>대상 %
+                            <input id="recommendTriggerPct" data-recommend-setting="triggerPct" type="number" min="1" max="999" step="1">
+                        </label>
+                        <label>적용 %
+                            <input id="recommendTargetPct" data-recommend-setting="targetPct" type="number" min="1" max="999" step="1">
+                        </label>
+                        <button data-recommend-stock="1">재료구매추천</button>
+                    </div>
                 </div>
                 <div class="shop" id="shopStock"></div>
             </div>
@@ -437,6 +454,7 @@ function newState() {
         unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, juice: false, honeyamericano: false, caramelmacchiato: false, whitemocha: false, sweetmilk: false, coldbrew: false, vanillacoldbrew: false, hojicha: false, strawberrymilk: false, bread: false, cookie: false, tart: false, cake: false },
         up: { machine: 0, seats: 0, interior: 0 },
         priceLevel: 1, alba: false, flyer: false, auto: false, speed: 1, history: [],
+        recommend: { basis: 'max', triggerPct: 110, targetPct: 150 },
         weather: rollWeather(), won: false,
     };
 }
@@ -456,6 +474,7 @@ function load() {
                     unlocked: Object.assign(base.unlocked, s.unlocked || {}),
                     up: Object.assign(base.up, s.up || {}),
                     history: Array.isArray(s.history) ? s.history : [],
+                    recommend: Object.assign(base.recommend, s.recommend || {}),
                 });
             }
         }
@@ -1851,6 +1870,7 @@ function renderPrep() {
     renderFinanceChart();
 
     // 재료
+    syncRecommendationControls();
     renderStockRecommendation();
     $('shopStock').innerHTML = Object.keys(PACKS).filter(ingAvailable).map(k => {
         const p = PACKS[k], ing = INGS[k];
@@ -1911,36 +1931,56 @@ function renderPrep() {
 function recentStockHistory() {
     return (S.history || []).filter(h => h.stockUsed && typeof h.stockUsed === 'object').slice(-3);
 }
+function recommendationConfig() {
+    const base = Object.assign({ basis: 'max', triggerPct: 110, targetPct: 150 }, S.recommend || {});
+    base.basis = base.basis === 'avg' ? 'avg' : 'max';
+    base.triggerPct = clamp(Number(base.triggerPct) || 110, 1, 999);
+    base.targetPct = clamp(Number(base.targetPct) || 150, 1, 999);
+    S.recommend = base;
+    return base;
+}
+function syncRecommendationControls() {
+    const cfg = recommendationConfig();
+    const basis = $('recommendBasis'), trigger = $('recommendTriggerPct'), target = $('recommendTargetPct');
+    if (basis) basis.value = cfg.basis;
+    if (trigger) trigger.value = cfg.triggerPct;
+    if (target) target.value = cfg.targetPct;
+}
 function stockRecommendations() {
     const hist = recentStockHistory();
-    if (!hist.length) return { hist, recs: [] };
+    const cfg = recommendationConfig();
+    if (!hist.length) return { hist, recs: [], cfg };
     const recs = Object.keys(PACKS).filter(ingAvailable).map(k => {
-        const sold3 = hist.reduce((sum, h) => sum + Number(h.stockUsed?.[k] || 0), 0);
-        const avg = sold3 / hist.length;
-        const target = Math.ceil(avg * 1.5);
+        const values = hist.map(h => Number(h.stockUsed?.[k] || 0));
+        const avg = values.reduce((sum, n) => sum + n, 0) / hist.length;
+        const max = Math.max(...values);
+        const basis = cfg.basis === 'avg' ? avg : max;
+        const trigger = Math.ceil(basis * cfg.triggerPct / 100);
+        const target = Math.ceil(basis * cfg.targetPct / 100);
         const need = Math.max(0, target - (S.stock[k] || 0));
         const p = PACKS[k];
-        const packs = need > 0 && (S.stock[k] || 0) < avg ? Math.ceil(need / p.qty) : 0;
-        return { key: k, avg, target, need, packs, buyQty: packs * p.qty, cost: packs * p.cost };
+        const packs = need > 0 && (S.stock[k] || 0) <= trigger ? Math.ceil(need / p.qty) : 0;
+        return { key: k, avg, max, basis, trigger, target, need, packs, buyQty: packs * p.qty, cost: packs * p.cost };
     }).filter(r => r.packs > 0)
-      .sort((a, b) => ((S.stock[a.key] || 0) / Math.max(1, a.avg)) - ((S.stock[b.key] || 0) / Math.max(1, b.avg)) || b.cost - a.cost);
-    return { hist, recs };
+      .sort((a, b) => ((S.stock[a.key] || 0) / Math.max(1, a.basis)) - ((S.stock[b.key] || 0) / Math.max(1, b.basis)) || b.cost - a.cost);
+    return { hist, recs, cfg };
 }
 function renderStockRecommendation() {
     const info = $('stockRecommendInfo');
     if (!info) return;
-    const { hist, recs } = stockRecommendations();
+    const { hist, recs, cfg } = stockRecommendations();
+    const basisName = cfg.basis === 'avg' ? '최근3일평균' : '최근3일최대';
     if (!hist.length) {
-        info.innerHTML = '최근 3일 재료별 판매 기록이 아직 없어요. 하루 마감 후부터 추천이 계산됩니다.';
+        info.innerHTML = `최근 3일 재료별 판매 기록이 아직 없어요. 하루 마감 후부터 <b>${basisName}</b> 기준 추천이 계산됩니다.`;
         return;
     }
     if (!recs.length) {
-        info.innerHTML = `최근 <b>${hist.length}일</b> 평균판매량 기준으로 부족한 재료가 없습니다.`;
+        info.innerHTML = `<b>${basisName}</b>의 <b>${cfg.triggerPct}% 이하</b> 재료가 없습니다. 목표는 <b>${cfg.targetPct}% 이상</b>입니다.`;
         return;
     }
     const total = recs.reduce((sum, r) => sum + r.cost, 0);
     const names = recs.slice(0, 3).map(r => `${INGS[r.key].name} +${r.buyQty}`).join(', ');
-    info.innerHTML = `최근 <b>${hist.length}일</b> 평균판매량 기준 부족 재료를 <b>1.5배 목표</b>까지 추천: ${names}${recs.length > 3 ? ' 외 ' + (recs.length - 3) + '개' : ''} · 예상 ${won(total)}`;
+    info.innerHTML = `<b>${basisName}</b>의 <b>${cfg.triggerPct}% 이하</b> 재료를 <b>${cfg.targetPct}% 이상</b>으로 추천: ${names}${recs.length > 3 ? ' 외 ' + (recs.length - 3) + '개' : ''} · 예상 ${won(total)}`;
 }
 function buyRecommendedStock() {
     const { hist, recs } = stockRecommendations();
@@ -2009,6 +2049,27 @@ function renderFinanceChart() {
         <div class="finance-note">점에 마우스를 올리면 정확한 금액을 볼 수 있어요.</div>
     </div>`;
 }
+
+$('prep').addEventListener('input', e => {
+    const el = e.target.closest('[data-recommend-setting]');
+    if (!el) return;
+    const cfg = recommendationConfig();
+    if (el.dataset.recommendSetting === 'basis') cfg.basis = el.value === 'avg' ? 'avg' : 'max';
+    if (el.dataset.recommendSetting === 'triggerPct') cfg.triggerPct = clamp(Number(el.value) || 1, 1, 999);
+    if (el.dataset.recommendSetting === 'targetPct') cfg.targetPct = clamp(Number(el.value) || 1, 1, 999);
+    save();
+    renderStockRecommendation();
+});
+$('prep').addEventListener('change', e => {
+    const el = e.target.closest('[data-recommend-setting]');
+    if (!el) return;
+    const cfg = recommendationConfig();
+    if (el.dataset.recommendSetting === 'basis') cfg.basis = el.value === 'avg' ? 'avg' : 'max';
+    if (el.dataset.recommendSetting === 'triggerPct') cfg.triggerPct = clamp(Number(el.value) || 1, 1, 999);
+    if (el.dataset.recommendSetting === 'targetPct') cfg.targetPct = clamp(Number(el.value) || 1, 1, 999);
+    save();
+    renderPrep();
+});
 
 $('prep').addEventListener('click', e => {
     const b = e.target.closest('button');
