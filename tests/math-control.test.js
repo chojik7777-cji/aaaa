@@ -68,6 +68,8 @@ async function call(handler, method, url, body = {}) {
   const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
   assert.match(game, /id="mathLockOverlay"/, 'game must have central lock overlay');
   assert.match(game, /function pollMathControl\(/, 'game must poll central lock state');
+  assert.match(game, /CONTROL_BYPASS_KEY/, 'student unlock must remember the unlocked control version locally');
+  assert.match(game, /localStorage\.setItem\(CONTROL_BYPASS_KEY/, 'successful student unlock must store bypass version');
   assert.match(game, /\/api\/math-control\?action=status/, 'game must call central status API');
   assert.match(game, /\/api\/math-control\?action=unlock/, 'game must call unlock API');
   assert.match(admin, /id="lockOnBtn"/, 'admin page must have lock button');

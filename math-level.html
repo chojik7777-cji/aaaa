@@ -161,6 +161,7 @@
 <script>
 'use strict';
 const SAVE_KEY = 'math-level-game-v1';
+const CONTROL_BYPASS_KEY = 'math-level-control-bypass-v1';
 const CONTROL_STATUS_URL = '/api/math-control?action=status';
 const CONTROL_UNLOCK_URL = '/api/math-control?action=unlock';
 const MIN_LEVEL = 1, MAX_LEVEL = 18;
@@ -420,7 +421,8 @@ function updatePauseUi() {
 function applyMathControl(data) {
     if (!data || data.ok === false) return;
     lastControlVersion = data.version ?? lastControlVersion;
-    centralLocked = !!data.locked;
+    const bypassVersion = Number(localStorage.getItem(CONTROL_BYPASS_KEY) || -1);
+    centralLocked = !!data.locked && Number(data.version ?? 0) > bypassVersion;
     $('mathLockMessage').textContent = data.message || '선생님 확인 후 계속하세요.';
     $('mathLockOverlay').classList.toggle('show', centralLocked);
     document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn, #menuBtn').forEach(b => { b.disabled = centralLocked || (b.id !== 'menuBtn' && paused); });
@@ -442,6 +444,7 @@ async function unlockMathControl() {
         const data = await res.json();
         if (!res.ok || !data.unlocked) throw new Error(data.error || '비밀번호가 맞지 않습니다.');
         centralLocked = false;
+        if (lastControlVersion != null) localStorage.setItem(CONTROL_BYPASS_KEY, String(lastControlVersion));
         $('mathLockOverlay').classList.remove('show');
         $('mathUnlockPassword').value = '';
         updatePauseUi();
