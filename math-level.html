@@ -42,6 +42,7 @@
         #questionText { font-size: clamp(28px, 8vw, 54px); font-weight: 900; letter-spacing: .5px; line-height: 1.2; word-break: keep-all; }
         #questionHint { margin-top: 8px; color: #c6f6d5; font-size: 13px; min-height: 20px; }
         .answer-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; margin-top: 12px; }
+        .play-tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
         #answerInput { font-size: 24px; text-align: center; font-weight: 800; }
         .feedback { margin-top: 10px; min-height: 28px; text-align: center; font-weight: 800; line-height: 1.5; }
         .feedback.good { color: #2f855a; } .feedback.bad { color: #c53030; }
@@ -118,6 +119,10 @@
             <button class="primary" id="submitBtn">정답 확인</button>
             <button id="skipBtn">모르겠어요</button>
         </div>
+        <div class="play-tools">
+            <button id="pauseBtn" type="button">⏸️ 멈춤</button>
+            <button id="menuBtn" type="button">🏠 메뉴로 가기</button>
+        </div>
         <div class="keypad" id="keypad"></div>
         <div class="feedback" id="feedback"></div>
     </section>
@@ -169,6 +174,10 @@ const pick = arr => arr[rnd(0, arr.length - 1)];
 let state = loadState();
 let current = null;
 let startedAt = 0;
+let paused = false;
+let pauseStarted = 0;
+let pausedTotal = 0;
+let nextTimer = null;
 
 function curriculumLabel(level) {
     const lv = clamp(Math.round(level), MIN_LEVEL, MAX_LEVEL);
@@ -302,6 +311,10 @@ function resumeGame() {
     nextProblem();
 }
 function nextProblem() {
+    if (nextTimer) { clearTimeout(nextTimer); nextTimer = null; }
+    paused = false;
+    pausedTotal = 0;
+    pauseStarted = 0;
     current = generateProblem(chooseNextLevel());
     startedAt = Date.now();
     $('problemNo').textContent = `${state.asked + 1}번째 문제`;
@@ -313,11 +326,12 @@ function nextProblem() {
     $('answerInput').focus();
     $('feedback').textContent = '';
     $('feedback').className = 'feedback';
+    updatePauseUi();
     render();
 }
 function submitAnswer(skip = false) {
-    if (!current) return;
-    const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+    if (!current || paused) return;
+    const seconds = Math.max(1, Math.round((Date.now() - startedAt - pausedTotal) / 1000));
     const correct = !skip && nearlyEqual($('answerInput').value, current.answer);
     const before = state.theta;
     const info = updateAbility(correct, current.difficulty, seconds);
@@ -330,7 +344,51 @@ function submitAnswer(skip = false) {
         ? `정답입니다! (${seconds}초) 추정 레벨 ${delta >= 0 ? '+' : ''}${delta.toFixed(2)}`
         : `정답은 <b>${fmt(current.answer)}</b>입니다. 추정 레벨 ${delta.toFixed(2)}`;
     render();
-    setTimeout(nextProblem, correct ? 850 : 1500);
+    nextTimer = setTimeout(nextProblem, correct ? 850 : 1500);
+}
+function elapsedSeconds() {
+    if (!current) return 0;
+    const extraPause = paused ? Date.now() - pauseStarted : 0;
+    return Math.max(0, Math.round((Date.now() - startedAt - pausedTotal - extraPause) / 1000));
+}
+function updatePauseUi() {
+    $('pauseBtn').textContent = paused ? '▶️ 계속하기' : '⏸️ 멈춤';
+    $('answerInput').disabled = paused;
+    $('submitBtn').disabled = paused;
+    $('skipBtn').disabled = paused;
+    document.querySelectorAll('#keypad button').forEach(b => { b.disabled = paused; });
+    if (paused) {
+        $('feedback').className = 'feedback';
+        $('feedback').textContent = '멈춤 상태입니다. 계속하기를 누르면 이어서 풀 수 있어요.';
+    }
+}
+function togglePause() {
+    if (!current || $('gamePanel').hidden) return;
+    paused = !paused;
+    if (paused) {
+        pauseStarted = Date.now();
+    } else {
+        pausedTotal += Date.now() - pauseStarted;
+        pauseStarted = 0;
+        $('feedback').textContent = '';
+        $('feedback').className = 'feedback';
+        $('answerInput').focus();
+    }
+    updatePauseUi();
+    render();
+}
+function goMenu() {
+    if (nextTimer) { clearTimeout(nextTimer); nextTimer = null; }
+    current = null;
+    paused = false;
+    pauseStarted = 0;
+    pausedTotal = 0;
+    $('gamePanel').hidden = true;
+    $('setupPanel').hidden = false;
+    $('feedback').textContent = '';
+    $('answerInput').value = '';
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function render() {
     const acc = state.asked ? Math.round(state.correct / state.asked * 100) : 0;
@@ -345,7 +403,7 @@ function render() {
     $('currentMeter').style.width = `${(current ? current.level : state.nextLevel) / MAX_LEVEL * 100}%`;
     $('accuracyMeter').style.width = `${acc}%`;
     $('confidenceMeter').style.width = `${conf}%`;
-    $('timeText').textContent = current ? `${Math.max(0, Math.round((Date.now() - startedAt) / 1000))}초` : '0초';
+    $('timeText').textContent = current ? `${elapsedSeconds()}초${paused ? ' · 멈춤' : ''}` : '0초';
     document.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('on', Number(b.dataset.level) === Number($('startLevel').value)));
     renderHistory();
 }
@@ -370,6 +428,7 @@ function buildControls() {
     const keys = ['7','8','9','⌫','4','5','6','-','1','2','3','.','0','정답','모름','초기화'];
     $('keypad').innerHTML = keys.map(k => `<button type="button" data-key="${k}">${k}</button>`).join('');
     $('keypad').addEventListener('click', e => {
+        if (paused) return;
         const k = e.target.closest('[data-key]')?.dataset.key;
         if (!k) return;
         const input = $('answerInput');
@@ -384,7 +443,9 @@ function buildControls() {
 $('startBtn').addEventListener('click', () => startGame());
 $('submitBtn').addEventListener('click', () => submitAnswer(false));
 $('skipBtn').addEventListener('click', () => submitAnswer(true));
-$('answerInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitAnswer(false); });
+$('pauseBtn').addEventListener('click', togglePause);
+$('menuBtn').addEventListener('click', goMenu);
+$('answerInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !paused) submitAnswer(false); });
 $('startLevel').addEventListener('change', render);
 $('resetBtn').addEventListener('click', () => {
     if (!confirm('풀이 기록과 추정 레벨을 초기화할까요?')) return;

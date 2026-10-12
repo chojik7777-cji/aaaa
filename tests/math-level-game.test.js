@@ -13,11 +13,17 @@ assert.match(game, /id="startLevel"/, '시작 레벨 선택 UI가 있어야 합�
 assert.match(game, /id="questionText"/, '문제 표시 영역이 있어야 합니다');
 assert.match(game, /id="answerInput"/, '답 입력칸이 있어야 합니다');
 assert.match(game, /id="submitBtn"/, '정답 제출 버튼이 있어야 합니다');
+assert.match(game, /id="pauseBtn"/, '문제 풀이를 멈추고 재개하는 버튼이 있어야 합니다');
+assert.match(game, /id="menuBtn"/, '문제 풀이 중 메뉴로 돌아가는 버튼이 있어야 합니다');
 assert.match(game, /id="estimateLevel"/, '추정 레벨 표시가 있어야 합니다');
 assert.match(game, /id="confidenceText"/, '수렴/신뢰도 표시가 있어야 합니다');
 assert.match(game, /function generateProblem\(level/, '레벨 기반 문제 생성 함수가 있어야 합니다');
 assert.match(game, /function updateAbility\(correct/, '결과 기반 능력치 갱신 함수가 있어야 합니다');
 assert.match(game, /function chooseNextLevel\(/, '다음 문제 난이도 선택 함수가 있어야 합니다');
+assert.match(game, /function togglePause\(/, '멈춤\/재개 함수가 있어야 합니다');
+assert.match(game, /function goMenu\(/, '메뉴 복귀 함수가 있어야 합니다');
+assert.match(game, /pausedTotal/, '멈춘 시간을 문제 풀이 시간에서 제외해야 합니다');
+assert.match(game, /menuBtn'\)\.addEventListener\('click', goMenu\)/, '메뉴 버튼에 goMenu 이벤트가 연결되어야 합니다');
 assert.match(game, /MAX_LEVEL = 18/, '중1부터 고3까지 18단계 레벨 체계여야 합니다');
 assert.match(game, /const CURRICULUM = \[/, '교과과정 레벨 메타데이터가 있어야 합니다');
 for (const label of ['중1', '중2', '중3', '고1', '고2', '고3']) {
