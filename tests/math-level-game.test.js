@@ -11,8 +11,9 @@ const intro = fs.readFileSync(path.join(root, 'intro.html'), 'utf8');
 assert.match(game, /<title>수학 레벨 진단 게임<\/title>/, '수학 레벨 진단 게임 페이지 제목이 있어야 합니다');
 assert.match(game, /id="startLevel"/, '시작 레벨 선택 UI가 있어야 합니다');
 assert.match(game, /id="questionText"/, '문제 표시 영역이 있어야 합니다');
-assert.match(game, /id="answerInput"/, '답 입력칸이 있어야 합니다');
-assert.match(game, /id="submitBtn"/, '정답 제출 버튼이 있어야 합니다');
+assert.doesNotMatch(game, /id="answerInput"/, '직접 입력칸 대신 객관식 보기만 사용해야 합니다');
+assert.doesNotMatch(game, /id="submitBtn"/, '정답 제출 버튼 대신 보기 선택으로 채점해야 합니다');
+assert.match(game, /id="choiceGrid"/, '객관식 보기 영역이 있어야 합니다');
 assert.match(game, /id="pauseBtn"/, '문제 풀이를 멈추고 재개하는 버튼이 있어야 합니다');
 assert.match(game, /id="menuBtn"/, '문제 풀이 중 메뉴로 돌아가는 버튼이 있어야 합니다');
 assert.match(game, /id="estimateLevel"/, '추정 레벨 표시가 있어야 합니다');
@@ -24,9 +25,11 @@ assert.match(game, /function togglePause\(/, '멈춤\/재개 함수가 있어야
 assert.match(game, /function goMenu\(/, '메뉴 복귀 함수가 있어야 합니다');
 assert.match(game, /pausedTotal/, '멈춘 시간을 문제 풀이 시간에서 제외해야 합니다');
 assert.match(game, /menuBtn'\)\.addEventListener\('click', goMenu\)/, '메뉴 버튼에 goMenu 이벤트가 연결되어야 합니다');
-assert.match(game, /\.keypad button \{[^}]*touch-action: manipulation/s, '숫자 키패드 터치가 모바일 화면 재배치를 최소화해야 합니다');
-assert.match(game, /keypad'\)\.addEventListener\('pointerdown'[^}]*preventDefault/s, '키패드 버튼 터치가 입력창 포커스 이동을 만들지 않아야 합니다');
-assert.doesNotMatch(game, /keypad[\s\S]{0,700}input\.focus\(\)/, '키패드 클릭 후 입력창을 강제 포커스하지 않아야 합니다');
+assert.match(game, /function buildChoices\(/, '정답과 오답 보기를 생성하는 함수가 있어야 합니다');
+assert.match(game, /function submitChoice\(/, '보기 선택으로 정답을 채점해야 합니다');
+assert.match(game, /data-choice/, '각 보기 버튼은 선택값을 가져야 합니다');
+assert.match(game, /class="choice-grid"/, '보기 버튼은 안정적인 그리드에 배치되어야 합니다');
+assert.doesNotMatch(game, /id="keypad"/, '숫자 키패드는 객관식 전환 후 제거되어야 합니다');
 assert.match(game, /MAX_LEVEL = 18/, '중1부터 고3까지 18단계 레벨 체계여야 합니다');
 assert.match(game, /const CURRICULUM = \[/, '교과과정 레벨 메타데이터가 있어야 합니다');
 for (const label of ['중1', '중2', '중3', '고1', '고2', '고3']) {
