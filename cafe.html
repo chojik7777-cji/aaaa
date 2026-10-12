@@ -303,6 +303,9 @@
 
         <div class="start-row">
             <button class="primary" id="openBtn">🔔 영업 시작</button>
+            <button id="exportStateBtn" type="button">현재상태 export</button>
+            <button id="importStateBtn" type="button">현재상태 import</button>
+            <input id="importStateFile" type="file" accept="application/json,.json" hidden>
             <button id="resetBtn">처음부터 다시</button>
         </div>
     </section>
@@ -486,6 +489,94 @@ function load() {
 }
 function save() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ }
+}
+
+function normalizeImportedState(imported) {
+    if (!imported || typeof imported.day !== 'number') throw new Error('카페 상태 파일이 아닙니다.');
+    const base = newState();
+    return Object.assign(base, imported, {
+        day: Math.max(1, Math.floor(Number(imported.day) || 1)),
+        money: Math.round(Number(imported.money) || 0),
+        rep: clamp(Number(imported.rep) || 0, 0, 100),
+        stock: Object.assign(base.stock, imported.stock || {}),
+        unlocked: Object.assign(base.unlocked, imported.unlocked || {}),
+        up: Object.keys(base.up).reduce((acc, k) => {
+            const max = UPGRADES[k].costs.length;
+            acc[k] = clamp(Math.floor(Number(imported.up?.[k]) || 0), 0, max);
+            return acc;
+        }, { ...base.up }),
+        priceLevel: clamp(Math.floor(Number(imported.priceLevel) || 0), 0, PRICE_LEVELS.length - 1),
+        alba: !!imported.alba,
+        flyer: !!imported.flyer,
+        auto: !!imported.auto,
+        speed: SPEED_LEVELS.includes(imported.speed) ? imported.speed : 1,
+        history: Array.isArray(imported.history) ? imported.history : [],
+        recommend: Object.assign(base.recommend, imported.recommend || {}),
+        weather: WEATHERS[imported.weather] ? imported.weather : base.weather,
+        won: !!imported.won,
+    });
+}
+
+function createExportPayload() {
+    return {
+        app: 'cafe-game',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        state: normalizeImportedState(S),
+    };
+}
+
+function exportState() {
+    save();
+    const payload = createExportPayload();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = `cafe-game-state-day-${S.day}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('현재 카페 상태를 JSON 파일로 저장했어요.', 'good');
+}
+
+function applyImportedState(imported) {
+    if (G && !G.over) {
+        if (!confirm('영업 중입니다. 불러오면 오늘 영업은 중단되고 현재 저장된 카페 상태가 바뀝니다. 계속할까요?')) return false;
+        G.over = true;
+        G = null;
+        $('play').hidden = true;
+        $('prep').hidden = false;
+        $('modalBg').hidden = true;
+    } else if (!confirm('불러오면 현재 저장된 카페 상태가 바뀝니다. 계속할까요?')) return false;
+    S = normalizeImportedState(imported);
+    save();
+    renderPrep();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast('카페 상태를 불러왔어요.', 'good');
+    return true;
+}
+
+function importStateFromFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const payload = JSON.parse(String(reader.result || '{}'));
+            const imported = payload && payload.state ? payload.state : payload;
+            applyImportedState(imported);
+        } catch (e) {
+            toast('상태 파일을 읽을 수 없어요: ' + e.message, 'bad');
+        } finally {
+            $('importStateFile').value = '';
+        }
+    };
+    reader.onerror = () => {
+        toast('상태 파일을 읽는 중 오류가 났어요.', 'bad');
+        $('importStateFile').value = '';
+    };
+    reader.readAsText(file, 'utf-8');
 }
 
 function loadSectionPrefs() {
@@ -2116,6 +2207,9 @@ $('resetBtn').addEventListener('click', () => {
     if (!confirm('정말 처음부터 다시 시작할까요? 진행 상황이 사라집니다.')) return;
     S = newState(); save(); renderPrep();
 });
+$('exportStateBtn').addEventListener('click', exportState);
+$('importStateBtn').addEventListener('click', () => $('importStateFile').click());
+$('importStateFile').addEventListener('change', e => importStateFromFile(e.target.files && e.target.files[0]));
 $('openBtn').addEventListener('click', startDay);
 
 // ===== 영업 =====
