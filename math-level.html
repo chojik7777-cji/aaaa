@@ -49,6 +49,14 @@
         .choice-grid button { font-size: 20px; padding: 14px 10px; min-height: 68px; touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
         .choice-grid button.selected-ok { background: #38a169; color: white; border-color: #38a169; }
         .choice-grid button.selected-bad { background: #e53e3e; color: white; border-color: #e53e3e; }
+        .lock-overlay { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, .72); backdrop-filter: blur(8px); }
+        .lock-overlay.show { display: flex; }
+        .lock-card { width: 100%; max-width: 420px; background: white; border-radius: 22px; padding: 22px; box-shadow: 0 24px 80px rgba(0,0,0,.45); text-align: center; }
+        .lock-card h2 { margin: 0 0 8px; color: #2d3748; }
+        .lock-card p { color: #718096; line-height: 1.6; margin: 0 0 14px; }
+        .lock-card input { width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid #cbd5e0; font: inherit; text-align: center; font-size: 20px; font-weight: 800; }
+        .lock-card button { margin-top: 10px; width: 100%; background: #667eea; color: white; }
+        .lock-error { min-height: 22px; margin-top: 8px; color: #c53030; font-weight: 800; }
         .history { display: grid; grid-template-columns: repeat(20, 1fr); gap: 4px; align-items: end; min-height: 86px; padding: 10px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0; }
         .bar { min-height: 8px; border-radius: 5px 5px 2px 2px; background: #fc8181; position: relative; }
         .bar.ok { background: linear-gradient(#68d391, #38a169); }
@@ -140,9 +148,21 @@
     <p class="footer">made by jeongik</p>
 </div>
 
+<div class="lock-overlay" id="mathLockOverlay" role="dialog" aria-modal="true" aria-labelledby="mathLockTitle">
+    <div class="lock-card">
+        <h2 id="mathLockTitle">🔐 수학게임 잠금</h2>
+        <p id="mathLockMessage">선생님 확인 후 계속하세요.</p>
+        <input id="mathUnlockPassword" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호">
+        <button id="mathUnlockBtn" type="button">계속하기</button>
+        <div class="lock-error" id="mathUnlockError"></div>
+    </div>
+</div>
+
 <script>
 'use strict';
 const SAVE_KEY = 'math-level-game-v1';
+const CONTROL_STATUS_URL = '/api/math-control?action=status';
+const CONTROL_UNLOCK_URL = '/api/math-control?action=unlock';
 const MIN_LEVEL = 1, MAX_LEVEL = 18;
 const CURRICULUM = [
     { grade: '중1', topic: '정수와 유리수', desc: '부호가 있는 수의 사칙연산' },
@@ -175,6 +195,8 @@ let paused = false;
 let pauseStarted = 0;
 let pausedTotal = 0;
 let nextTimer = null;
+let centralLocked = false;
+let lastControlVersion = null;
 
 function curriculumLabel(level) {
     const lv = clamp(Math.round(level), MIN_LEVEL, MAX_LEVEL);
@@ -359,7 +381,7 @@ function nextProblem() {
     render();
 }
 function submitAnswer(skip = false, selectedValue = null) {
-    if (!current || paused) return;
+    if (!current || paused || centralLocked) return;
     const seconds = Math.max(1, Math.round((Date.now() - startedAt - pausedTotal) / 1000));
     const correct = !skip && nearlyEqual(selectedValue, current.answer);
     const before = state.theta;
@@ -395,8 +417,40 @@ function updatePauseUi() {
         $('feedback').textContent = '멈춤 상태입니다. 계속하기를 누르면 이어서 풀 수 있어요.';
     }
 }
+function applyMathControl(data) {
+    if (!data || data.ok === false) return;
+    lastControlVersion = data.version ?? lastControlVersion;
+    centralLocked = !!data.locked;
+    $('mathLockMessage').textContent = data.message || '선생님 확인 후 계속하세요.';
+    $('mathLockOverlay').classList.toggle('show', centralLocked);
+    document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn, #menuBtn').forEach(b => { b.disabled = centralLocked || (b.id !== 'menuBtn' && paused); });
+    if (centralLocked) $('mathUnlockPassword').focus();
+}
+async function pollMathControl() {
+    try {
+        const res = await fetch(CONTROL_STATUS_URL, { cache: 'no-store' });
+        if (res.ok) applyMathControl(await res.json());
+    } catch (e) { /* 오프라인이면 마지막 상태 유지 */ }
+}
+async function unlockMathControl() {
+    $('mathUnlockError').textContent = '';
+    try {
+        const res = await fetch(CONTROL_UNLOCK_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: $('mathUnlockPassword').value }), cache: 'no-store'
+        });
+        const data = await res.json();
+        if (!res.ok || !data.unlocked) throw new Error(data.error || '비밀번호가 맞지 않습니다.');
+        centralLocked = false;
+        $('mathLockOverlay').classList.remove('show');
+        $('mathUnlockPassword').value = '';
+        updatePauseUi();
+    } catch (e) {
+        $('mathUnlockError').textContent = e.message || '해제할 수 없습니다.';
+    }
+}
 function togglePause() {
-    if (!current || $('gamePanel').hidden) return;
+    if (!current || $('gamePanel').hidden || centralLocked) return;
     paused = !paused;
     if (paused) {
         pauseStarted = Date.now();
@@ -459,7 +513,7 @@ function buildControls() {
     });
     $('choiceGrid').addEventListener('pointerdown', e => { if (e.target.closest('[data-choice]')) e.preventDefault(); });
     $('choiceGrid').addEventListener('click', e => {
-        if (paused) return;
+        if (paused || centralLocked) return;
         const value = e.target.closest('[data-choice]')?.dataset.choice;
         if (value == null) return;
         submitChoice(value);
@@ -469,6 +523,8 @@ $('startBtn').addEventListener('click', () => startGame());
 $('skipBtn').addEventListener('click', () => submitAnswer(true));
 $('pauseBtn').addEventListener('click', togglePause);
 $('menuBtn').addEventListener('click', goMenu);
+$('mathUnlockBtn').addEventListener('click', unlockMathControl);
+$('mathUnlockPassword').addEventListener('keydown', e => { if (e.key === 'Enter') unlockMathControl(); });
 $('startLevel').addEventListener('change', render);
 $('resetBtn').addEventListener('click', () => {
     if (!confirm('풀이 기록과 추정 레벨을 초기화할까요?')) return;
@@ -482,9 +538,11 @@ $('resetBtn').addEventListener('click', () => {
     render();
 });
 setInterval(() => { if (current && !$('gamePanel').hidden) render(); }, 1000);
+setInterval(pollMathControl, 5000);
 buildControls();
 if (state.asked > 0) { $('startLevel').value = String(clamp(Math.round(state.theta), MIN_LEVEL, MAX_LEVEL)); resumeGame(); }
 else render();
+pollMathControl();
 </script>
 </body>
 </html>
