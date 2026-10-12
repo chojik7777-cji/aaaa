@@ -46,8 +46,9 @@
         #answerInput { font-size: 24px; text-align: center; font-weight: 800; }
         .feedback { margin-top: 10px; min-height: 28px; text-align: center; font-weight: 800; line-height: 1.5; }
         .feedback.good { color: #2f855a; } .feedback.bad { color: #c53030; }
-        .keypad { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; }
-        .keypad button { font-size: 18px; padding: 10px 0; }
+        #gamePanel { overflow-anchor: none; }
+        .keypad { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; min-height: 164px; }
+        .keypad button { font-size: 18px; padding: 10px 0; min-height: 44px; touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
         .history { display: grid; grid-template-columns: repeat(20, 1fr); gap: 4px; align-items: end; min-height: 86px; padding: 10px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0; }
         .bar { min-height: 8px; border-radius: 5px 5px 2px 2px; background: #fc8181; position: relative; }
         .bar.ok { background: linear-gradient(#68d391, #38a169); }
@@ -115,7 +116,7 @@
             <div id="questionHint"></div>
         </div>
         <div class="answer-row">
-            <input id="answerInput" inputmode="decimal" autocomplete="off" placeholder="답 입력">
+            <input id="answerInput" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="답 입력">
             <button class="primary" id="submitBtn">정답 확인</button>
             <button id="skipBtn">모르겠어요</button>
         </div>
@@ -323,7 +324,6 @@ function nextProblem() {
     $('questionText').textContent = current.text;
     $('questionHint').textContent = current.hint;
     $('answerInput').value = '';
-    $('answerInput').focus();
     $('feedback').textContent = '';
     $('feedback').className = 'feedback';
     updatePauseUi();
@@ -372,7 +372,6 @@ function togglePause() {
         pauseStarted = 0;
         $('feedback').textContent = '';
         $('feedback').className = 'feedback';
-        $('answerInput').focus();
     }
     updatePauseUi();
     render();
@@ -427,6 +426,7 @@ function buildControls() {
     });
     const keys = ['7','8','9','⌫','4','5','6','-','1','2','3','.','0','정답','모름','초기화'];
     $('keypad').innerHTML = keys.map(k => `<button type="button" data-key="${k}">${k}</button>`).join('');
+    $('keypad').addEventListener('pointerdown', e => { if (e.target.closest('[data-key]')) e.preventDefault(); });
     $('keypad').addEventListener('click', e => {
         if (paused) return;
         const k = e.target.closest('[data-key]')?.dataset.key;
@@ -437,7 +437,6 @@ function buildControls() {
         else if (k === '모름') submitAnswer(true);
         else if (k === '초기화') input.value = '';
         else input.value += k;
-        input.focus();
     });
 }
 $('startBtn').addEventListener('click', () => startGame());

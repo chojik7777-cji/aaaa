@@ -24,6 +24,9 @@ assert.match(game, /function togglePause\(/, '멈춤\/재개 함수가 있어야
 assert.match(game, /function goMenu\(/, '메뉴 복귀 함수가 있어야 합니다');
 assert.match(game, /pausedTotal/, '멈춘 시간을 문제 풀이 시간에서 제외해야 합니다');
 assert.match(game, /menuBtn'\)\.addEventListener\('click', goMenu\)/, '메뉴 버튼에 goMenu 이벤트가 연결되어야 합니다');
+assert.match(game, /\.keypad button \{[^}]*touch-action: manipulation/s, '숫자 키패드 터치가 모바일 화면 재배치를 최소화해야 합니다');
+assert.match(game, /keypad'\)\.addEventListener\('pointerdown'[^}]*preventDefault/s, '키패드 버튼 터치가 입력창 포커스 이동을 만들지 않아야 합니다');
+assert.doesNotMatch(game, /keypad[\s\S]{0,700}input\.focus\(\)/, '키패드 클릭 후 입력창을 강제 포커스하지 않아야 합니다');
 assert.match(game, /MAX_LEVEL = 18/, '중1부터 고3까지 18단계 레벨 체계여야 합니다');
 assert.match(game, /const CURRICULUM = \[/, '교과과정 레벨 메타데이터가 있어야 합니다');
 for (const label of ['중1', '중2', '중3', '고1', '고2', '고3']) {
