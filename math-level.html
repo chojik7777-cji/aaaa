@@ -68,7 +68,7 @@
 <body>
 <div class="card">
     <h1>🧠 수학 레벨 진단 게임</h1>
-    <p class="sub">처음 레벨을 고르고 문제를 풀면, 정답/오답과 반응 속도를 보고 다음 문제 난이도를 자동 조정합니다.<br>여러 문제를 풀수록 추정 레벨이 점점 수렴합니다.</p>
+    <p class="sub">중1 첫 단원부터 고3 마지막 수능형 단원까지 전체 교과과정을 레벨로 나누어 진단합니다.<br>정답/오답과 반응 속도에 따라 다음 문제 난이도를 조정하고, 여러 문제를 풀수록 실제 수준에 수렴합니다.</p>
 
     <div class="stats grid">
         <div class="stat"><div class="k">추정 레벨</div><div class="v" id="estimateLevel">-</div><div class="meter"><div id="estimateMeter"></div></div></div>
@@ -81,18 +81,24 @@
         <div class="setup grid">
             <label>시작 레벨
                 <select id="startLevel" aria-label="시작 레벨">
-                    <option value="1">Lv.1 초등 연산 시작</option>
-                    <option value="2">Lv.2 두 자리 덧셈/뺄셈</option>
-                    <option value="3">Lv.3 곱셈 기초</option>
-                    <option value="4">Lv.4 나눗셈/혼합</option>
-                    <option value="5">Lv.5 분수·소수 기초</option>
-                    <option value="6" selected>Lv.6 중등 방정식 입문</option>
-                    <option value="7">Lv.7 음수·비례</option>
-                    <option value="8">Lv.8 일차방정식</option>
-                    <option value="9">Lv.9 연립/제곱</option>
-                    <option value="10">Lv.10 함수·기울기</option>
-                    <option value="11">Lv.11 고난도 계산</option>
-                    <option value="12">Lv.12 도전 문제</option>
+                    <option value="1">Lv.1 중1 · 정수와 유리수</option>
+                    <option value="2">Lv.2 중1 · 문자와 식</option>
+                    <option value="3">Lv.3 중1 · 일차방정식/좌표</option>
+                    <option value="4">Lv.4 중2 · 유리수와 순환소수</option>
+                    <option value="5">Lv.5 중2 · 연립방정식</option>
+                    <option value="6" selected>Lv.6 중2 · 일차함수</option>
+                    <option value="7">Lv.7 중3 · 제곱근/실수</option>
+                    <option value="8">Lv.8 중3 · 인수분해/이차방정식</option>
+                    <option value="9">Lv.9 중3 · 이차함수</option>
+                    <option value="10">Lv.10 고1 · 다항식/나머지정리</option>
+                    <option value="11">Lv.11 고1 · 방정식/부등식</option>
+                    <option value="12">Lv.12 고1 · 함수/경우의 수</option>
+                    <option value="13">Lv.13 고2 · 지수·로그</option>
+                    <option value="14">Lv.14 고2 · 삼각함수</option>
+                    <option value="15">Lv.15 고2 · 수열</option>
+                    <option value="16">Lv.16 고2/고3 · 미분</option>
+                    <option value="17">Lv.17 고3 · 적분/확률과 통계/기하</option>
+                    <option value="18">Lv.18 고3 · 수능 종합</option>
                 </select>
             </label>
             <button class="primary" id="startBtn">진단 시작</button>
@@ -125,7 +131,7 @@
 
     <section class="panel explain">
         <b>레벨 해석</b><br>
-        Lv.1~4는 기본 연산, Lv.5~7은 분수·소수·음수·비례, Lv.8~10은 방정식과 함수, Lv.11~12는 고난도 계산/응용입니다. 추정 레벨은 “현재 맞힐 확률이 약 50~70%인 문제대”로 생각하면 됩니다.
+        Lv.1~3은 중1, Lv.4~6은 중2, Lv.7~9는 중3, Lv.10~12는 고1, Lv.13~15는 고2, Lv.16~18은 고3 마지막 수능형 단원까지입니다. 추정 레벨은 “현재 맞힐 확률이 약 50~70%인 교과 수준”으로 생각하면 됩니다.
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="resetBtn" class="danger">기록 초기화</button><a href="intro.html" style="align-self:center;color:#667eea;font-weight:700;text-decoration:none">← 소개 페이지</a></div>
     </section>
 
@@ -135,7 +141,27 @@
 <script>
 'use strict';
 const SAVE_KEY = 'math-level-game-v1';
-const MIN_LEVEL = 1, MAX_LEVEL = 12;
+const MIN_LEVEL = 1, MAX_LEVEL = 18;
+const CURRICULUM = [
+    { grade: '중1', topic: '정수와 유리수', desc: '부호가 있는 수의 사칙연산' },
+    { grade: '중1', topic: '문자와 식', desc: '문자식의 값과 간단한 식 정리' },
+    { grade: '중1', topic: '일차방정식/좌표', desc: '일차방정식과 좌표평면 기초' },
+    { grade: '중2', topic: '유리수와 순환소수', desc: '분수와 순환소수의 계산' },
+    { grade: '중2', topic: '연립방정식', desc: '두 미지수 일차방정식' },
+    { grade: '중2', topic: '일차함수', desc: '기울기와 직선의 식' },
+    { grade: '중3', topic: '제곱근/실수', desc: '제곱근과 근호 계산' },
+    { grade: '중3', topic: '인수분해/이차방정식', desc: '곱셈공식과 이차방정식' },
+    { grade: '중3', topic: '이차함수', desc: '포물선과 함수값' },
+    { grade: '고1', topic: '다항식/나머지정리', desc: '다항식 연산과 나머지정리' },
+    { grade: '고1', topic: '방정식/부등식', desc: '복소수, 이차방정식, 부등식' },
+    { grade: '고1', topic: '함수/경우의 수', desc: '함수 합성/역함수와 순열조합 기초' },
+    { grade: '고2', topic: '지수·로그', desc: '지수법칙과 로그 계산' },
+    { grade: '고2', topic: '삼각함수', desc: '삼각비와 삼각함수 값' },
+    { grade: '고2', topic: '수열', desc: '등차·등비수열과 합' },
+    { grade: '고2/고3', topic: '미분', desc: '극한, 도함수, 접선' },
+    { grade: '고3', topic: '적분/확률과 통계/기하', desc: '정적분, 확률, 벡터·기하' },
+    { grade: '고3', topic: '수능 종합', desc: '고등 전 범위 복합 사고' },
+];
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
@@ -144,6 +170,11 @@ let state = loadState();
 let current = null;
 let startedAt = 0;
 
+function curriculumLabel(level) {
+    const lv = clamp(Math.round(level), MIN_LEVEL, MAX_LEVEL);
+    const meta = CURRICULUM[lv - 1];
+    return `Lv.${lv} ${meta.grade} · ${meta.topic}`;
+}
 function newState(level = 6) {
     return { theta: level, nextLevel: level, asked: 0, correct: 0, streak: 0, uncertainty: 3.2, history: [] };
 }
@@ -160,20 +191,69 @@ function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a 
 
 function generateProblem(level) {
     level = clamp(Math.round(level), MIN_LEVEL, MAX_LEVEL);
-    let a, b, c, x, y, ans, text, hint, type;
-    if (level === 1) { a = rnd(2, 9); b = rnd(1, 9); ans = a + b; text = `${a} + ${b}`; type = '한 자리 덧셈'; hint = '머릿속으로 빠르게 계산해 보세요.'; }
-    else if (level === 2) { a = rnd(12, 59); b = rnd(10, 49); if (Math.random() < .5) { ans = a + b; text = `${a} + ${b}`; type = '두 자리 덧셈'; } else { if (a < b) [a, b] = [b, a]; ans = a - b; text = `${a} - ${b}`; type = '두 자리 뺄셈'; } hint = '받아올림/받아내림을 조심하세요.'; }
-    else if (level === 3) { a = rnd(3, 12); b = rnd(3, 12); ans = a * b; text = `${a} × ${b}`; type = '구구단 확장'; hint = '곱셈표를 떠올려 보세요.'; }
-    else if (level === 4) { b = rnd(3, 12); ans = rnd(3, 15); a = b * ans; text = `${a} ÷ ${b}`; type = '나눗셈'; hint = '어떤 수에 나누는 수를 곱하면 원래 수가 될까요?'; }
-    else if (level === 5) { a = rnd(2, 9); b = rnd(2, 9); c = rnd(1, b - 1); ans = a + c / b; text = `${a} + ${c}/${b}`; type = '분수·소수'; hint = '소수로 입력해도 됩니다. 예: 3.5'; }
-    else if (level === 6) { x = rnd(2, 9); a = rnd(2, 9); b = rnd(1, 15); ans = x; text = `${a}x + ${b} = ${a * x + b}, x = ?`; type = '일차방정식 입문'; hint = '먼저 상수를 옮기고 계수로 나눕니다.'; }
-    else if (level === 7) { a = rnd(-12, -2); b = rnd(3, 12); ans = a * b; text = `(${a}) × ${b}`; type = '음수 계산'; hint = '음수 × 양수는 음수입니다.'; }
-    else if (level === 8) { x = rnd(-8, 12); a = rnd(2, 8); b = rnd(-12, 12); c = rnd(2, 8); const rhs = (a - c) * x + b; ans = x; text = `${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)} = ${c}x ${rhs >= 0 ? '+ ' + rhs : '- ' + Math.abs(rhs)}, x = ?`; type = '일차방정식'; hint = 'x항과 숫자항을 각각 한쪽으로 모으세요.'; }
-    else if (level === 9) { a = rnd(4, 15); b = rnd(2, 8); ans = a * a - b * b; text = `${a}² - ${b}²`; type = '제곱 계산'; hint = '(a-b)(a+b)로 계산해도 됩니다.'; }
-    else if (level === 10) { a = rnd(-5, 7) || 2; b = rnd(-10, 10); x = rnd(-4, 8); ans = a * x + b; text = `y = ${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}, x=${x}일 때 y`; type = '일차함수'; hint = 'x 자리에 값을 대입하세요.'; }
-    else if (level === 11) { a = rnd(12, 29); b = rnd(11, 24); ans = a * b; text = `${a} × ${b}`; type = '고난도 곱셈'; hint = '분배법칙으로 쪼개 보세요.'; }
-    else { a = rnd(2, 9); b = rnd(2, 9); c = rnd(2, 9); ans = a * b + c * c; text = `${a} × ${b} + ${c}²`; type = '복합 계산'; hint = '곱셈과 제곱을 먼저 계산합니다.'; }
-    return { level, difficulty: level, text, answer: ans, type, hint };
+    let a, b, c, d, x, y, ans, text, hint, type;
+    const meta = CURRICULUM[level - 1];
+    if (level === 1) {
+        a = rnd(-12, 15); b = rnd(-12, 15); ans = a + b;
+        text = `(${a}) + (${b})`; type = '정수와 유리수'; hint = '부호를 먼저 정리하세요.';
+    } else if (level === 2) {
+        a = rnd(2, 8); x = rnd(-5, 9); b = rnd(-10, 10); ans = a * x + b;
+        text = `x=${x}일 때 ${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}`; type = '문자와 식'; hint = '문자에 값을 대입한 뒤 계산합니다.';
+    } else if (level === 3) {
+        x = rnd(-8, 12); a = rnd(2, 9); b = rnd(-12, 12); ans = x;
+        text = `${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)} = ${a * x + b}, x = ?`; type = '일차방정식'; hint = '상수를 옮기고 계수로 나눕니다.';
+    } else if (level === 4) {
+        b = pick([3, 6, 7, 9, 11]); a = rnd(1, b - 1); c = rnd(1, 4); ans = c + a / b;
+        text = `${c} + ${a}/${b}`; type = '유리수와 순환소수'; hint = '분수 또는 소수로 입력해도 됩니다.';
+    } else if (level === 5) {
+        x = rnd(-5, 8); y = rnd(-5, 8); a = rnd(1, 5); b = rnd(1, 5); c = rnd(1, 5); d = rnd(1, 5);
+        while (a * d === b * c) { c = rnd(1, 5); d = rnd(1, 5); }
+        ans = x + y;
+        text = `${a}x+${b}y=${a*x+b*y}, ${c}x+${d}y=${c*x+d*y}. x+y=?`; type = '연립방정식'; hint = '두 식을 풀고 x+y만 답하세요.';
+    } else if (level === 6) {
+        a = rnd(-5, 6) || 2; b = rnd(-10, 10); x = rnd(-4, 7); ans = a * x + b;
+        text = `y=${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}, x=${x}일 때 y`; type = '일차함수'; hint = '직선의 식에 x를 대입합니다.';
+    } else if (level === 7) {
+        a = rnd(2, 9); b = rnd(2, 6); ans = a * b;
+        text = `√${a*a*b*b}`; type = '제곱근/실수'; hint = '제곱수는 근호 밖으로 나옵니다.';
+    } else if (level === 8) {
+        a = rnd(-8, 8) || 2; b = rnd(-8, 8) || -3; ans = a + b;
+        text = `x² ${-(a+b) >= 0 ? '+ ' + (-(a+b)) : '- ' + Math.abs(-(a+b))}x ${a*b >= 0 ? '+ ' + a*b : '- ' + Math.abs(a*b)} = 0의 두 근의 합`; type = '인수분해/이차방정식'; hint = '두 근이 a,b이면 합은 a+b입니다.';
+    } else if (level === 9) {
+        a = pick([1, 2, -1, -2]); b = rnd(-4, 4); x = rnd(-3, 3); ans = a * x * x + b;
+        text = `y=${a}x² ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}, x=${x}일 때 y`; type = '이차함수'; hint = 'x²을 먼저 계산하세요.';
+    } else if (level === 10) {
+        a = rnd(2, 6); b = rnd(-5, 5); c = rnd(-5, 5); ans = a * c + b;
+        text = `f(x)=${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}일 때 f(${c})`; type = '다항식/나머지정리'; hint = '나머지정리는 f(c)를 구하는 문제로 볼 수 있습니다.';
+    } else if (level === 11) {
+        b = rnd(-8, 8) || 2; c = rnd(-8, 8) || -3; ans = Math.abs(b - c);
+        text = `방정식 x² ${-(b+c) >= 0 ? '+ ' + (-(b+c)) : '- ' + Math.abs(-(b+c))}x ${b*c >= 0 ? '+ ' + b*c : '- ' + Math.abs(b*c)}=0의 두 근 차이의 절댓값`; type = '방정식/부등식'; hint = '두 근을 인수분해로 찾고 차이를 구합니다.';
+    } else if (level === 12) {
+        a = rnd(4, 8); b = rnd(2, a - 1); ans = 1;
+        for (let i = 0; i < b; i++) ans *= (a - i);
+        text = `서로 다른 ${a}명 중 ${b}명을 줄 세우는 경우의 수`; type = '함수/경우의 수'; hint = '순열 nP r 계산입니다.';
+    } else if (level === 13) {
+        a = rnd(2, 5); b = rnd(2, 4); ans = Math.pow(a, b + 1);
+        text = `${a}^${b} × ${a}`; type = '지수·로그'; hint = '밑이 같으면 지수를 더합니다.';
+    } else if (level === 14) {
+        const choices = [{t:'sin 30°',v:0.5},{t:'cos 60°',v:0.5},{t:'tan 45°',v:1},{t:'sin 90°',v:1},{t:'cos 0°',v:1}];
+        const q = pick(choices); ans = q.v; text = q.t; type = '삼각함수'; hint = '특수각 값을 떠올리세요. 1/2은 0.5로 입력하세요.';
+    } else if (level === 15) {
+        a = rnd(1, 8); d = rnd(2, 8); x = rnd(5, 12); ans = x * (2 * a + (x - 1) * d) / 2;
+        text = `첫항 ${a}, 공차 ${d}인 등차수열의 첫 ${x}항의 합`; type = '수열'; hint = 'Sn = n(2a+(n-1)d)/2';
+    } else if (level === 16) {
+        a = rnd(1, 5); b = rnd(-4, 4); c = rnd(-3, 5); x = rnd(-2, 4); ans = 3*a*x*x + 2*b*x + c;
+        text = `f(x)=${a}x³ ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}x² ${c >= 0 ? '+ ' + c : '- ' + Math.abs(c)}x, f'(${x})`; type = '미분'; hint = '도함수를 구한 뒤 x값을 대입합니다.';
+    } else if (level === 17) {
+        const mode = pick(['integral','prob','geo']);
+        if (mode === 'integral') { a = rnd(1, 5); b = rnd(1, 4); ans = a * b * b / 2; text = `∫₀^${b} ${a}x dx`; type = '적분'; hint = 'x의 적분은 x²/2입니다.'; }
+        else if (mode === 'prob') { a = rnd(2, 5); b = rnd(6, 10); ans = a / b; text = `전체 ${b}개 중 성공 ${a}개의 확률`; type = '확률과 통계'; hint = '성공/전체를 소수로 입력해도 됩니다.'; }
+        else { a = rnd(-3, 5); b = rnd(-3, 5); c = rnd(-3, 5); d = rnd(-3, 5); ans = a*c + b*d; text = `벡터 (${a}, ${b}) · (${c}, ${d})`; type = '기하'; hint = '내적은 x끼리 곱한 값 + y끼리 곱한 값입니다.'; }
+    } else {
+        a = rnd(1, 4); b = rnd(1, 4); c = rnd(1, 4); x = rnd(1, 3); ans = (2*a*x + b) + c;
+        text = `f(x)=${a}x²+${b}x, g(x)=f'(x)+${c}. g(${x})`; type = '수능 종합'; hint = '미분 후 함수값을 구하는 복합 문제입니다.';
+    }
+    return { level, difficulty: level, text, answer: ans, type, hint, meta };
 }
 
 function nearlyEqual(input, answer) {
@@ -194,6 +274,10 @@ function updateAbility(correct, difficulty, seconds) {
     return { expected, k };
 }
 function chooseNextLevel() {
+    if (state.asked === 0) {
+        state.nextLevel = clamp(Math.round(state.theta), MIN_LEVEL, MAX_LEVEL);
+        return state.nextLevel;
+    }
     const exploration = state.asked < 8 ? (state.asked % 3 === 2 ? 1 : 0) : 0;
     const streakPush = state.streak >= 3 ? 1 : state.streak <= -2 ? -1 : 0;
     const jitter = state.uncertainty > 1.5 ? pick([-1, 0, 1]) : 0;
@@ -221,7 +305,8 @@ function nextProblem() {
     current = generateProblem(chooseNextLevel());
     startedAt = Date.now();
     $('problemNo').textContent = `${state.asked + 1}번째 문제`;
-    $('problemType').textContent = `Lv.${current.level} · ${current.type}`;
+    const topicPart = current.type === current.meta.topic ? '' : ` · ${current.type}`;
+    $('problemType').textContent = `${curriculumLabel(current.level)}${topicPart}`;
     $('questionText').textContent = current.text;
     $('questionHint').textContent = current.hint;
     $('answerInput').value = '';
@@ -251,7 +336,9 @@ function render() {
     const acc = state.asked ? Math.round(state.correct / state.asked * 100) : 0;
     const conf = confidencePercent();
     $('estimateLevel').textContent = state.asked ? `Lv.${state.theta.toFixed(1)}` : '-';
+    $('estimateLevel').title = state.asked ? curriculumLabel(state.theta) : '';
     $('currentLevel').textContent = current ? `Lv.${current.level}` : `Lv.${state.nextLevel}`;
+    $('currentLevel').title = current ? curriculumLabel(current.level) : curriculumLabel(state.nextLevel);
     $('accuracyText').textContent = state.asked ? `${acc}%` : '-';
     $('confidenceText').textContent = state.asked ? `${conf}%` : '-';
     $('estimateMeter').style.width = `${state.theta / MAX_LEVEL * 100}%`;
@@ -268,12 +355,12 @@ function renderHistory() {
     if (!state.asked) return;
     const last = state.history[state.history.length - 1];
     const conf = confidencePercent();
-    const band = state.theta < 4.5 ? '기본 연산 구간' : state.theta < 7.5 ? '분수·음수·비례 구간' : state.theta < 10.5 ? '방정식·함수 구간' : '고난도 계산 구간';
-    $('analysisText').innerHTML = `현재 추정치는 <b>Lv.${state.theta.toFixed(1)}</b> (${band})입니다. 수렴도는 <b>${conf}%</b>이고, 다음 문제는 <b>Lv.${state.nextLevel}</b> 근처로 출제됩니다.`;
-    $('log').innerHTML = state.history.slice(-8).reverse().map(h => `<div>${h.correct ? '✅' : '❌'} Lv.${h.level} · ${h.q} = ${fmt(h.answer)} · ${h.seconds}초 · 추정 Lv.${h.theta}</div>`).join('');
+    const band = curriculumLabel(state.theta);
+    $('analysisText').innerHTML = `현재 추정치는 <b>Lv.${state.theta.toFixed(1)}</b> (${band})입니다. 수렴도는 <b>${conf}%</b>이고, 다음 문제는 <b>${curriculumLabel(state.nextLevel)}</b> 근처로 출제됩니다.`;
+    $('log').innerHTML = state.history.slice(-8).reverse().map(h => `<div>${h.correct ? '✅' : '❌'} ${curriculumLabel(h.level)} · ${h.q} = ${fmt(h.answer)} · ${h.seconds}초 · 추정 Lv.${h.theta}</div>`).join('');
 }
 function buildControls() {
-    $('levelButtons').innerHTML = Array.from({ length: MAX_LEVEL }, (_, i) => `<button type="button" data-level="${i + 1}">Lv.${i + 1}</button>`).join('');
+    $('levelButtons').innerHTML = Array.from({ length: MAX_LEVEL }, (_, i) => `<button type="button" data-level="${i + 1}" title="${CURRICULUM[i].grade} · ${CURRICULUM[i].topic}">Lv.${i + 1}<br><small>${CURRICULUM[i].grade}</small></button>`).join('');
     $('levelButtons').addEventListener('click', e => {
         const b = e.target.closest('[data-level]');
         if (!b) return;
