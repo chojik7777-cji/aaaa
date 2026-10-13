@@ -4,8 +4,11 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const html = fs.readFileSync(path.resolve(__dirname, '..', 'cafe.html'), 'utf8');
+const cafeHtml = fs.readFileSync(path.resolve(__dirname, '..', 'cafe.html'), 'utf8');
+const indexHtml = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8');
+const html = cafeHtml;
 
+assert.strictEqual(indexHtml, cafeHtml, 'index.html은 cafe.html과 같은 카페게임 내용이어야 합니다');
 assert.match(html, /id="exportStateBtn"/, '카페게임에 현재상태 export 버튼이 있어야 합니다');
 assert.match(html, /id="importStateBtn"/, '카페게임에 현재상태 import 버튼이 있어야 합니다');
 assert.match(html, /id="importStateFile"[^>]*type="file"/, '카페게임에 JSON 파일 import 입력이 있어야 합니다');
