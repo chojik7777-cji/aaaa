@@ -75,7 +75,7 @@
         <input id="fileInput" type="file">
         <button id="uploadBtn" type="button">업로드</button>
       </div>
-      <p class="hint">현재 버전은 작은 파일용입니다. 파일당 900KB 이하, 방당 최대 30개까지 가능합니다.</p>
+      <p class="hint" id="storageText">☁️ 임시 서버 저장 (오래 쉬면 사라질 수 있어요) · 파일당 900KB까지</p>
       <div class="file-list" id="fileList"></div>
     </section>
   </main>
@@ -124,6 +124,10 @@ async function api(action, body) {
 function applyRemote(data, force = false) {
   const remoteNewer = data.version > state.version;
   state = data;
+  // 맥미니(임시터널)로 열면 파일이 맥미니 폴더에 저장돼요
+  $('storageText').textContent = data.storage === 'folder'
+    ? `💾 맥미니 '${data.folder}' 폴더에 저장 · 파일당 ${fmtSize(data.maxFileBytes)}까지`
+    : '☁️ 임시 서버 저장 (오래 쉬면 사라질 수 있어요) · 파일당 900KB까지';
   renderFiles(data.files || []);
   updateStatus(data);
   if (force || (!dirty && remoteNewer)) {
@@ -184,7 +188,8 @@ function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;
 async function uploadFile() {
   const file = $('fileInput').files[0];
   if (!file) return alert('업로드할 파일을 선택하세요.');
-  if (file.size > 900000) return alert('현재 버전은 900KB 이하 파일만 업로드할 수 있습니다.');
+  const max = state.maxFileBytes || 900000;
+  if (file.size > max) return alert(`${fmtSize(max)} 이하 파일만 업로드할 수 있습니다.`);
   $('uploadBtn').disabled = true;
   try {
     const dataUrl = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); });
