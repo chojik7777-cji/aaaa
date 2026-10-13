@@ -81,9 +81,9 @@ http://192.168.45.156:8791/yut-dashboard.html
 
 참고: `https://aaaa-phi-lovat.vercel.app/omok.html`, `https://aaaa-phi-lovat.vercel.app/yut.html`는 정적 배포 페이지라서 맥미니 로컬 서버 API와 직접 연결되지 않습니다. 온라인 방 대국은 위 맥미니 서버 주소로 접속해야 합니다.
 
-## 맥미니 공유노트 (family 폴더)
+## 맥미니 공유노트 (note/family 폴더)
 
-`note.html`을 맥미니 포털 서버로 열면 메모와 첨부파일이 맥미니의 `family` 폴더에 실제 파일로 저장됩니다.
+`note.html`을 맥미니 포털 서버로 열면 메모와 첨부파일이 맥미니의 `note/family` 폴더에 실제 파일로 저장됩니다.
 임시터널 주소가 바뀌어도 파일은 폴더에 그대로 남습니다. (Vercel 주소의 note.html은 기존처럼 임시 서버 저장, 비밀번호는 Vercel 환경변수 `NOTE_PASSWORD` 또는 기본 비밀번호)
 
 ```bash
@@ -95,11 +95,11 @@ cloudflared tunnel --url http://localhost:8793
 ```
 
 - 접속: `https://<터널주소>/note.html`
-- 저장 폴더: `github-aaaa/family/` (다른 폴더는 `NOTE_DIR=/Users/chojiks/family node portal-server.js`)
+- 저장 폴더: `github-aaaa/note/family/` (예전 `github-aaaa/family/`가 있으면 처음 켤 때 자동으로 옮김, 다른 폴더는 `NOTE_DIR=/Users/chojiks/family node portal-server.js`)
 - 파일당 50MB까지, Finder로 폴더에 넣거나 지운 파일도 목록에 바로 반영
-- `?room=이름`으로 열면 `family/이름/` 하위 폴더를 사용
-- 메모 본문은 `family/.note-memo.txt`에 저장 (숨김 파일)
-- `family/` 폴더는 `.gitignore`에 있어 GitHub에 올라가지 않음
-- 비밀번호: 기본 비밀번호는 Vercel note.html과 같음 (공개 저장소라 코드엔 해시만 저장). 바꾸려면 `family/.note-password` 파일에 새 비밀번호를 적거나 (재시작 불필요) `NOTE_PASSWORD=새비번 node portal-server.js`
+- `?room=이름`으로 열면 `note/family/이름/` 하위 폴더를 사용
+- 메모 본문은 `note/family/.note-memo.txt`에 저장 (숨김 파일)
+- `note/`, `family/` 폴더는 `.gitignore`에 있어 GitHub에 올라가지 않음
+- 비밀번호: 기본 비밀번호는 Vercel note.html과 같음 (공개 저장소라 코드엔 해시만 저장). 바꾸려면 `note/family/.note-password` 파일에 새 비밀번호를 적거나 (재시작 불필요) `NOTE_PASSWORD=새비번 node portal-server.js`
   - 비밀번호를 바꾸면 이미 들어와 있던 기기도 다시 입력해야 함
   - 5번 틀리면 그 접속(IP)은 1시간 동안 잠금

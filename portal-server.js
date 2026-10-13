@@ -8,15 +8,23 @@ const path = require('path');
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = Number(process.env.PORT || 8793);
 const ROOT = __dirname;
-// 공유노트(note.html) 파일 저장 폴더. 기본은 이 폴더 안의 family, NOTE_DIR로 바꿀 수 있음
-const NOTE_DIR = path.resolve(process.env.NOTE_DIR || path.join(ROOT, 'family'));
-// 공유노트 비밀번호: NOTE_PASSWORD 환경변수 > family/.note-password 파일 > 기본 비밀번호(note-auth.js)
+// 공유노트(note.html) 파일 저장 폴더. 기본은 이 폴더 안의 note/family, NOTE_DIR로 바꿀 수 있음
+const NOTE_BASE = path.join(ROOT, 'note');
+const NOTE_DIR = path.resolve(process.env.NOTE_DIR || path.join(NOTE_BASE, 'family'));
+// 예전 위치(github-aaaa/family)에 있던 파일은 처음 한 번 note/family 로 옮김
+const OLD_NOTE_DIR = path.join(ROOT, 'family');
+if (!process.env.NOTE_DIR && fs.existsSync(OLD_NOTE_DIR) && !fs.existsSync(NOTE_DIR)) {
+  fs.mkdirSync(NOTE_BASE, { recursive: true });
+  fs.renameSync(OLD_NOTE_DIR, NOTE_DIR);
+  console.log(`공유노트 폴더를 옮겼어요: ${OLD_NOTE_DIR} → ${NOTE_DIR}`);
+}
+// 공유노트 비밀번호: NOTE_PASSWORD 환경변수 > note/family/.note-password 파일 > 기본 비밀번호(note-auth.js)
 // (파일은 요청마다 읽어서, 파일 내용만 바꿔도 서버 재시작 없이 바로 적용)
 function notePassword() {
   if (process.env.NOTE_PASSWORD) return process.env.NOTE_PASSWORD;
   try { return fs.readFileSync(path.join(NOTE_DIR, '.note-password'), 'utf8').trim(); } catch (e) { return ''; }
 }
-const noteHandler = require('./note-folder').createNoteFolderHandler(NOTE_DIR, { password: notePassword });
+const noteHandler = require('./note-folder').createNoteFolderHandler(NOTE_DIR, { password: notePassword, label: path.relative(ROOT, NOTE_DIR).startsWith('..') ? NOTE_DIR : path.relative(ROOT, NOTE_DIR).split(path.sep).join('/') });
 fs.mkdirSync(NOTE_DIR, { recursive: true });
 
 const TARGETS = {
@@ -53,7 +61,8 @@ function serveStatic(req, res) {
   const file = path.normalize(path.join(ROOT, pathname));
   if (!file.startsWith(ROOT)) return send(res, 403, 'Forbidden');
   // 공유노트 폴더는 /api/note 로만 접근 (주소로 직접 열기 막기)
-  if (file === NOTE_DIR || file.startsWith(NOTE_DIR + path.sep)) return send(res, 403, 'Forbidden');
+  const inside = (dir) => file === dir || file.startsWith(dir + path.sep);
+  if (inside(NOTE_DIR) || inside(NOTE_BASE) || inside(OLD_NOTE_DIR)) return send(res, 403, 'Forbidden');
   fs.readFile(file, (err, buf) => {
     if (err) return send(res, 404, 'Not found');
     const ext = path.extname(file).toLowerCase();
