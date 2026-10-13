@@ -7,6 +7,8 @@ globalThis.__MATH_GAME_CONTROL__ = globalThis.__MATH_GAME_CONTROL__ || {
   locked: false,
   message: '선생님 확인 후 계속하세요.',
   unlockPassword: '1212',
+  questionLimit: 5,
+  limitPassword: '1414',
   version: 0,
   updatedAt: Date.now(),
 };
@@ -46,15 +48,21 @@ function publicState(extra = {}) {
     ok: true,
     locked: !!control.locked,
     message: control.message || '선생님 확인 후 계속하세요.',
+    questionLimit: Number.isFinite(Number(control.questionLimit)) ? Number(control.questionLimit) : 5,
     version: control.version || 0,
     updatedAt: control.updatedAt || Date.now(),
     ...extra,
   };
 }
-function setState({ locked, message, unlockPassword }) {
+function setState({ locked, message, unlockPassword, questionLimit, limitPassword }) {
   control.locked = !!locked;
   if (message != null) control.message = String(message).trim().slice(0, 180) || '선생님 확인 후 계속하세요.';
   if (unlockPassword != null && String(unlockPassword).trim()) control.unlockPassword = String(unlockPassword).trim().slice(0, 64);
+  if (questionLimit != null) {
+    const limit = Math.max(0, Math.min(999, Math.floor(Number(questionLimit))));
+    if (Number.isFinite(limit)) control.questionLimit = limit;
+  }
+  if (limitPassword != null && String(limitPassword).trim()) control.limitPassword = String(limitPassword).trim().slice(0, 64);
   control.version = (control.version || 0) + 1;
   control.updatedAt = Date.now();
 }
@@ -79,6 +87,13 @@ module.exports = async function handler(req, res) {
       return send(res, 403, { ok: false, error: '비밀번호가 맞지 않습니다.', locked: !!control.locked });
     }
     return send(res, 200, publicState({ unlocked: true }));
+  }
+
+  if (action === 'limit-unlock' && req.method === 'POST') {
+    if (String(body.password || '') !== String(control.limitPassword || '1414')) {
+      return send(res, 403, { ok: false, error: '비밀번호가 맞지 않습니다.' });
+    }
+    return send(res, 200, publicState({ limitUnlocked: true }));
   }
 
   return send(res, 404, { ok: false, error: '지원하지 않는 요청입니다.' });

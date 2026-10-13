@@ -158,12 +158,24 @@
     </div>
 </div>
 
+<div class="lock-overlay" id="questionLimitOverlay" role="dialog" aria-modal="true" aria-labelledby="questionLimitTitle">
+    <div class="lock-card">
+        <h2 id="questionLimitTitle">🔑 계속 풀기</h2>
+        <p id="questionLimitMessage">5문제를 풀었습니다. 계속하려면 선생님 비밀번호를 입력하세요.</p>
+        <input id="questionLimitPassword" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호">
+        <button id="questionLimitUnlockBtn" type="button">계속 풀기</button>
+        <div class="lock-error" id="questionLimitError"></div>
+    </div>
+</div>
+
 <script>
 'use strict';
 const SAVE_KEY = 'math-level-game-v1';
 const CONTROL_BYPASS_KEY = 'math-level-control-bypass-v1';
+const LIMIT_UNLOCK_KEY = 'math-level-limit-unlock-v1';
 const CONTROL_STATUS_URL = '/api/math-control?action=status';
 const CONTROL_UNLOCK_URL = '/api/math-control?action=unlock';
+const LIMIT_UNLOCK_URL = '/api/math-control?action=limit-unlock';
 const MIN_LEVEL = 1, MAX_LEVEL = 18;
 const CURRICULUM = [
     { grade: '중1', topic: '정수와 유리수', desc: '부호가 있는 수의 사칙연산' },
@@ -198,6 +210,8 @@ let pausedTotal = 0;
 let nextTimer = null;
 let centralLocked = false;
 let lastControlVersion = null;
+let questionLimit = 5;
+let limitLocked = false;
 
 function curriculumLabel(level) {
     const lv = clamp(Math.round(level), MIN_LEVEL, MAX_LEVEL);
@@ -365,6 +379,10 @@ function resumeGame() {
 }
 function nextProblem() {
     if (nextTimer) { clearTimeout(nextTimer); nextTimer = null; }
+    if (shouldShowQuestionLimitLock()) {
+        showQuestionLimitLock();
+        return;
+    }
     paused = false;
     pausedTotal = 0;
     pauseStarted = 0;
@@ -381,8 +399,50 @@ function nextProblem() {
     updatePauseUi();
     render();
 }
+function currentLimitUnlockVersion() { return Number(sessionStorage.getItem(LIMIT_UNLOCK_KEY) || -1); }
+function shouldShowQuestionLimitLock() {
+    return Number(questionLimit) > 0 && state.asked >= Number(questionLimit) && currentLimitUnlockVersion() < Number(lastControlVersion ?? 0);
+}
+function setQuestionLimitFromControl(data) {
+    if (data.questionLimit == null) return;
+    const nextLimit = Number(data.questionLimit);
+    if (Number.isFinite(nextLimit)) questionLimit = Math.max(0, Math.floor(nextLimit));
+}
+function showQuestionLimitLock() {
+    limitLocked = true;
+    paused = false;
+    $('questionLimitMessage').textContent = `${questionLimit}문제를 풀었습니다. 계속하려면 선생님 비밀번호를 입력하세요.`;
+    $('questionLimitError').textContent = '';
+    $('questionLimitOverlay').classList.add('show');
+    document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn').forEach(b => { b.disabled = true; });
+    $('questionLimitPassword').focus();
+}
+function hideQuestionLimitLock() {
+    limitLocked = false;
+    $('questionLimitOverlay').classList.remove('show');
+    $('questionLimitPassword').value = '';
+    updatePauseUi();
+}
+async function unlockQuestionLimit() {
+    $('questionLimitError').textContent = '';
+    try {
+        const res = await fetch(LIMIT_UNLOCK_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: $('questionLimitPassword').value }), cache: 'no-store'
+        });
+        const data = await res.json();
+        if (!res.ok || !data.limitUnlocked) throw new Error(data.error || '비밀번호가 맞지 않습니다.');
+        setQuestionLimitFromControl(data);
+        if (data.version != null) lastControlVersion = data.version;
+        sessionStorage.setItem(LIMIT_UNLOCK_KEY, String(lastControlVersion ?? 0));
+        hideQuestionLimitLock();
+        nextProblem();
+    } catch (e) {
+        $('questionLimitError').textContent = e.message || '해제할 수 없습니다.';
+    }
+}
 function submitAnswer(skip = false, selectedValue = null) {
-    if (!current || paused || centralLocked) return;
+    if (!current || paused || centralLocked || limitLocked) return;
     const seconds = Math.max(1, Math.round((Date.now() - startedAt - pausedTotal) / 1000));
     const correct = !skip && nearlyEqual(selectedValue, current.answer);
     const before = state.theta;
@@ -421,12 +481,15 @@ function updatePauseUi() {
 function applyMathControl(data) {
     if (!data || data.ok === false) return;
     lastControlVersion = data.version ?? lastControlVersion;
+    questionLimit = Number(data.questionLimit ?? questionLimit);
+    setQuestionLimitFromControl(data);
     const bypassVersion = Number(localStorage.getItem(CONTROL_BYPASS_KEY) || -1);
     centralLocked = !!data.locked && Number(data.version ?? 0) > bypassVersion;
     $('mathLockMessage').textContent = data.message || '선생님 확인 후 계속하세요.';
     $('mathLockOverlay').classList.toggle('show', centralLocked);
     document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn, #menuBtn').forEach(b => { b.disabled = centralLocked || (b.id !== 'menuBtn' && paused); });
     if (centralLocked) $('mathUnlockPassword').focus();
+    if (!centralLocked && current && shouldShowQuestionLimitLock()) showQuestionLimitLock();
 }
 async function pollMathControl() {
     try {
@@ -453,7 +516,7 @@ async function unlockMathControl() {
     }
 }
 function togglePause() {
-    if (!current || $('gamePanel').hidden || centralLocked) return;
+    if (!current || $('gamePanel').hidden || centralLocked || limitLocked) return;
     paused = !paused;
     if (paused) {
         pauseStarted = Date.now();
@@ -516,7 +579,7 @@ function buildControls() {
     });
     $('choiceGrid').addEventListener('pointerdown', e => { if (e.target.closest('[data-choice]')) e.preventDefault(); });
     $('choiceGrid').addEventListener('click', e => {
-        if (paused || centralLocked) return;
+        if (paused || centralLocked || limitLocked) return;
         const value = e.target.closest('[data-choice]')?.dataset.choice;
         if (value == null) return;
         submitChoice(value);
@@ -528,6 +591,8 @@ $('pauseBtn').addEventListener('click', togglePause);
 $('menuBtn').addEventListener('click', goMenu);
 $('mathUnlockBtn').addEventListener('click', unlockMathControl);
 $('mathUnlockPassword').addEventListener('keydown', e => { if (e.key === 'Enter') unlockMathControl(); });
+$('questionLimitUnlockBtn').addEventListener('click', unlockQuestionLimit);
+$('questionLimitPassword').addEventListener('keydown', e => { if (e.key === 'Enter') unlockQuestionLimit(); });
 $('startLevel').addEventListener('change', render);
 $('resetBtn').addEventListener('click', () => {
     if (!confirm('풀이 기록과 추정 레벨을 초기화할까요?')) return;

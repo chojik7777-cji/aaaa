@@ -14,6 +14,9 @@ assert.match(game, /id="questionText"/, '문제 표시 영역이 있어야 합�
 assert.doesNotMatch(game, /id="answerInput"/, '직접 입력칸 대신 객관식 보기만 사용해야 합니다');
 assert.doesNotMatch(game, /id="submitBtn"/, '정답 제출 버튼 대신 보기 선택으로 채점해야 합니다');
 assert.match(game, /id="choiceGrid"/, '객관식 보기 영역이 있어야 합니다');
+assert.match(game, /id="questionLimitOverlay"/, '5문제 초과 시 비밀번호 오버레이가 있어야 합니다');
+assert.match(game, /let questionLimit = 5/, '기본 풀이 제한은 5문제여야 합니다');
+assert.match(game, /questionLimit = Number\(data\.questionLimit/, '관리자 설정값으로 풀이 제한을 갱신해야 합니다');
 assert.match(game, /id="pauseBtn"/, '문제 풀이를 멈추고 재개하는 버튼이 있어야 합니다');
 assert.match(game, /id="menuBtn"/, '문제 풀이 중 메뉴로 돌아가는 버튼이 있어야 합니다');
 assert.match(game, /id="estimateLevel"/, '추정 레벨 표시가 있어야 합니다');
@@ -27,6 +30,10 @@ assert.match(game, /pausedTotal/, '멈춘 시간을 문제 풀이 시간에서 �
 assert.match(game, /menuBtn'\)\.addEventListener\('click', goMenu\)/, '메뉴 버튼에 goMenu 이벤트가 연결되어야 합니다');
 assert.match(game, /function buildChoices\(/, '정답과 오답 보기를 생성하는 함수가 있어야 합니다');
 assert.match(game, /function submitChoice\(/, '보기 선택으로 정답을 채점해야 합니다');
+assert.match(game, /function shouldShowQuestionLimitLock\(/, '6번째 문제 전에 제한 잠금을 확인해야 합니다');
+assert.match(game, /function unlockQuestionLimit\(/, '5문제 제한 잠금을 해제하는 함수가 있어야 합니다');
+assert.match(game, /sessionStorage\.setItem\(LIMIT_UNLOCK_KEY/, '제한 해제는 현재 브라우저 세션에 저장되어야 합니다');
+assert.match(game, /\/api\/math-control\?action=limit-unlock/, '5문제 초과 해제 비밀번호는 서버 API로 검증해야 합니다');
 assert.match(game, /data-choice/, '각 보기 버튼은 선택값을 가져야 합니다');
 assert.match(game, /class="choice-grid"/, '보기 버튼은 안정적인 그리드에 배치되어야 합니다');
 assert.doesNotMatch(game, /id="keypad"/, '숫자 키패드는 객관식 전환 후 제거되어야 합니다');
