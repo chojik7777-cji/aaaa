@@ -28,6 +28,7 @@ assert.match(game, /function generateProblem\(level/, '레벨 기반 문제 생�
 assert.match(game, /function updateAbility\(correct/, '결과 기반 능력치 갱신 함수가 있어야 합니다');
 assert.match(game, /function chooseNextLevel\(/, '다음 문제 난이도 선택 함수가 있어야 합니다');
 assert.match(game, /function togglePause\(/, '멈춤\/재개 함수가 있어야 합니다');
+assert.match(game, /b\.id !== 'pauseBtn' && paused/, '멈춤 상태에서도 계속하기 버튼은 활성 상태로 남아야 합니다');
 assert.match(game, /function goMenu\(/, '메뉴 복귀 함수가 있어야 합니다');
 assert.match(game, /pausedTotal/, '멈춘 시간을 문제 풀이 시간에서 제외해야 합니다');
 assert.match(game, /menuBtn'\)\.addEventListener\('click', goMenu\)/, '메뉴 버튼에 goMenu 이벤트가 연결되어야 합니다');
