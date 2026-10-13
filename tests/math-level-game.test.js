@@ -54,6 +54,7 @@ assert.match(game, /localStorage\.setItem\(SAVE_KEY/, '진행 기록이 저장�
 assert.match(game, /최근 풀이 흐름/, '풀이 흐름 시각화가 있어야 합니다');
 assert.match(game, /function curriculumLabel\(/, '추정 레벨을 교과 라벨로 바꾸는 함수가 있어야 합니다');
 assert.match(intro, /href="math-level\.html">수학 문제풀이 레벨 게임<\/a>/, '소개 페이지에 수학 문제풀이 레벨 게임 링크가 있어야 합니다');
+assert.match(intro, /href="math-control\.html"[^>]*class="dashboard-link"[^>]*>수학관리<\/a>/, '소개 페이지에 수학관리 링크가 있어야 합니다');
 assert.doesNotMatch(game, /← 소개 페이지/, '수학게임 페이지 하단에는 소개 페이지 링크가 없어야 합니다');
 assert.doesNotMatch(game, /href="intro\.html"/, '수학게임 페이지에는 소개 페이지로 돌아가는 링크가 없어야 합니다');
 
