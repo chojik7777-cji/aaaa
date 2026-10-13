@@ -3,7 +3,8 @@
 const assert = require('assert');
 const handler = require('../api/note2.js');
 
-function mockReq(method, url, body = {}) { return { method, url, headers: { host: 'localhost' }, body }; }
+let token = '';
+function mockReq(method, url, body = {}) { return { method, url, headers: { host: 'localhost', 'x-note-token': token }, body }; }
 function mockRes() { return { statusCode: 0, headers: {}, body: Buffer.alloc(0), setHeader(k, v) { this.headers[k.toLowerCase()] = v; }, end(x) { this.body = Buffer.isBuffer(x) ? x : Buffer.from(x || ''); } }; }
 async function call(method, url, body = {}) { const res = mockRes(); await handler(mockReq(method, url, body), res); return { status: res.statusCode, headers: res.headers, data: JSON.parse(res.body.toString() || '{}') }; }
 
@@ -12,6 +13,10 @@ async function call(method, url, body = {}) { const res = mockRes(); await handl
   assert.strictEqual(setup.status, 200);
   assert.strictEqual(setup.data.ok, true);
   assert.ok(setup.data.sql.includes('collab_notes'));
+  assert.strictEqual((await call('GET', '/api/note2/state?room=test')).status, 401);
+  const login = await call('POST', '/api/note2/login', { password: '1313' });
+  assert.strictEqual(login.status, 200);
+  token = login.data.token;
   const state = await call('GET', '/api/note2/state?room=test');
   assert.strictEqual(state.status, 503);
   assert.strictEqual(state.data.setupRequired, true);
