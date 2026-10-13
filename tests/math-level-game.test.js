@@ -15,6 +15,9 @@ assert.doesNotMatch(game, /id="answerInput"/, '직접 입력칸 대신 객관식
 assert.doesNotMatch(game, /id="submitBtn"/, '정답 제출 버튼 대신 보기 선택으로 채점해야 합니다');
 assert.match(game, /id="choiceGrid"/, '객관식 보기 영역이 있어야 합니다');
 assert.match(game, /id="questionLimitOverlay"/, '5문제 초과 시 비밀번호 오버레이가 있어야 합니다');
+assert.match(game, /id="questionLimitMessage">비번입력<\//, '학생 제한 비밀번호 안내문은 비번입력만 표시해야 합니다');
+assert.match(game, /id="questionLimitPassword"[^>]+placeholder="비번입력"/, '학생 제한 비밀번호 입력창 placeholder는 비번입력이어야 합니다');
+assert.doesNotMatch(game, /questionLimitMessage[\s\S]{0,300}선생님/, '학생 제한 비밀번호 화면에는 선생님 문구가 없어야 합니다');
 assert.match(game, /let questionLimit = 5/, '기본 풀이 제한은 5문제여야 합니다');
 assert.match(game, /questionLimit = Number\(data\.questionLimit/, '관리자 설정값으로 풀이 제한을 갱신해야 합니다');
 assert.match(game, /id="pauseBtn"/, '문제 풀이를 멈추고 재개하는 버튼이 있어야 합니다');
