@@ -103,3 +103,14 @@ cloudflared tunnel --url http://localhost:8793
 - 비밀번호: 기본 비밀번호는 Vercel note.html과 같음 (공개 저장소라 코드엔 해시만 저장). 바꾸려면 `note/family/.note-password` 파일에 새 비밀번호를 적거나 (재시작 불필요) `NOTE_PASSWORD=새비번 node portal-server.js`
   - 비밀번호를 바꾸면 이미 들어와 있던 기기도 다시 입력해야 함
   - 5번 틀리면 그 접속(IP)은 1시간 동안 잠금
+
+## 맥미니 공유노트 B (note2/<room> 폴더)
+
+`note2.html?room=이름`을 맥미니 포털 서버(임시터널)로 열면 `github-aaaa/note2/이름/` 폴더에서 메모와 파일을 관리합니다.
+
+- 예: `https://<터널주소>/note2.html?room=church` → `note2/church/`
+- room이 없으면 `note2/default/`
+- 폴더는 처음 쓸 때 자동 생성, Finder로 넣거나 지운 파일도 목록에 반영, 파일당 50MB
+- 비밀번호: 기본 비밀번호는 note.html과 같음. 바꾸려면 `note2/.note-password` 파일 또는 `NOTE2_PASSWORD` 환경변수
+- Vercel 주소의 note2.html은 기존처럼 Supabase 저장 (비밀번호는 Vercel 환경변수 `NOTE2_PASSWORD` 또는 기본 비밀번호)
+- `note2/` 폴더는 `.gitignore`에 있어 GitHub에 올라가지 않음

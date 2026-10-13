@@ -27,6 +27,16 @@ function notePassword() {
 const noteHandler = require('./note-folder').createNoteFolderHandler(NOTE_DIR, { password: notePassword, label: path.relative(ROOT, NOTE_DIR).startsWith('..') ? NOTE_DIR : path.relative(ROOT, NOTE_DIR).split(path.sep).join('/') });
 fs.mkdirSync(NOTE_DIR, { recursive: true });
 
+// 공유노트 B(note2.html): note2/<room> 폴더 (note2.html?room=church → note2/church)
+// 비밀번호: NOTE2_PASSWORD 환경변수 > note2/.note-password 파일 > 기본 비밀번호
+const NOTE2_DIR = path.resolve(process.env.NOTE2_DIR || path.join(ROOT, 'note2'));
+function note2Password() {
+  if (process.env.NOTE2_PASSWORD) return process.env.NOTE2_PASSWORD;
+  try { return fs.readFileSync(path.join(NOTE2_DIR, '.note-password'), 'utf8').trim(); } catch (e) { return ''; }
+}
+const note2Handler = require('./note-folder').createNoteFolderHandler(NOTE2_DIR, { password: note2Password, roomFolders: true, label: path.relative(ROOT, NOTE2_DIR).startsWith('..') ? NOTE2_DIR : path.relative(ROOT, NOTE2_DIR).split(path.sep).join('/') });
+fs.mkdirSync(NOTE2_DIR, { recursive: true });
+
 const TARGETS = {
   '/api/room': 'http://127.0.0.1:8791',   // yut-server.js
   '/api/dashboard': 'http://127.0.0.1:8791', // yut dashboard summary
@@ -62,7 +72,7 @@ function serveStatic(req, res) {
   if (!file.startsWith(ROOT)) return send(res, 403, 'Forbidden');
   // 공유노트 폴더는 /api/note 로만 접근 (주소로 직접 열기 막기)
   const inside = (dir) => file === dir || file.startsWith(dir + path.sep);
-  if (inside(NOTE_DIR) || inside(NOTE_BASE) || inside(OLD_NOTE_DIR)) return send(res, 403, 'Forbidden');
+  if (inside(NOTE_DIR) || inside(NOTE_BASE) || inside(OLD_NOTE_DIR) || inside(NOTE2_DIR)) return send(res, 403, 'Forbidden');
   fs.readFile(file, (err, buf) => {
     if (err) return send(res, 404, 'Not found');
     const ext = path.extname(file).toLowerCase();
@@ -90,6 +100,7 @@ const server = http.createServer((req, res) => {
     return send(res, 200, JSON.stringify({ ok: true, portal: true, yut: '8791', omok: '8792' }), 'application/json; charset=utf-8');
   }
   if (pathname === '/api/note' || pathname.startsWith('/api/note/')) return noteHandler(req, res);
+  if (pathname === '/api/note2' || pathname.startsWith('/api/note2/')) return note2Handler(req, res);
   for (const [prefix, base] of Object.entries(TARGETS)) {
     if (pathname === prefix || pathname.startsWith(prefix + '/')) return proxy(req, res, base);
   }
@@ -102,4 +113,5 @@ server.listen(PORT, HOST, () => {
   console.log(`- omok:  http://${HOST}:${PORT}/omok.html`);
   console.log(`- yut:   http://${HOST}:${PORT}/yut.html`);
   console.log(`- note:  http://${HOST}:${PORT}/note.html  (파일 폴더: ${NOTE_DIR})`);
+  console.log(`- note2: http://${HOST}:${PORT}/note2.html?room=church  (파일 폴더: ${NOTE2_DIR}/<room>)`);
 });

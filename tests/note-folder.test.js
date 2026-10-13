@@ -117,6 +117,30 @@ async function call(method, url, body, ip = '1.1.1.1') {
   assert.strictEqual((await call('POST', '/api/note/login', { password: '0000' }, '4.4.4.4')).status, 401);
   assert.strictEqual((await call('POST', '/api/note/login', { password: '1313' }, '4.4.4.4')).status, 200);
 
+  // note2 방식: 모든 room이 하위 폴더, /api/note2/<action> 경로
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'note2-'));
+  const h2 = createNoteFolderHandler(dir2, { password: () => '1313', roomFolders: true, label: 'note2' });
+  async function call2(method, url, body) {
+    const res = mockRes();
+    await h2({ method, url, headers: { host: 'localhost', 'x-note-token': tok2 }, body: body || (method === 'POST' ? {} : undefined) }, res);
+    return { status: res.statusCode, data: JSON.parse((await res.done).toString()) };
+  }
+  let tok2 = '';
+  tok2 = (await call2('POST', '/api/note2/login', { password: '1313' })).data.token;
+  r = await call2('POST', '/api/note2/upload?room=church', { name: '주보.txt', dataUrl: 'data:text/plain;base64,eA==', user: 'A' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.folder, 'note2/church');
+  assert.ok(fs.existsSync(path.join(dir2, 'church', '주보.txt')));
+  r = await call2('POST', '/api/note2/save?room=church', { text: '교회 메모' });
+  assert.strictEqual(fs.readFileSync(path.join(dir2, 'church', '.note-memo.txt'), 'utf8'), '교회 메모');
+  r = await call2('GET', '/api/note2/state?room=church');
+  assert.strictEqual(r.data.text, '교회 메모');
+  assert.deepStrictEqual(r.data.files.map((f) => f.name), ['주보.txt']);
+  r = await call2('GET', '/api/note2/state');
+  assert.strictEqual(r.data.folder, 'note2/default');
+  assert.strictEqual(r.data.files.length, 0, 'room 없으면 note2/default, church 파일 안 보임');
+  fs.rmSync(dir2, { recursive: true, force: true });
+
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('note-folder ok');
 })().catch((e) => { console.error(e); process.exit(1); });

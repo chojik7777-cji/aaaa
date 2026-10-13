@@ -43,7 +43,7 @@ function readBody(req) {
     req.on('error', reject);
   });
 }
-function roomId(v) { return String(v || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'default'; }
+function roomId(v) { return String(v || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50) || 'default'; }
 function safeName(v) {
   const n = path.basename(String(v || 'file')).replace(/[\\/\0\r\n:]/g, '_').replace(/^\.+/, '').slice(0, MAX_NAME);
   return n || 'file';
@@ -69,10 +69,14 @@ function uniqueName(dir, name) {
 }
 
 // opts.password: 문자열 또는 문자열을 돌려주는 함수 (비우면 기본 비밀번호, 매 요청마다 읽음)
+// opts.roomFolders: true면 모든 room이 하위 폴더 (room=church → <폴더>/church, room 없으면 <폴더>/default)
+// opts.label: 화면에 보여 줄 폴더 이름
 function createNoteFolderHandler(rootDir, opts = {}) {
   const ROOT = path.resolve(rootDir);
   const auth = createNoteAuth(opts);
-  const dirOf = (room) => room === 'default' ? ROOT : path.join(ROOT, room);
+  const dirOf = (room) => (room === 'default' && !opts.roomFolders) ? ROOT : path.join(ROOT, room);
+  const label = opts.label || path.basename(ROOT);
+  const labelOf = (room) => (room === 'default' && !opts.roomFolders) ? label : `${label}/${room}`;
   function readMeta(dir) {
     try { const m = JSON.parse(fs.readFileSync(path.join(dir, META), 'utf8')); return { version: 0, updatedAt: 0, updatedBy: '', uploads: {}, ...m }; }
     catch (e) { return { version: 0, updatedAt: 0, updatedBy: '', uploads: {} }; }
@@ -96,7 +100,7 @@ function createNoteFolderHandler(rootDir, opts = {}) {
     try { text = fs.readFileSync(path.join(dir, MEMO), 'utf8'); } catch (e) { /* 아직 없음 */ }
     return {
       ok: true, room, text, version: meta.version, updatedAt: meta.updatedAt, updatedBy: meta.updatedBy,
-      files: listFiles(dir, meta), storage: 'folder', folder: opts.label || path.basename(ROOT), maxFileBytes: MAX_FILE_BYTES,
+      files: listFiles(dir, meta), storage: 'folder', folder: labelOf(room), maxFileBytes: MAX_FILE_BYTES,
     };
   }
   // 파일 id(=파일 이름)가 폴더 밖이나 숨김 파일을 가리키지 않게
@@ -112,9 +116,10 @@ function createNoteFolderHandler(rootDir, opts = {}) {
     });
     try {
       const url = new URL(req.url, `http://${(req.headers && req.headers.host) || 'localhost'}`);
+      // /api/note/<action> 또는 /api/note2/<action>
       const parts = url.pathname.split('/').filter(Boolean);
-      const i = parts.indexOf('note');
-      const action = url.searchParams.get('action') || (i >= 0 ? parts.slice(i + 1).join('/') : '');
+      const i = parts.indexOf('api');
+      const action = url.searchParams.get('action') || (i >= 0 ? parts.slice(i + 2).join('/') : '');
       const body = await readBody(req);
       const room = roomId(url.searchParams.get('room') || body.room);
       const dir = dirOf(room);

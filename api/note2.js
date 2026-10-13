@@ -4,6 +4,9 @@ const crypto = require('crypto');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+const { createNoteAuth } = require('../note-auth');
+// 비밀번호: Vercel 환경변수 NOTE2_PASSWORD, 없으면 기본 비밀번호(note-auth.js)
+const auth = createNoteAuth({ password: () => process.env.NOTE2_PASSWORD || '' });
 const BUCKET = process.env.SUPABASE_NOTE_BUCKET || 'note-files';
 const MAX_TEXT = 500_000;
 const MAX_FILE_BYTES = 8_000_000;
@@ -113,6 +116,8 @@ module.exports = async function handler(req, res) {
   });
   const { url, action } = actionFrom(req);
   if (action === 'setup') return send(res, 200, { ok: true, configured: configured(), requiredEnv: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'], bucket: BUCKET, sql: setupSql });
+  if (action === 'login' && req.method === 'POST') { const [st, data] = auth.login(req, bodyOf(req)); return send(res, st, data); }
+  if (!auth.tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
   if (!configured()) return notConfigured(res);
   try {
     const body = bodyOf(req);
