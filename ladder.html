@@ -117,7 +117,7 @@
         </div>
         <div class="opts">
             <label><input type="checkbox" id="hideResults" checked> 결과 가리기</label>
-            <label><input type="checkbox" id="hideLadder"> 사다리 가리기 (지나간 길만 보여요)</label>
+            <label><input type="checkbox" id="hideLadder" checked> 사다리 가리기 (지나간 길만 보여요)</label>
         </div>
     </details>
 
@@ -210,12 +210,12 @@ const PRESETS = {
     clean: n => Array.from({ length: n }, (_, i) => i === 0 ? '🧹 청소 당번' : '자유'),
     penalty: n => ['🎤 노래 한 곡', '💃 춤추기', '🍫 간식 사기', '😆 애교 3종', '🙆 통과', '📸 셀카 올리기', '🧃 음료 쏘기', '🙆 통과', '🗣️ 성대모사', '🙆 통과'].slice(0, n),
 };
-const SAVE_KEY = 'ladder-game-v1';
+const SAVE_KEY = 'ladder-game-v2'; // v2: 사다리 가리기 기본 ON
 const isWin = s => /당첨|1등|커피|청소|벌칙|🎤|💃|🍫|😆|📸|🧃|🗣️/.test(s) && !/꽝|통과|자유/.test(s);
 
 let st = {
     n: 4, names: DEFAULT_NAMES.slice(0, 4), results: PRESETS.win(4), preset: 'win',
-    seed: Math.floor(Math.random() * 1e9), hideResults: true, hideLadder: false,
+    seed: Math.floor(Math.random() * 1e9), hideResults: true, hideLadder: true,
 };
 let rungs = [], done = {}, anim = null, soundOn = true, audio = null;
 
@@ -232,7 +232,7 @@ function fromHash() {
         n, preset: 'custom', seed: Number(q.get('seed')) >>> 0,
         names: Array.from({ length: n }, (_, i) => names[i] || DEFAULT_NAMES[i]),
         results: Array.from({ length: n }, (_, i) => results[i] || '꽝'),
-        hideResults: q.get('hr') !== '0', hideLadder: q.get('hl') === '1',
+        hideResults: q.get('hr') !== '0', hideLadder: q.get('hl') !== '0',
     };
     return true;
 }
