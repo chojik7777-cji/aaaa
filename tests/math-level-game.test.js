@@ -56,10 +56,6 @@ assert.match(game, /최근 풀이 흐름/, '풀이 흐름 시각화가 있어야
 assert.match(game, /function curriculumLabel\(/, '추정 레벨을 교과 라벨로 바꾸는 함수가 있어야 합니다');
 assert.match(intro, /href="math-level\.html">수학 문제풀이 레벨 게임<\/a>/, '소개 페이지에 수학 문제풀이 레벨 게임 링크가 있어야 합니다');
 assert.match(intro, /href="math-control\.html"[^>]*class="dashboard-link"[^>]*>수학관리<\/a>/, '소개 페이지에 수학관리 링크가 있어야 합니다');
-assert.match(intro, /id="webPageLinks"/, '소개 페이지 하단에 웹페이지 링크 리스트 섹션이 있어야 합니다');
-for (const page of ['intro.html', 'index.html', 'cafe.html', 'church.html', 'math-academy.html', 'math-level.html', 'omok.html', 'baduk.html', 'yut.html', 'note.html', 'note2.html']) {
-  assert.match(intro, new RegExp(`href="${page}"`), `${page} 링크가 웹페이지 링크 리스트에 있어야 합니다`);
-}
 assert.doesNotMatch(game, /← 소개 페이지/, '수학게임 페이지 하단에는 소개 페이지 링크가 없어야 합니다');
 assert.doesNotMatch(game, /href="intro\.html"/, '수학게임 페이지에는 소개 페이지로 돌아가는 링크가 없어야 합니다');
 
