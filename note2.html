@@ -38,5 +38,6 @@ async function uploadFile(){const file=$('fileInput').files[0]; if(!file)return 
 async function deleteFile(id){if(!confirm('첨부파일을 삭제할까요?'))return;try{applyRemote(await api('delete-file',{id,user:user()}),false)}catch(e){alert(e.message)}}
 $('editor').addEventListener('input',()=>{if(!applyingRemote)scheduleSave();$('countText').textContent=`${$('editor').value.length.toLocaleString()}자`});$('saveBtn').addEventListener('click',saveNow);$('reloadBtn').addEventListener('click',()=>load(true));$('uploadBtn').addEventListener('click',uploadFile);$('fileList').addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteFile(b.dataset.delete)});$('copyLinkBtn').addEventListener('click',async()=>{const url=`${location.origin}${location.pathname}?room=${encodeURIComponent(room)}`;try{await navigator.clipboard.writeText(url);alert('공유 링크를 복사했습니다.')}catch(e){prompt('공유 링크를 복사하세요.',url)}});try{$('userName').value=localStorage.getItem('note-user-name')||''}catch(e){}$('shareUrl').textContent=`공유 URL: ${location.origin}${location.pathname}?room=${room}`;load(true);setInterval(()=>load(false),1500);
 </script>
+    <p class="footer">문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
 </body>
 </html>
