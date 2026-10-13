@@ -37,6 +37,8 @@
         .setup summary { cursor: pointer; font-weight: 700; color: #4a5568; font-size: 15px; }
         .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .presets button { font-size: 13px; padding: 6px 10px; }
+        .pick { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600; }
+        .pick[hidden] { display: none; }
         .presets button.on { background: #764ba2; color: white; border-color: #764ba2; }
         .lists { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
         .lists h3 { font-size: 13px; color: #718096; margin-bottom: 6px; }
@@ -104,12 +106,13 @@
         <div class="row">
             <select id="count" aria-label="참가 인원"></select>
             <div class="row presets" id="presets">
-                <button data-preset="win">🎯 당첨 1명</button>
+                <button data-preset="win">🎯 당첨</button>
                 <button data-preset="order">🔢 순서 정하기</button>
                 <button data-preset="coffee">☕ 커피 내기</button>
                 <button data-preset="clean">🧹 청소 당번</button>
                 <button data-preset="penalty">🤪 벌칙 정하기</button>
             </div>
+            <label class="pick" id="pickWrap"><span id="pickLabel">당첨 인원</span> <select id="pick" aria-label="뽑을 인원"></select></label>
         </div>
         <div class="lists">
             <div><h3>👥 참가자 (위)</h3><div id="namesBox"></div></div>
@@ -203,18 +206,23 @@ if (typeof document !== 'undefined') {
 const $ = id => document.getElementById(id);
 const COLORS = ['#e53e3e', '#dd6b20', '#d69e2e', '#38a169', '#319795', '#3182ce', '#5a67d8', '#805ad5', '#d53f8c', '#718096'];
 const DEFAULT_NAMES = ['철수', '영희', '민수', '지은', '현우', '수아', '도윤', '하은', '준서', '서연'];
+const PENALTIES = ['🎤 노래 한 곡', '💃 춤추기', '🍫 간식 사기', '😆 애교 3종', '📸 셀카 올리기', '🧃 음료 쏘기', '🗣️ 성대모사'];
+// k = 뽑을 인원 (당첨·커피·청소·벌칙 받는 사람 수)
 const PRESETS = {
-    win: n => Array.from({ length: n }, (_, i) => i === 0 ? '🎉 당첨' : '꽝'),
+    win: (n, k = 1) => Array.from({ length: n }, (_, i) => i < k ? '🎉 당첨' : '꽝'),
     order: n => Array.from({ length: n }, (_, i) => `${i + 1}등`),
-    coffee: n => Array.from({ length: n }, (_, i) => i === 0 ? '☕ 커피 쏘기' : '통과'),
-    clean: n => Array.from({ length: n }, (_, i) => i === 0 ? '🧹 청소 당번' : '자유'),
-    penalty: n => ['🎤 노래 한 곡', '💃 춤추기', '🍫 간식 사기', '😆 애교 3종', '🙆 통과', '📸 셀카 올리기', '🧃 음료 쏘기', '🙆 통과', '🗣️ 성대모사', '🙆 통과'].slice(0, n),
+    coffee: (n, k = 1) => Array.from({ length: n }, (_, i) => i < k ? '☕ 커피 쏘기' : '통과'),
+    clean: (n, k = 1) => Array.from({ length: n }, (_, i) => i < k ? '🧹 청소 당번' : '자유'),
+    penalty: (n, k = 1) => Array.from({ length: n }, (_, i) => i < k ? PENALTIES[i % PENALTIES.length] : '🙆 통과'),
 };
+const PICK_LABEL = { win: '🎯 당첨 인원', coffee: '☕ 커피 쏠 사람', clean: '🧹 청소 당번', penalty: '🤪 벌칙 받을 사람' };
+const clampPick = (k, n) => Math.max(1, Math.min(n - 1, Math.floor(Number(k)) || 1));
+const presetResults = () => PRESETS[st.preset](st.n, st.pick);
 const SAVE_KEY = 'ladder-game-v2'; // v2: 사다리 가리기 기본 ON
 const isWin = s => /당첨|1등|커피|청소|벌칙|🎤|💃|🍫|😆|📸|🧃|🗣️/.test(s) && !/꽝|통과|자유/.test(s);
 
 let st = {
-    n: 4, names: DEFAULT_NAMES.slice(0, 4), results: PRESETS.win(4), preset: 'win',
+    n: 4, names: DEFAULT_NAMES.slice(0, 4), results: PRESETS.win(4), preset: 'win', pick: 1,
     seed: Math.floor(Math.random() * 1e9), hideResults: true, hideLadder: true,
 };
 let rungs = [], done = {}, anim = null, soundOn = true, audio = null;
@@ -229,7 +237,7 @@ function fromHash() {
     const split = s => (s || '').split('|').slice(0, n);
     const names = split(q.get('names')), results = split(q.get('results'));
     st = {
-        n, preset: 'custom', seed: Number(q.get('seed')) >>> 0,
+        n, preset: 'custom', pick: 1, seed: Number(q.get('seed')) >>> 0,
         names: Array.from({ length: n }, (_, i) => names[i] || DEFAULT_NAMES[i]),
         results: Array.from({ length: n }, (_, i) => results[i] || '꽝'),
         hideResults: q.get('hr') !== '0', hideLadder: q.get('hl') !== '0',
@@ -240,7 +248,7 @@ function load() {
     if (fromHash()) return;
     try {
         const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-        if (s && s.n >= MIN_N && s.n <= MAX_N && Array.isArray(s.names) && Array.isArray(s.results)) st = Object.assign(st, s);
+        if (s && s.n >= MIN_N && s.n <= MAX_N && Array.isArray(s.names) && Array.isArray(s.results)) { st = Object.assign(st, s); st.pick = clampPick(st.pick, st.n); }
     } catch (e) { /* 기본값 */ }
 }
 function shareUrl() {
@@ -274,6 +282,9 @@ function sfx(kind) {
 function renderSetup() {
     $('count').innerHTML = Array.from({ length: MAX_N - MIN_N + 1 }, (_, i) => i + MIN_N).map(v => `<option value="${v}" ${v === st.n ? 'selected' : ''}>${v}명</option>`).join('');
     $('presets').querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('on', b.dataset.preset === st.preset));
+    $('pickWrap').hidden = !PICK_LABEL[st.preset];
+    $('pickLabel').textContent = PICK_LABEL[st.preset] || '';
+    $('pick').innerHTML = Array.from({ length: st.n - 1 }, (_, i) => i + 1).map(v => `<option value="${v}" ${v === st.pick ? 'selected' : ''}>${v}명</option>`).join('');
     $('namesBox').innerHTML = st.names.map((nm, i) => `<div class="who"><span style="background:${COLORS[i]}"></span><input data-name="${i}" maxlength="12" aria-label="참가자 ${i + 1}"></div>`).join('');
     $('resultsBox').innerHTML = st.results.map((r, i) => `<input data-result="${i}" maxlength="14" aria-label="결과 ${i + 1}">`).join('');
     // 값은 속성이 아니라 value로 넣어 특수문자도 안전하게
@@ -285,8 +296,8 @@ function renderSetup() {
 function resize(n) {
     const names = st.names.slice(0, n), results = st.results.slice(0, n);
     for (let i = names.length; i < n; i++) names.push(DEFAULT_NAMES[i]);
-    st.n = n; st.names = names;
-    st.results = st.preset !== 'custom' && PRESETS[st.preset] ? PRESETS[st.preset](n) : Array.from({ length: n }, (_, i) => results[i] || '꽝');
+    st.n = n; st.names = names; st.pick = clampPick(st.pick, n);
+    st.results = st.preset !== 'custom' && PRESETS[st.preset] ? presetResults() : Array.from({ length: n }, (_, i) => results[i] || '꽝');
 }
 function resetRun(newSeed) {
     if (anim) { cancelAnimationFrame(anim.raf); anim = null; }
@@ -447,7 +458,12 @@ function toast(msg) {
 $('count').addEventListener('change', () => { resize(Number($('count').value)); renderSetup(); resetRun(true); });
 $('presets').addEventListener('click', e => {
     const b = e.target.closest('[data-preset]'); if (!b) return;
-    st.preset = b.dataset.preset; st.results = PRESETS[st.preset](st.n);
+    st.preset = b.dataset.preset; st.results = presetResults();
+    renderSetup(); resetRun(false);
+});
+$('pick').addEventListener('change', () => {
+    st.pick = clampPick($('pick').value, st.n);
+    if (PRESETS[st.preset]) st.results = presetResults();
     renderSetup(); resetRun(false);
 });
 $('namesBox').addEventListener('input', e => {
