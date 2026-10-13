@@ -25,5 +25,8 @@ assert.match(html, /function editCafeTitle\(/, '카페 타이틀 편집 함수�
 assert.match(html, /cafeTitle:\s*DEFAULT_CAFE_TITLE/, '새 게임 기본 타이틀은 조이이익 카페여야 합니다');
 assert.match(html, /cafeTitle:\s*normalizeCafeTitle\(imported\.cafeTitle/, 'import 시 카페 타이틀을 정상화해야 합니다');
 assert.match(html, /editCafeTitleBtn'\)\.addEventListener\('click', editCafeTitle\)/, '타이틀 편집 버튼에 이벤트가 연결되어야 합니다');
+assert.match(html, /문의\s*:/, '카페게임 제일 하단에 문의 표시가 있어야 합니다');
+assert.match(html, /chojeongik@naver\.com/, '카페게임 제일 하단에 문의 이메일이 있어야 합니다');
+assert.match(html, /mailto:chojeongik@naver\.com/, '문의 이메일은 메일 링크여야 합니다');
 
 console.log('cafe export/import tests passed');
