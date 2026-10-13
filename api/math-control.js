@@ -5,7 +5,7 @@ const path = require('path');
 
 globalThis.__MATH_GAME_CONTROL__ = globalThis.__MATH_GAME_CONTROL__ || {
   locked: false,
-  message: '선생님 확인 후 계속하세요.',
+  message: '비번을 입력하세요',
   unlockPassword: '1212',
   questionLimit: 5,
   limitPassword: '1414',
@@ -47,7 +47,7 @@ function publicState(extra = {}) {
   return {
     ok: true,
     locked: !!control.locked,
-    message: control.message || '선생님 확인 후 계속하세요.',
+    message: control.message || '비번을 입력하세요',
     questionLimit: Number.isFinite(Number(control.questionLimit)) ? Number(control.questionLimit) : 5,
     version: control.version || 0,
     updatedAt: control.updatedAt || Date.now(),
@@ -56,7 +56,7 @@ function publicState(extra = {}) {
 }
 function setState({ locked, message, unlockPassword, questionLimit, limitPassword }) {
   control.locked = !!locked;
-  if (message != null) control.message = String(message).trim().slice(0, 180) || '선생님 확인 후 계속하세요.';
+  if (message != null) control.message = String(message).trim().slice(0, 180) || '비번을 입력하세요';
   if (unlockPassword != null && String(unlockPassword).trim()) control.unlockPassword = String(unlockPassword).trim().slice(0, 64);
   if (questionLimit != null) {
     const limit = Math.max(0, Math.min(999, Math.floor(Number(questionLimit))));

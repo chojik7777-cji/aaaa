@@ -151,7 +151,7 @@
 <div class="lock-overlay" id="mathLockOverlay" role="dialog" aria-modal="true" aria-labelledby="mathLockTitle">
     <div class="lock-card">
         <h2 id="mathLockTitle">🔐 수학게임 잠금</h2>
-        <p id="mathLockMessage">선생님 확인 후 계속하세요.</p>
+        <p id="mathLockMessage">비번을 입력하세요</p>
         <input id="mathUnlockPassword" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호">
         <button id="mathUnlockBtn" type="button">계속하기</button>
         <div class="lock-error" id="mathUnlockError"></div>
@@ -485,7 +485,7 @@ function applyMathControl(data) {
     setQuestionLimitFromControl(data);
     const bypassVersion = Number(localStorage.getItem(CONTROL_BYPASS_KEY) || -1);
     centralLocked = !!data.locked && Number(data.version ?? 0) > bypassVersion;
-    $('mathLockMessage').textContent = data.message || '선생님 확인 후 계속하세요.';
+    $('mathLockMessage').textContent = data.message || '비번을 입력하세요';
     $('mathLockOverlay').classList.toggle('show', centralLocked);
     document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn, #menuBtn').forEach(b => { b.disabled = centralLocked || (b.id !== 'menuBtn' && b.id !== 'pauseBtn' && paused); });
     if (centralLocked) $('mathUnlockPassword').focus();

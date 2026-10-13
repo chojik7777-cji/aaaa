@@ -36,6 +36,7 @@ async function call(handler, method, url, body = {}) {
   assert.strictEqual(initial.status, 200, 'status endpoint works');
   assert.strictEqual(initial.data.ok, true);
   assert.strictEqual(initial.data.locked, false, 'default unlocked');
+  assert.strictEqual(initial.data.message, '비번을 입력하세요', 'default lock message asks for password');
   assert.strictEqual(initial.data.questionLimit, 5, 'default question limit is 5');
   assert.ok(!('unlockPassword' in initial.data), 'public status must not expose unlock password');
   assert.ok(!('limitPassword' in initial.data), 'public status must not expose limit password');
@@ -46,14 +47,14 @@ async function call(handler, method, url, body = {}) {
   const locked = await call(handler, 'POST', '/api/math-control?action=set', {
     adminPassword: 'admin-test',
     locked: true,
-    message: '선생님 확인 후 계속하세요',
+    message: '테스트 안내문',
     unlockPassword: '2468',
     questionLimit: 7,
     limitPassword: '1414',
   });
   assert.strictEqual(locked.status, 200, 'admin can lock');
   assert.strictEqual(locked.data.locked, true);
-  assert.strictEqual(locked.data.message, '선생님 확인 후 계속하세요');
+  assert.strictEqual(locked.data.message, '테스트 안내문');
   assert.strictEqual(locked.data.questionLimit, 7, 'admin can change question limit');
   assert.ok(!('unlockPassword' in locked.data), 'set response must not expose unlock password');
   assert.ok(!('limitPassword' in locked.data), 'set response must not expose limit password');
@@ -80,6 +81,8 @@ async function call(handler, method, url, body = {}) {
   const admin = fs.readFileSync(path.join(root, 'math-control.html'), 'utf8');
   const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
   assert.match(game, /id="mathLockOverlay"/, 'game must have central lock overlay');
+  assert.match(game, /비번을 입력하세요/, 'game default lock message must ask for password');
+  assert.doesNotMatch(game, /선생님 확인 후 계속하세요/, 'old default lock message must be removed from game page');
   assert.match(game, /function pollMathControl\(/, 'game must poll central lock state');
   assert.match(game, /CONTROL_BYPASS_KEY/, 'student unlock must remember the unlocked control version locally');
   assert.match(game, /localStorage\.setItem\(CONTROL_BYPASS_KEY/, 'successful student unlock must store bypass version');
@@ -87,6 +90,8 @@ async function call(handler, method, url, body = {}) {
   assert.match(game, /\/api\/math-control\?action=unlock/, 'game must call unlock API');
   assert.match(game, /\/api\/math-control\?action=limit-unlock/, 'game must call question limit unlock API');
   assert.match(admin, /id="lockOnBtn"/, 'admin page must have lock button');
+  assert.match(admin, /<textarea id="lockMessage">비번을 입력하세요<\/textarea>/, 'admin default lock message must ask for password');
+  assert.doesNotMatch(admin, /선생님 확인 후 계속하세요/, 'old default lock message must be removed from admin page');
   assert.match(admin, /id="questionLimit"/, 'admin page must configure question limit');
   assert.match(admin, /id="limitPassword"/, 'admin page must configure question limit password');
   assert.match(admin, /id="applySettingsBtn"/, 'admin page must have a settings apply button for changing limits without toggling lock');
