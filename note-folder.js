@@ -1,6 +1,6 @@
 'use strict';
 
-// 맥미니용 공유노트 API: 메모와 첨부파일을 특정 폴더(기본: family)에 실제 파일로 저장합니다.
+// 맥미니용 공유노트 API: 메모와 첨부파일을 특정 폴더(기본: note/family)에 실제 파일로 저장합니다.
 // note.html이 쓰는 /api/note/* 와 같은 형식이라, 임시터널 주소로 note.html을 열면 이 폴더를 공유합니다.
 // - room=default → NOTE_DIR 자체, 다른 room → NOTE_DIR/<room> 하위 폴더
 // - 메모 본문은 .note-memo.txt, 버전·올린 사람 기록은 .note-meta.json (점으로 시작해 목록에 안 보임)
@@ -96,7 +96,7 @@ function createNoteFolderHandler(rootDir, opts = {}) {
     try { text = fs.readFileSync(path.join(dir, MEMO), 'utf8'); } catch (e) { /* 아직 없음 */ }
     return {
       ok: true, room, text, version: meta.version, updatedAt: meta.updatedAt, updatedBy: meta.updatedBy,
-      files: listFiles(dir, meta), storage: 'folder', folder: path.basename(ROOT), maxFileBytes: MAX_FILE_BYTES,
+      files: listFiles(dir, meta), storage: 'folder', folder: opts.label || path.basename(ROOT), maxFileBytes: MAX_FILE_BYTES,
     };
   }
   // 파일 id(=파일 이름)가 폴더 밖이나 숨김 파일을 가리키지 않게
