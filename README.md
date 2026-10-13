@@ -100,3 +100,6 @@ cloudflared tunnel --url http://localhost:8793
 - `?room=이름`으로 열면 `family/이름/` 하위 폴더를 사용
 - 메모 본문은 `family/.note-memo.txt`에 저장 (숨김 파일)
 - `family/` 폴더는 `.gitignore`에 있어 GitHub에 올라가지 않음
+- 비밀번호: 기본 `1212`. 바꾸려면 `family/.note-password` 파일에 새 비밀번호를 적거나 (재시작 불필요) `NOTE_PASSWORD=새비번 node portal-server.js`
+  - 비밀번호를 바꾸면 이미 들어와 있던 기기도 다시 입력해야 함
+  - 5번 틀리면 그 접속(IP)은 1시간 동안 잠금

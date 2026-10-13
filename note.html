@@ -34,6 +34,13 @@
     .file-actions { display:flex; gap:7px; flex-wrap:wrap; }
     .hint { font-size:12px; color:#718096; line-height:1.6; }
     .copy { word-break:break-all; color:#2b6cb0; font-size:13px; }
+    .lock { position:fixed; inset:0; background:rgba(26,32,44,.72); display:flex; align-items:center; justify-content:center; padding:16px; z-index:10; }
+    .lock[hidden] { display:none; }
+    .lock form { background:white; border-radius:20px; padding:24px; width:100%; max-width:340px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+    .lock h2 { margin:0 0 6px; color:#1a365d; }
+    .lock input { width:100%; border:1px solid #cbd5e0; border-radius:12px; padding:12px; font-size:18px; margin:10px 0; }
+    .lock button { width:100%; }
+    .lock .err { color:#c53030; font-size:13px; min-height:18px; margin:8px 0 0; }
     @media (max-width:720px) { .top { grid-template-columns:1fr; } textarea{min-height:46vh;} header,.panel{padding:16px;} }
   </style>
 </head>
@@ -80,6 +87,16 @@
     </section>
   </main>
 
+  <div class="lock" id="lock" hidden>
+    <form id="lockForm">
+      <h2>🔒 비밀번호</h2>
+      <p class="hint">가족 공유노트예요. 비밀번호를 입력하세요.</p>
+      <input id="lockPw" type="password" autocomplete="current-password" aria-label="비밀번호">
+      <button type="submit" id="lockBtn">들어가기</button>
+      <p class="err" id="lockErr"></p>
+    </form>
+  </div>
+
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
@@ -96,6 +113,16 @@ let saving = false;
 let saveTimer = null;
 let applyingRemote = false;
 let lastLocalEdit = 0;
+let locked = false;
+const TOKEN_KEY = 'note-token';
+function token() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+function showLock(msg) {
+  locked = true;
+  $('lock').hidden = false;
+  if (msg) $('lockErr').textContent = msg;
+  setBadge('bad', '● 비밀번호 필요');
+  setTimeout(() => $('lockPw').focus(), 50);
+}
 
 function user() {
   const v = $('userName').value.trim();
@@ -113,11 +140,12 @@ function updateStatus(data) {
 async function api(action, body) {
   const res = await fetch(`${API}/${action}?room=${encodeURIComponent(room)}`, {
     method: action === 'state' ? 'GET' : 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Note-Token': token() },
     body: action === 'state' ? undefined : JSON.stringify({ room, ...(body || {}) }),
     cache: 'no-store',
   });
   const data = action === 'file' ? null : await res.json();
+  if (res.status === 401 && data && data.authRequired && action !== 'login') { showLock(); throw new Error(data.error); }
   if (!res.ok || (data && !data.ok)) throw new Error((data && data.error) || '서버 오류');
   return data;
 }
@@ -141,6 +169,7 @@ function applyRemote(data, force = false) {
   }
 }
 async function load(force = false) {
+  if (locked) return;
   try {
     const data = await api('state');
     applyRemote(data, force);
@@ -179,7 +208,7 @@ function renderFiles(files) {
     <div class="file">
       <div><b>${esc(f.name)}</b><br><small>${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)} · ${esc(f.uploadedBy || '익명')}</small></div>
       <div class="file-actions">
-        <a href="${API}/file?room=${encodeURIComponent(room)}&id=${encodeURIComponent(f.id)}" download="${esc(f.name)}"><button type="button" class="secondary">다운로드</button></a>
+        <a href="${API}/file?room=${encodeURIComponent(room)}&id=${encodeURIComponent(f.id)}${token() ? `&token=${encodeURIComponent(token())}` : ''}" download="${esc(f.name)}"><button type="button" class="secondary">다운로드</button></a>
         <button type="button" class="danger" data-delete="${esc(f.id)}">삭제</button>
       </div>
     </div>`).join('');
@@ -205,6 +234,17 @@ async function deleteFile(id) {
   catch (e) { alert(e.message); }
 }
 
+$('lockForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('lockBtn').disabled = true; $('lockErr').textContent = '';
+  try {
+    const data = await api('login', { password: $('lockPw').value });
+    try { localStorage.setItem(TOKEN_KEY, data.token || ''); } catch (err) {}
+    locked = false; $('lock').hidden = true; $('lockPw').value = '';
+    load(true);
+  } catch (err) { $('lockErr').textContent = err.message; $('lockPw').select(); }
+  finally { $('lockBtn').disabled = false; }
+});
 $('editor').addEventListener('input', () => { if (!applyingRemote) scheduleSave(); $('countText').textContent = `${$('editor').value.length.toLocaleString()}자`; });
 $('saveBtn').addEventListener('click', saveNow);
 $('reloadBtn').addEventListener('click', () => load(true));
