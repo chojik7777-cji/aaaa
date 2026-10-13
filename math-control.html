@@ -17,6 +17,7 @@
     button { border:0; border-radius:12px; padding:13px 14px; font:inherit; font-weight:900; cursor:pointer; color:white; }
     #lockOnBtn { background:#e53e3e; }
     #lockOffBtn { background:#38a169; }
+    #applySettingsBtn { background:#5a67d8; }
     #refreshBtn { background:#4a5568; }
     .status { margin-top:16px; padding:14px; border-radius:14px; background:#f7fafc; border:1px solid #e2e8f0; line-height:1.7; }
     .badge { display:inline-block; border-radius:999px; padding:3px 10px; font-weight:900; }
@@ -54,7 +55,10 @@
       <button id="lockOffBtn" type="button">잠금 OFF</button>
     </div>
     <div class="row">
+      <button id="applySettingsBtn" type="button">설정 적용</button>
       <button id="refreshBtn" type="button">상태 새로고침</button>
+    </div>
+    <div class="row">
       <a href="math-level.html" style="align-self:center;text-align:center">수학게임 열기 →</a>
     </div>
 
@@ -64,7 +68,9 @@
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
+let currentLocked = false;
 function showStatus(data) {
+  currentLocked = !!data.locked;
   const badge = data.locked ? '<span class="badge locked">잠금 ON</span>' : '<span class="badge open">잠금 OFF</span>';
   $('statusBox').innerHTML = `${badge}<br>문제 제한: ${Number(data.questionLimit ?? 5)}문제 초과 시 비밀번호 요구<br>안내문: ${escapeHtml(data.message || '')}<br>버전: ${data.version ?? '-'}<br>갱신: ${data.updatedAt ? new Date(data.updatedAt).toLocaleString('ko-KR') : '-'}`;
   $('questionLimit').value = Number(data.questionLimit ?? 5);
@@ -92,8 +98,10 @@ async function setLock(locked) {
   if (!res.ok) throw new Error(data.error || '통제 상태 변경 실패');
   showStatus(data);
 }
+function applySettings() { return setLock(currentLocked); }
 $('lockOnBtn').addEventListener('click', () => setLock(true).catch(e => alert(e.message)));
 $('lockOffBtn').addEventListener('click', () => setLock(false).catch(e => alert(e.message)));
+$('applySettingsBtn').addEventListener('click', () => applySettings().catch(e => alert(e.message)));
 $('refreshBtn').addEventListener('click', () => refreshState().catch(e => alert(e.message)));
 refreshState().catch(e => { $('statusBox').textContent = e.message; });
 </script>

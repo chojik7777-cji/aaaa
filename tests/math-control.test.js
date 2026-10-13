@@ -89,6 +89,8 @@ async function call(handler, method, url, body = {}) {
   assert.match(admin, /id="lockOnBtn"/, 'admin page must have lock button');
   assert.match(admin, /id="questionLimit"/, 'admin page must configure question limit');
   assert.match(admin, /id="limitPassword"/, 'admin page must configure question limit password');
+  assert.match(admin, /id="applySettingsBtn"/, 'admin page must have a settings apply button for changing limits without toggling lock');
+  assert.match(admin, /applySettingsBtn'\)\.addEventListener\('click', \(\) => applySettings\(\)/, 'settings apply button must save current settings');
   assert.match(admin, /\/api\/math-control\?action=set/, 'admin page must set central lock state');
   assert.match(vercel, /api\/math-control\/:action/, 'vercel rewrites must support math-control actions');
 
