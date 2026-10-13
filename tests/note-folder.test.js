@@ -112,6 +112,11 @@ async function call(method, url, body, ip = '1.1.1.1') {
   assert.ok(!r.data.files.some((f) => f.name.startsWith('.')));
   assert.strictEqual((await call('GET', '/api/note/file?room=default&id=.note-password')).status, 404);
 
+  // 비밀번호 설정이 없으면 기본 비밀번호 1313
+  password = '';
+  assert.strictEqual((await call('POST', '/api/note/login', { password: '0000' }, '4.4.4.4')).status, 401);
+  assert.strictEqual((await call('POST', '/api/note/login', { password: '1313' }, '4.4.4.4')).status, 200);
+
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('note-folder ok');
 })().catch((e) => { console.error(e); process.exit(1); });
