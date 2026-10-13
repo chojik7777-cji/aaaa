@@ -7,7 +7,10 @@ const path = require('path');
 const { createNoteFolderHandler } = require('../note-folder.js');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'note-family-'));
-const handler = createNoteFolderHandler(dir);
+let clock = 1_000_000;
+let password = '0000';
+const handler = createNoteFolderHandler(dir, { password: () => password, now: () => clock });
+let tok = '';
 
 function mockRes() {
   const { PassThrough } = require('stream');
@@ -19,16 +22,44 @@ function mockRes() {
   res.done = new Promise((r) => res.on('finish', () => r(Buffer.concat(chunks))));
   return res;
 }
-async function call(method, url, body) {
+async function call(method, url, body, ip = '1.1.1.1') {
   const res = mockRes();
-  await handler({ method, url, headers: { host: 'localhost' }, body: body || (method === 'POST' ? {} : undefined) }, res);
+  await handler({ method, url, headers: { host: 'localhost', 'x-note-token': tok, 'cf-connecting-ip': ip }, body: body || (method === 'POST' ? {} : undefined) }, res);
   const buf = await res.done;
   const type = res.headers['content-type'] || '';
   return type.includes('application/json') ? { status: res.statusCode, data: JSON.parse(buf.toString()) } : { status: res.statusCode, headers: res.headers, body: buf };
 }
 
 (async () => {
+  // 비밀번호 없이는 막힘
   let r = await call('GET', '/api/note/state?room=default');
+  assert.strictEqual(r.status, 401);
+  assert.strictEqual(r.data.authRequired, true);
+
+  // 4번 틀리고 맞추면 통과 (실패 횟수 초기화)
+  for (let i = 0; i < 4; i++) assert.strictEqual((await call('POST', '/api/note/login', { password: 'x' })).status, 401);
+  r = await call('POST', '/api/note/login', { password: '0000' });
+  assert.strictEqual(r.status, 200);
+  tok = r.data.token;
+  assert.ok(tok);
+
+  // 다른 IP가 5번 틀리면 1시간 잠금 (맞는 비번도 거부), 1시간 뒤 풀림
+  for (let i = 0; i < 4; i++) await call('POST', '/api/note/login', { password: 'x' }, '2.2.2.2');
+  r = await call('POST', '/api/note/login', { password: 'x' }, '2.2.2.2');
+  assert.strictEqual(r.status, 429);
+  r = await call('POST', '/api/note/login', { password: '0000' }, '2.2.2.2');
+  assert.strictEqual(r.status, 429);
+  assert.strictEqual((await call('POST', '/api/note/login', { password: '0000' }, '3.3.3.3')).status, 200, '다른 접속은 영향 없음');
+  clock += 60 * 60 * 1000 + 1;
+  assert.strictEqual((await call('POST', '/api/note/login', { password: '0000' }, '2.2.2.2')).status, 200);
+
+  // 다운로드 링크용 ?token= 도 허용
+  const saved = tok; tok = '';
+  r = await call('GET', `/api/note/state?room=default&token=${saved}`);
+  assert.strictEqual(r.status, 200);
+  tok = saved;
+
+  r = await call('GET', '/api/note/state?room=default');
   assert.strictEqual(r.data.storage, 'folder');
   assert.strictEqual(r.data.files.length, 0);
 
@@ -70,6 +101,16 @@ async function call(method, url, body) {
   // 다른 room은 하위 폴더
   r = await call('POST', '/api/note/save?room=trip', { text: '여행', user: 'A' });
   assert.strictEqual(fs.readFileSync(path.join(dir, 'trip', '.note-memo.txt'), 'utf8'), '여행');
+
+  // 비밀번호를 바꾸면 기존 토큰은 무효
+  password = '9999';
+  assert.strictEqual((await call('GET', '/api/note/state?room=default')).status, 401);
+  // .note-password 같은 숨김 파일은 목록·다운로드 불가
+  password = '0000';
+  fs.writeFileSync(path.join(dir, '.note-password'), 'secret');
+  r = await call('GET', '/api/note/state?room=default');
+  assert.ok(!r.data.files.some((f) => f.name.startsWith('.')));
+  assert.strictEqual((await call('GET', '/api/note/file?room=default&id=.note-password')).status, 404);
 
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('note-folder ok');
