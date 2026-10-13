@@ -1,0 +1,175 @@
+'use strict';
+
+// 맥미니용 공유노트 API: 메모와 첨부파일을 특정 폴더(기본: family)에 실제 파일로 저장합니다.
+// note.html이 쓰는 /api/note/* 와 같은 형식이라, 임시터널 주소로 note.html을 열면 이 폴더를 공유합니다.
+// - room=default → NOTE_DIR 자체, 다른 room → NOTE_DIR/<room> 하위 폴더
+// - 메모 본문은 .note-memo.txt, 버전·올린 사람 기록은 .note-meta.json (점으로 시작해 목록에 안 보임)
+// - Finder로 폴더에 직접 넣거나 지운 파일도 목록에 그대로 반영됩니다.
+
+const fs = require('fs');
+const path = require('path');
+
+const MAX_TEXT = 500_000;
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
+const MAX_BODY = Math.ceil(MAX_FILE_BYTES * 1.4) + 100_000; // base64 여유분
+const MAX_NAME = 160;
+const MEMO = '.note-memo.txt';
+const META = '.note-meta.json';
+
+function send(res, status, data, headers = {}) {
+  res.statusCode = status;
+  for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+  res.setHeader('Cache-Control', 'no-store');
+  if (Buffer.isBuffer(data)) return res.end(data);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(data));
+}
+function readBody(req) {
+  if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
+  if (req.method !== 'POST') return Promise.resolve({});
+  return new Promise((resolve, reject) => {
+    const chunks = []; let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_BODY) { reject(Object.assign(new Error('파일이 너무 큽니다.'), { status: 413 })); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); }
+      catch (e) { reject(new Error('요청 형식이 올바르지 않습니다.')); }
+    });
+    req.on('error', reject);
+  });
+}
+function roomId(v) { return String(v || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'default'; }
+function safeName(v) {
+  const n = path.basename(String(v || 'file')).replace(/[\\/\0\r\n:]/g, '_').replace(/^\.+/, '').slice(0, MAX_NAME);
+  return n || 'file';
+}
+function guessType(name) {
+  const ext = path.extname(name).toLowerCase();
+  return ({
+    '.txt': 'text/plain; charset=utf-8', '.pdf': 'application/pdf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif', '.webp': 'image/webp', '.heic': 'image/heic', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.mov': 'video/quicktime',
+    '.zip': 'application/zip', '.hwp': 'application/x-hwp', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  })[ext] || 'application/octet-stream';
+}
+function parseDataUrl(dataUrl) {
+  const m = String(dataUrl || '').match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+  if (!m) throw new Error('파일 데이터 형식이 올바르지 않습니다.');
+  return m[2] ? Buffer.from(m[3] || '', 'base64') : Buffer.from(decodeURIComponent(m[3] || ''));
+}
+function uniqueName(dir, name) {
+  if (!fs.existsSync(path.join(dir, name))) return name;
+  const ext = path.extname(name), base = name.slice(0, name.length - ext.length);
+  for (let i = 1; ; i++) { const n = `${base} (${i})${ext}`; if (!fs.existsSync(path.join(dir, n))) return n; }
+}
+
+function createNoteFolderHandler(rootDir) {
+  const ROOT = path.resolve(rootDir);
+  const dirOf = (room) => room === 'default' ? ROOT : path.join(ROOT, room);
+  function readMeta(dir) {
+    try { const m = JSON.parse(fs.readFileSync(path.join(dir, META), 'utf8')); return { version: 0, updatedAt: 0, updatedBy: '', uploads: {}, ...m }; }
+    catch (e) { return { version: 0, updatedAt: 0, updatedBy: '', uploads: {} }; }
+  }
+  function writeMeta(dir, meta) { fs.writeFileSync(path.join(dir, META), JSON.stringify(meta)); }
+  function listFiles(dir, meta) {
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch (e) { return []; }
+    const files = [];
+    for (const name of names) {
+      if (name.startsWith('.')) continue;
+      let s; try { s = fs.statSync(path.join(dir, name)); } catch (e) { continue; }
+      if (!s.isFile()) continue;
+      files.push({ id: name, name, type: guessType(name), size: s.size, uploadedAt: s.mtimeMs, uploadedBy: (meta.uploads || {})[name] || '' });
+    }
+    return files.sort((a, b) => b.uploadedAt - a.uploadedAt);
+  }
+  function state(room) {
+    const dir = dirOf(room), meta = readMeta(dir);
+    let text = '';
+    try { text = fs.readFileSync(path.join(dir, MEMO), 'utf8'); } catch (e) { /* 아직 없음 */ }
+    return {
+      ok: true, room, text, version: meta.version, updatedAt: meta.updatedAt, updatedBy: meta.updatedBy,
+      files: listFiles(dir, meta), storage: 'folder', folder: path.basename(ROOT), maxFileBytes: MAX_FILE_BYTES,
+    };
+  }
+  // 파일 id(=파일 이름)가 폴더 밖이나 숨김 파일을 가리키지 않게
+  function fileIn(dir, id) {
+    const name = String(id || '');
+    if (!name || name !== path.basename(name) || name.startsWith('.')) return null;
+    return path.join(dir, name);
+  }
+
+  return async function handler(req, res) {
+    if (req.method === 'OPTIONS') return send(res, 204, {}, {
+      'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    });
+    try {
+      const url = new URL(req.url, `http://${(req.headers && req.headers.host) || 'localhost'}`);
+      const parts = url.pathname.split('/').filter(Boolean);
+      const i = parts.indexOf('note');
+      const action = url.searchParams.get('action') || (i >= 0 ? parts.slice(i + 1).join('/') : '');
+      const body = await readBody(req);
+      const room = roomId(url.searchParams.get('room') || body.room);
+      const dir = dirOf(room);
+
+      if (!action || action === 'state') return send(res, 200, state(room));
+
+      if (action === 'save' && req.method === 'POST') {
+        const text = String(body.text ?? '');
+        if (text.length > MAX_TEXT) return send(res, 413, { ok: false, error: '본문이 너무 깁니다.' });
+        fs.mkdirSync(dir, { recursive: true });
+        const meta = readMeta(dir);
+        fs.writeFileSync(path.join(dir, MEMO), text);
+        meta.version += 1; meta.updatedAt = Date.now(); meta.updatedBy = String(body.user || '').slice(0, 40);
+        writeMeta(dir, meta);
+        return send(res, 200, state(room));
+      }
+
+      if (action === 'upload' && req.method === 'POST') {
+        const buffer = parseDataUrl(body.dataUrl);
+        if (!buffer.length) return send(res, 400, { ok: false, error: '빈 파일은 업로드할 수 없습니다.' });
+        if (buffer.length > MAX_FILE_BYTES) return send(res, 413, { ok: false, error: '파일은 50MB 이하만 업로드할 수 있습니다.' });
+        fs.mkdirSync(dir, { recursive: true });
+        const name = uniqueName(dir, safeName(body.name));
+        fs.writeFileSync(path.join(dir, name), buffer);
+        const meta = readMeta(dir);
+        meta.uploads = { ...(meta.uploads || {}), [name]: String(body.user || '').slice(0, 40) };
+        meta.version += 1; meta.updatedAt = Date.now(); meta.updatedBy = meta.uploads[name];
+        writeMeta(dir, meta);
+        return send(res, 200, state(room));
+      }
+
+      if (action === 'delete-file' && req.method === 'POST') {
+        const file = fileIn(dir, body.id);
+        if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
+        fs.unlinkSync(file);
+        const meta = readMeta(dir);
+        if (meta.uploads) delete meta.uploads[path.basename(file)];
+        meta.version += 1; meta.updatedAt = Date.now(); meta.updatedBy = String(body.user || '').slice(0, 40);
+        writeMeta(dir, meta);
+        return send(res, 200, state(room));
+      }
+
+      if (action === 'file') {
+        const file = fileIn(dir, url.searchParams.get('id') || body.id);
+        let s = null; try { s = file && fs.statSync(file); } catch (e) { /* 없음 */ }
+        if (!s || !s.isFile()) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
+        res.statusCode = 200;
+        res.setHeader('Content-Type', guessType(file));
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(file))}`);
+        res.setHeader('Content-Length', String(s.size));
+        res.setHeader('Cache-Control', 'no-store');
+        return fs.createReadStream(file).pipe(res);
+      }
+
+      return send(res, 404, { ok: false, error: '알 수 없는 API입니다.', action });
+    } catch (e) {
+      return send(res, e.status || 400, { ok: false, error: e.message || String(e) });
+    }
+  };
+}
+
+module.exports = { createNoteFolderHandler, MAX_FILE_BYTES };

@@ -8,6 +8,10 @@ const path = require('path');
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = Number(process.env.PORT || 8793);
 const ROOT = __dirname;
+// 공유노트(note.html) 파일 저장 폴더. 기본은 이 폴더 안의 family, NOTE_DIR로 바꿀 수 있음
+const NOTE_DIR = path.resolve(process.env.NOTE_DIR || path.join(ROOT, 'family'));
+const noteHandler = require('./note-folder').createNoteFolderHandler(NOTE_DIR);
+fs.mkdirSync(NOTE_DIR, { recursive: true });
 
 const TARGETS = {
   '/api/room': 'http://127.0.0.1:8791',   // yut-server.js
@@ -42,6 +46,8 @@ function serveStatic(req, res) {
   if (pathname === '/') pathname = '/index.html';
   const file = path.normalize(path.join(ROOT, pathname));
   if (!file.startsWith(ROOT)) return send(res, 403, 'Forbidden');
+  // 공유노트 폴더는 /api/note 로만 접근 (주소로 직접 열기 막기)
+  if (file === NOTE_DIR || file.startsWith(NOTE_DIR + path.sep)) return send(res, 403, 'Forbidden');
   fs.readFile(file, (err, buf) => {
     if (err) return send(res, 404, 'Not found');
     const ext = path.extname(file).toLowerCase();
@@ -68,6 +74,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/health') {
     return send(res, 200, JSON.stringify({ ok: true, portal: true, yut: '8791', omok: '8792' }), 'application/json; charset=utf-8');
   }
+  if (pathname === '/api/note' || pathname.startsWith('/api/note/')) return noteHandler(req, res);
   for (const [prefix, base] of Object.entries(TARGETS)) {
     if (pathname === prefix || pathname.startsWith(prefix + '/')) return proxy(req, res, base);
   }
@@ -79,4 +86,5 @@ server.listen(PORT, HOST, () => {
   console.log(`- intro: http://${HOST}:${PORT}/index.html`);
   console.log(`- omok:  http://${HOST}:${PORT}/omok.html`);
   console.log(`- yut:   http://${HOST}:${PORT}/yut.html`);
+  console.log(`- note:  http://${HOST}:${PORT}/note.html  (파일 폴더: ${NOTE_DIR})`);
 });
