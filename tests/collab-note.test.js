@@ -3,8 +3,9 @@
 const assert = require('assert');
 const handler = require('../api/note.js');
 
+let token = '';
 function mockReq(method, url, body = {}) {
-  return { method, url, headers: { host: 'localhost' }, body };
+  return { method, url, headers: { host: 'localhost', 'x-note-token': token }, body };
 }
 function mockRes() {
   return {
@@ -25,7 +26,16 @@ async function call(method, url, body = {}) {
 
 (async () => {
   const room = `test_${Date.now()}`;
+  // 비밀번호 없이는 401, 기본 비밀번호(1313)로 로그인
   let r = await call('GET', `/api/note/state?room=${room}`);
+  assert.strictEqual(r.status, 401);
+  assert.strictEqual(r.data.authRequired, true);
+  r = await call('POST', '/api/note/login', { password: '1212' });
+  assert.strictEqual(r.status, 401);
+  r = await call('POST', '/api/note/login', { password: '1313' });
+  assert.strictEqual(r.status, 200);
+  token = r.data.token;
+  r = await call('GET', `/api/note/state?room=${room}`);
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.data.ok, true);
   assert.strictEqual(r.data.text, '');

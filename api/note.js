@@ -1,6 +1,10 @@
 'use strict';
 
 const crypto = require('crypto');
+const { createNoteAuth } = require('../note-auth');
+
+// 비밀번호: Vercel 환경변수 NOTE_PASSWORD, 없으면 기본 비밀번호(note-auth.js)
+const auth = createNoteAuth({ password: () => process.env.NOTE_PASSWORD || '' });
 
 globalThis.__COLLAB_NOTES__ = globalThis.__COLLAB_NOTES__ || new Map();
 const notes = globalThis.__COLLAB_NOTES__;
@@ -66,6 +70,8 @@ module.exports = async function handler(req, res) {
     const { url, action } = actionFrom(req);
     const body = bodyOf(req);
     const room = roomId(url.searchParams.get('room') || body.room);
+    if (action === 'login' && req.method === 'POST') { const [st, data] = auth.login(req, body); return send(res, st, data); }
+    if (!auth.tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
     const note = getNote(room);
 
     if (!action || action === 'state') return send(res, 200, meta(note));

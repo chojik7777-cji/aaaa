@@ -10,12 +10,11 @@ const PORT = Number(process.env.PORT || 8793);
 const ROOT = __dirname;
 // 공유노트(note.html) 파일 저장 폴더. 기본은 이 폴더 안의 family, NOTE_DIR로 바꿀 수 있음
 const NOTE_DIR = path.resolve(process.env.NOTE_DIR || path.join(ROOT, 'family'));
-// 공유노트 비밀번호: NOTE_PASSWORD 환경변수 > family/.note-password 파일 > 기본 1212
+// 공유노트 비밀번호: NOTE_PASSWORD 환경변수 > family/.note-password 파일 > 기본 비밀번호(note-auth.js)
 // (파일은 요청마다 읽어서, 파일 내용만 바꿔도 서버 재시작 없이 바로 적용)
 function notePassword() {
   if (process.env.NOTE_PASSWORD) return process.env.NOTE_PASSWORD;
-  try { const v = fs.readFileSync(path.join(NOTE_DIR, '.note-password'), 'utf8').trim(); if (v) return v; } catch (e) { /* 없음 */ }
-  return '1212';
+  try { return fs.readFileSync(path.join(NOTE_DIR, '.note-password'), 'utf8').trim(); } catch (e) { return ''; }
 }
 const noteHandler = require('./note-folder').createNoteFolderHandler(NOTE_DIR, { password: notePassword });
 fs.mkdirSync(NOTE_DIR, { recursive: true });

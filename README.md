@@ -84,7 +84,7 @@ http://192.168.45.156:8791/yut-dashboard.html
 ## 맥미니 공유노트 (family 폴더)
 
 `note.html`을 맥미니 포털 서버로 열면 메모와 첨부파일이 맥미니의 `family` 폴더에 실제 파일로 저장됩니다.
-임시터널 주소가 바뀌어도 파일은 폴더에 그대로 남습니다. (Vercel 주소의 note.html은 기존처럼 임시 서버 저장)
+임시터널 주소가 바뀌어도 파일은 폴더에 그대로 남습니다. (Vercel 주소의 note.html은 기존처럼 임시 서버 저장, 비밀번호는 Vercel 환경변수 `NOTE_PASSWORD` 또는 기본 비밀번호)
 
 ```bash
 cd /Users/chojiks/github-aaaa
@@ -100,6 +100,6 @@ cloudflared tunnel --url http://localhost:8793
 - `?room=이름`으로 열면 `family/이름/` 하위 폴더를 사용
 - 메모 본문은 `family/.note-memo.txt`에 저장 (숨김 파일)
 - `family/` 폴더는 `.gitignore`에 있어 GitHub에 올라가지 않음
-- 비밀번호: 기본 `1212`. 바꾸려면 `family/.note-password` 파일에 새 비밀번호를 적거나 (재시작 불필요) `NOTE_PASSWORD=새비번 node portal-server.js`
+- 비밀번호: 기본 비밀번호는 Vercel note.html과 같음 (공개 저장소라 코드엔 해시만 저장). 바꾸려면 `family/.note-password` 파일에 새 비밀번호를 적거나 (재시작 불필요) `NOTE_PASSWORD=새비번 node portal-server.js`
   - 비밀번호를 바꾸면 이미 들어와 있던 기기도 다시 입력해야 함
   - 5번 틀리면 그 접속(IP)은 1시간 동안 잠금

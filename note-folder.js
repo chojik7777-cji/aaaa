@@ -7,9 +7,9 @@
 // - Finder로 폴더에 직접 넣거나 지운 파일도 목록에 그대로 반영됩니다.
 // - 비밀번호: login 으로 토큰을 받아야 다른 API를 쓸 수 있음. 5번 틀리면 그 접속(IP)은 1시간 잠금.
 
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { createNoteAuth } = require('./note-auth');
 
 const MAX_TEXT = 500_000;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
@@ -17,8 +17,6 @@ const MAX_BODY = Math.ceil(MAX_FILE_BYTES * 1.4) + 100_000; // base64 여유분
 const MAX_NAME = 160;
 const MEMO = '.note-memo.txt';
 const META = '.note-meta.json';
-const MAX_FAILS = 5;
-const LOCK_MS = 60 * 60 * 1000;
 
 function send(res, status, data, headers = {}) {
   res.statusCode = status;
@@ -70,43 +68,10 @@ function uniqueName(dir, name) {
   for (let i = 1; ; i++) { const n = `${base} (${i})${ext}`; if (!fs.existsSync(path.join(dir, n))) return n; }
 }
 
-function clientIp(req) {
-  const h = req.headers || {};
-  return String(h['cf-connecting-ip'] || (h['x-forwarded-for'] || '').split(',')[0] || (req.socket && req.socket.remoteAddress) || '').trim() || 'unknown';
-}
-const sha = (v) => crypto.createHash('sha256').update(String(v)).digest();
-
-// opts.password: 문자열 또는 문자열을 돌려주는 함수 (매 요청마다 읽어서 바꾸면 바로 적용)
+// opts.password: 문자열 또는 문자열을 돌려주는 함수 (비우면 기본 비밀번호, 매 요청마다 읽음)
 function createNoteFolderHandler(rootDir, opts = {}) {
   const ROOT = path.resolve(rootDir);
-  const getPassword = () => String((typeof opts.password === 'function' ? opts.password() : opts.password) || '');
-  const now = opts.now || Date.now;
-  const fails = new Map(); // ip → { count, lockedUntil }
-  // 비밀번호에서 만든 토큰: 서버를 다시 켜도 유지, 비밀번호를 바꾸면 모두 다시 로그인
-  const tokenFor = (pw) => crypto.createHmac('sha256', 'family-note-v1').update(pw).digest('hex');
-  function tokenOk(req, url) {
-    const pw = getPassword();
-    if (!pw) return true;
-    const t = String((req.headers && req.headers['x-note-token']) || url.searchParams.get('token') || '');
-    return crypto.timingSafeEqual(sha(t), sha(tokenFor(pw)));
-  }
-  function login(req, body) {
-    const pw = getPassword();
-    const ip = clientIp(req);
-    const f = fails.get(ip) || { count: 0, lockedUntil: 0 };
-    if (f.lockedUntil > now()) {
-      return [429, { ok: false, locked: true, retryAfterMs: f.lockedUntil - now(), error: `비밀번호를 ${MAX_FAILS}번 틀려서 잠겼어요. ${Math.ceil((f.lockedUntil - now()) / 60000)}분 뒤에 다시 시도하세요.` }];
-    }
-    if (!pw || crypto.timingSafeEqual(sha(body.password || ''), sha(pw))) {
-      fails.delete(ip);
-      return [200, { ok: true, token: pw ? tokenFor(pw) : '' }];
-    }
-    f.count += 1;
-    if (f.count >= MAX_FAILS) { f.count = 0; f.lockedUntil = now() + LOCK_MS; }
-    fails.set(ip, f);
-    if (f.lockedUntil > now()) return [429, { ok: false, locked: true, retryAfterMs: LOCK_MS, error: `비밀번호를 ${MAX_FAILS}번 틀려서 1시간 동안 잠겼어요.` }];
-    return [401, { ok: false, authRequired: true, error: `비밀번호가 틀렸어요. (${MAX_FAILS - f.count}번 남음)` }];
-  }
+  const auth = createNoteAuth(opts);
   const dirOf = (room) => room === 'default' ? ROOT : path.join(ROOT, room);
   function readMeta(dir) {
     try { const m = JSON.parse(fs.readFileSync(path.join(dir, META), 'utf8')); return { version: 0, updatedAt: 0, updatedBy: '', uploads: {}, ...m }; }
@@ -154,8 +119,8 @@ function createNoteFolderHandler(rootDir, opts = {}) {
       const room = roomId(url.searchParams.get('room') || body.room);
       const dir = dirOf(room);
 
-      if (action === 'login' && req.method === 'POST') { const [st, data] = login(req, body); return send(res, st, data); }
-      if (!tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
+      if (action === 'login' && req.method === 'POST') { const [st, data] = auth.login(req, body); return send(res, st, data); }
+      if (!auth.tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
 
       if (!action || action === 'state') return send(res, 200, state(room));
 
