@@ -20,6 +20,9 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         h1 { font-size: 26px; text-align: center; margin-bottom: 4px; }
+        .title-row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .title-row h1 { margin: 0; }
+        .title-edit-btn { padding: 5px 9px; font-size: 12px; border-radius: 999px; }
         .sub { text-align: center; font-size: 13px; color: #718096; margin-bottom: 14px; }
         h2 { font-size: 16px; color: #4a5568; margin: 18px 0 8px; }
         .prep-section { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff; overflow: hidden; }
@@ -217,7 +220,10 @@
 </head>
 <body>
 <div class="card">
-    <h1>☕ 조이이익 카페</h1>
+    <div class="title-row">
+        <h1>☕ <span id="cafeTitleText">조이이익 카페</span></h1>
+        <button id="editCafeTitleBtn" class="title-edit-btn" type="button">제목 편집</button>
+    </div>
     <p class="sub">음료를 만들어 손님을 만족시키고 카페를 키워보세요! 목표: 💰 1,000,000원</p>
 
     <div class="stats">
@@ -355,6 +361,7 @@ const DAY_LEN = 90;            // 하루 영업 시간(초)
 const GOAL = 1000000;
 const SAVE_KEY = 'cafe-game-save-v1';
 const SECTION_KEY = 'cafe-game-sections-v1';
+const DEFAULT_CAFE_TITLE = '조이이익 카페';
 const ALBA_WAGE = 25000;
 const FLYER_COST = 10000;
 const SPEED_LEVELS = [1, 1.5, 2, 3, 10];
@@ -455,6 +462,7 @@ const SLOT_KEYS = ['Q', 'W', 'E', 'R', 'T'];
 // ===== 상태 =====
 function newState() {
     return {
+        cafeTitle: DEFAULT_CAFE_TITLE,
         day: 1, money: 50000, rep: 30,
         stock: { shot: 20, milk: 10, syrup: 0, choco: 0, matcha: 0, ginseng: 0, fruit: 0, honey: 0, caramel: 0, whitechoco: 0, coldbrew: 0, hojicha: 0, strawberry: 0, bread: 0, cookie: 0, tart: 0, cake: 0 },
         unlocked: { vanilla: false, mocha: false, greentea: false, ginsenglatte: false, juice: false, honeyamericano: false, caramelmacchiato: false, whitemocha: false, sweetmilk: false, coldbrew: false, vanillacoldbrew: false, hojicha: false, strawberrymilk: false, bread: false, cookie: false, tart: false, cake: false },
@@ -468,6 +476,10 @@ function rollWeather() {
     const r = Math.random();
     return r < 0.4 ? 'sunny' : r < 0.6 ? 'hot' : r < 0.8 ? 'rain' : 'cold';
 }
+function normalizeCafeTitle(value) {
+    const title = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 24);
+    return title || DEFAULT_CAFE_TITLE;
+}
 function load() {
     try {
         const raw = localStorage.getItem(SAVE_KEY);
@@ -476,6 +488,7 @@ function load() {
             if (s && typeof s.day === 'number') {
                 const base = newState();
                 return Object.assign(base, s, {
+                    cafeTitle: normalizeCafeTitle(s.cafeTitle),
                     stock: Object.assign(base.stock, s.stock || {}),
                     unlocked: Object.assign(base.unlocked, s.unlocked || {}),
                     up: Object.assign(base.up, s.up || {}),
@@ -512,6 +525,7 @@ function normalizeImportedState(imported) {
         speed: SPEED_LEVELS.includes(imported.speed) ? imported.speed : 1,
         history: Array.isArray(imported.history) ? imported.history : [],
         recommend: Object.assign(base.recommend, imported.recommend || {}),
+        cafeTitle: normalizeCafeTitle(imported.cafeTitle),
         weather: WEATHERS[imported.weather] ? imported.weather : base.weather,
         won: !!imported.won,
     });
@@ -605,6 +619,19 @@ const $ = id => document.getElementById(id);
 const won = n => (n < 0 ? '-' : '') + Math.abs(Math.round(n)).toLocaleString('ko-KR') + '원';
 const round100 = n => Math.round(n / 100) * 100;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function updateCafeTitle() {
+    S.cafeTitle = normalizeCafeTitle(S.cafeTitle);
+    $('cafeTitleText').textContent = S.cafeTitle;
+    document.title = S.cafeTitle + ' - 카페 운영 게임';
+}
+function editCafeTitle() {
+    const next = prompt('카페 이름을 입력하세요', S.cafeTitle || DEFAULT_CAFE_TITLE);
+    if (next == null) return;
+    S.cafeTitle = normalizeCafeTitle(next);
+    save();
+    updateCafeTitle();
+    toast('카페 이름을 바꿨어요.', 'good');
+}
 function stars(rep) {
     const n = clamp(Math.round(rep / 20), 0, 5);
     return '★'.repeat(n) + '☆'.repeat(5 - n);
@@ -1946,6 +1973,7 @@ const Scene = (() => {
 })();
 
 function renderStats() {
+    updateCafeTitle();
     $('sDay').textContent = S.day + '일차';
     $('sMoney').textContent = won(S.money);
     $('sRep').textContent = stars(S.rep);
@@ -2207,6 +2235,7 @@ $('resetBtn').addEventListener('click', () => {
     if (!confirm('정말 처음부터 다시 시작할까요? 진행 상황이 사라집니다.')) return;
     S = newState(); save(); renderPrep();
 });
+$('editCafeTitleBtn').addEventListener('click', editCafeTitle);
 $('exportStateBtn').addEventListener('click', exportState);
 $('importStateBtn').addEventListener('click', () => $('importStateFile').click());
 $('importStateFile').addEventListener('change', e => importStateFromFile(e.target.files && e.target.files[0]));

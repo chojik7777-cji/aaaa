@@ -18,5 +18,12 @@ assert.match(html, /cafe-game-state-/, '다운로드 파일명은 카페게임 �
 assert.match(html, /불러오면 현재 저장된 카페 상태가 바뀝니다/, 'import 전에 기존 상태 변경 경고가 있어야 합니다');
 assert.match(html, /Object\.assign\(base\.recommend, imported\.recommend \|\| \{\}\)/, 'import 시 추천 설정을 기본값과 병합해야 합니다');
 assert.match(html, /if \(G && !G\.over\)/, '영업 중 import는 중단 확인/방어 처리가 있어야 합니다');
+assert.match(html, /id="cafeTitleText"/, '카페 타이틀 표시 영역이 있어야 합니다');
+assert.match(html, /id="editCafeTitleBtn"/, '카페 타이틀 편집 버튼이 있어야 합니다');
+assert.match(html, /function updateCafeTitle\(/, '카페 타이틀을 화면과 브라우저 제목에 반영하는 함수가 있어야 합니다');
+assert.match(html, /function editCafeTitle\(/, '카페 타이틀 편집 함수가 있어야 합니다');
+assert.match(html, /cafeTitle:\s*DEFAULT_CAFE_TITLE/, '새 게임 기본 타이틀은 조이이익 카페여야 합니다');
+assert.match(html, /cafeTitle:\s*normalizeCafeTitle\(imported\.cafeTitle/, 'import 시 카페 타이틀을 정상화해야 합니다');
+assert.match(html, /editCafeTitleBtn'\)\.addEventListener\('click', editCafeTitle\)/, '타이틀 편집 버튼에 이벤트가 연결되어야 합니다');
 
 console.log('cafe export/import tests passed');
