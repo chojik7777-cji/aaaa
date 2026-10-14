@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
 const { createNoteAuth } = require('../note-auth');
+const { fileHeaders } = require('../note-preview');
 // 비밀번호: Vercel 환경변수 NOTE2_PASSWORD, 없으면 기본 비밀번호(note-auth.js)
 const auth = createNoteAuth({ password: () => process.env.NOTE2_PASSWORD || '' });
 const BUCKET = process.env.SUPABASE_NOTE_BUCKET || 'note-files';
@@ -174,10 +175,7 @@ module.exports = async function handler(req, res) {
       if (!rows.length) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
       const f = rows[0];
       const arr = await sb(`/storage/v1/object/${encodeURIComponent(BUCKET)}/${f.path}`);
-      return send(res, 200, Buffer.from(arr), {
-        'Content-Type': f.type || 'application/octet-stream',
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`,
-      });
+      return send(res, 200, Buffer.from(arr), fileHeaders(f.name, f.type, url.searchParams.get('inline') === '1'));
     }
 
     return send(res, 404, { ok: false, error: '알 수 없는 API입니다.', action });

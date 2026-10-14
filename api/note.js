@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const { createNoteAuth } = require('../note-auth');
+const { fileHeaders } = require('../note-preview');
 
 // 비밀번호: Vercel 환경변수 NOTE_PASSWORD, 없으면 기본 비밀번호(note-auth.js)
 const auth = createNoteAuth({ password: () => process.env.NOTE_PASSWORD || '' });
@@ -124,8 +125,7 @@ module.exports = async function handler(req, res) {
       if (!f) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
       const buf = Buffer.from(f.data, 'base64');
       return send(res, 200, buf, {
-        'Content-Type': f.type || 'application/octet-stream',
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`,
+        ...fileHeaders(f.name, f.type, url.searchParams.get('inline') === '1'),
         'Content-Length': String(buf.length),
       });
     }
