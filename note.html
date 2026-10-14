@@ -42,6 +42,22 @@
     .lock button { width:100%; }
     .lock .err { color:#c53030; font-size:13px; min-height:18px; margin:8px 0 0; }
     @media (max-width:720px) { .top { grid-template-columns:1fr; } textarea{min-height:46vh;} header,.panel{padding:16px;} }
+      .file .fname { background:none; border:0; padding:0; color:#2b6cb0; font-weight:800; text-align:left; cursor:pointer; text-decoration:underline; text-underline-offset:3px; word-break:break-all; }
+    .file .fname.plain { color:#2d3748; text-decoration:none; cursor:default; }
+    .file .kind { font-size:18px; margin-right:4px; }
+    .hover-pv { position:fixed; z-index:20; pointer-events:none; background:white; padding:6px; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.35); }
+    .hover-pv img { display:block; max-width:280px; max-height:240px; border-radius:8px; }
+    .pv { position:fixed; inset:0; z-index:30; background:rgba(10,14,22,.94); display:flex; flex-direction:column; padding:12px; }
+    .pv[hidden] { display:none; }
+    .pv-top { display:flex; justify-content:space-between; align-items:center; gap:8px; color:white; margin-bottom:10px; }
+    .pv-top b { word-break:break-all; font-size:15px; }
+    .pv-top .btns { display:flex; gap:6px; flex-shrink:0; }
+    .pv-body { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+    .pv-body img, .pv-body video { max-width:100%; max-height:100%; border-radius:10px; background:#111; }
+    .pv-body iframe { width:100%; height:100%; border:0; border-radius:10px; background:white; }
+    .pv-body pre { width:100%; max-height:100%; overflow:auto; background:white; border-radius:10px; padding:16px; margin:0; white-space:pre-wrap; word-break:break-all; font-size:14px; line-height:1.6; }
+    .pv-body audio { width:min(520px,100%); }
+    .pv-msg { color:#e2e8f0; text-align:center; line-height:1.7; }
   </style>
 </head>
 <body>
@@ -97,6 +113,10 @@
     </form>
   </div>
 
+  <div class="pv" id="pv" hidden role="dialog" aria-modal="true" aria-label="파일 미리보기">
+    <div class="pv-top"><b id="pvName"></b><div class="btns"><a id="pvDown"><button type="button" class="secondary">다운로드</button></a><button type="button" class="secondary" id="pvClose">✕ 닫기</button></div></div>
+    <div class="pv-body" id="pvBody"></div>
+  </div>
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
@@ -202,16 +222,28 @@ function scheduleSave() {
   saveTimer = setTimeout(saveNow, 1000);
 }
 function renderFiles(files) {
+  pvFiles = files;
   const box = $('fileList');
+  // 목록이 바뀌었을 때만 다시 그리기 (1.5초마다 그리면 미리보기가 깜빡여요)
+  const sig = JSON.stringify([token(), files.map((f) => [f.id, f.size, f.uploadedAt, f.uploadedBy])]);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
   if (!files.length) { box.innerHTML = '<div class="hint">아직 첨부파일이 없습니다.</div>'; return; }
-  box.innerHTML = files.map((f) => `
+  box.innerHTML = files.map((f) => {
+    const kind = pvKind(f);
+    const name = kind
+      ? `<button type="button" class="fname" data-preview="${esc(f.id)}" title="눌러서 미리보기"><span class="kind">${PV_ICON[kind]}</span>${esc(f.name)}</button>`
+      : `<b>${esc(f.name)}</b>`;
+    return `
     <div class="file">
-      <div><b>${esc(f.name)}</b><br><small>${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)} · ${esc(f.uploadedBy || '익명')}</small></div>
+      <div>${name}<br><small>${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)} · ${esc(f.uploadedBy || '익명')}</small></div>
       <div class="file-actions">
-        <a href="${API}/file?room=${encodeURIComponent(room)}&id=${encodeURIComponent(f.id)}${token() ? `&token=${encodeURIComponent(token())}` : ''}" download="${esc(f.name)}"><button type="button" class="secondary">다운로드</button></a>
+        ${kind ? `<button type="button" class="secondary" data-preview="${esc(f.id)}">👁 미리보기</button>` : ''}
+        <a href="${fileUrl(f, false)}" download="${esc(f.name)}"><button type="button" class="secondary">다운로드</button></a>
         <button type="button" class="danger" data-delete="${esc(f.id)}">삭제</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 async function uploadFile() {
@@ -234,6 +266,84 @@ async function deleteFile(id) {
   catch (e) { alert(e.message); }
 }
 
+// ===== 첨부파일 미리보기 =====
+// 사진: 마우스를 올리면 작은 미리보기, 클릭·터치하면 크게 / PDF·영상·음악·텍스트: 클릭·터치하면 미리보기 창
+const PV_EXT = { image: /\.(jpe?g|png|gif|webp|bmp|heic)$/i, pdf: /\.pdf$/i, video: /\.(mp4|webm|mov)$/i, audio: /\.(mp3|m4a|wav|ogg|aac)$/i, text: /\.(txt|md|csv|log)$/i };
+const PV_ICON = { image: '🖼️', pdf: '📕', video: '🎬', audio: '🎵', text: '📄' };
+function pvKind(f) {
+  const t = String(f.type || '').toLowerCase();
+  for (const [k, re] of Object.entries(PV_EXT)) if (re.test(f.name || '')) return k;
+  if (t.startsWith('image/') && !t.includes('svg')) return 'image';
+  if (t === 'application/pdf') return 'pdf';
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('audio/')) return 'audio';
+  if (t.startsWith('text/plain')) return 'text';
+  return '';
+}
+function fileUrl(f, inline) {
+  const tk = token();
+  return `${API}/file?room=${encodeURIComponent(room)}&id=${encodeURIComponent(f.id)}${tk ? `&token=${encodeURIComponent(tk)}` : ''}${inline ? '&inline=1' : ''}`;
+}
+let pvFiles = [];
+const hoverPv = document.createElement('div'); hoverPv.className = 'hover-pv'; hoverPv.hidden = true; document.body.appendChild(hoverPv);
+const canHover = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
+function hideHover() { hoverPv.hidden = true; hoverPv.innerHTML = ''; }
+let lastHoverEvt = null;
+function placeHover(e) {
+  lastHoverEvt = e;
+  const w = hoverPv.offsetWidth || 290, h = hoverPv.offsetHeight || 250;
+  let x = e.clientX + 18, y = e.clientY + 18;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 18;
+  if (y + h > innerHeight - 8) y = Math.max(8, innerHeight - h - 8);
+  hoverPv.style.left = `${Math.max(8, x)}px`; hoverPv.style.top = `${y}px`;
+}
+function openPreview(f) {
+  hideHover();
+  const kind = pvKind(f), url = fileUrl(f, true), body = $('pvBody');
+  $('pvName').textContent = f.name;
+  $('pvDown').href = fileUrl(f, false); $('pvDown').setAttribute('download', f.name);
+  body.innerHTML = '';
+  if (kind === 'image') {
+    const img = new Image(); img.alt = f.name; img.src = url;
+    img.onerror = () => { body.innerHTML = '<div class="pv-msg">이 사진은 브라우저에서 미리 볼 수 없어요.<br>(아이폰 HEIC 사진은 사파리에서만 보일 수 있어요)<br>다운로드해서 열어 주세요.</div>'; };
+    body.appendChild(img);
+  } else if (kind === 'pdf') {
+    const fr = document.createElement('iframe'); fr.src = url; fr.title = f.name; body.appendChild(fr);
+  } else if (kind === 'video' || kind === 'audio') {
+    const m = document.createElement(kind); m.src = url; m.controls = true; m.playsInline = true; body.appendChild(m);
+  } else if (kind === 'text') {
+    const pre = document.createElement('pre'); pre.textContent = '불러오는 중…'; body.appendChild(pre);
+    fetch(url, { cache: 'no-store' }).then((r) => r.text()).then((t) => { pre.textContent = t.length > 300000 ? t.slice(0, 300000) + '\n\n… (앞부분만 표시)' : t; }).catch(() => { pre.textContent = '불러오지 못했어요.'; });
+  } else {
+    body.innerHTML = '<div class="pv-msg">이 파일은 미리 볼 수 없어요.<br>다운로드해서 열어 주세요.</div>';
+  }
+  $('pv').hidden = false;
+}
+function closePreview() { $('pv').hidden = true; $('pvBody').innerHTML = ''; }
+$('pvClose').addEventListener('click', closePreview);
+$('pv').addEventListener('click', (e) => { if (e.target === $('pv') || e.target === $('pvBody')) closePreview(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('pv').hidden) closePreview(); });
+$('fileList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-preview]'); if (!b) return;
+  const f = pvFiles.find((x) => x.id === b.dataset.preview); if (f) openPreview(f);
+});
+if (canHover) {
+  $('fileList').addEventListener('mouseover', (e) => {
+    const b = e.target.closest('[data-preview]'); if (!b) return;
+    const f = pvFiles.find((x) => x.id === b.dataset.preview);
+    if (!f || pvKind(f) !== 'image') return;
+    if (hoverPv.dataset.id !== f.id || hoverPv.hidden) {
+      hoverPv.dataset.id = f.id;
+      hoverPv.innerHTML = `<img alt="" src="${fileUrl(f, true)}">`;
+      hoverPv.querySelector('img').onerror = hideHover;
+      hoverPv.querySelector('img').onload = () => { if (lastHoverEvt) placeHover(lastHoverEvt); };
+      hoverPv.hidden = false;
+    }
+    placeHover(e);
+  });
+  $('fileList').addEventListener('mousemove', (e) => { if (!hoverPv.hidden) placeHover(e); });
+  $('fileList').addEventListener('mouseout', (e) => { const b = e.target.closest('[data-preview]'); if (b && !b.contains(e.relatedTarget)) hideHover(); });
+}
 $('lockForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('lockBtn').disabled = true; $('lockErr').textContent = '';

@@ -10,6 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createNoteAuth } = require('./note-auth');
+const { fileHeaders } = require('./note-preview');
 
 const MAX_TEXT = 500_000;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
@@ -170,8 +171,8 @@ function createNoteFolderHandler(rootDir, opts = {}) {
         let s = null; try { s = file && fs.statSync(file); } catch (e) { /* 없음 */ }
         if (!s || !s.isFile()) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
         res.statusCode = 200;
-        res.setHeader('Content-Type', guessType(file));
-        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(file))}`);
+        const fh = fileHeaders(path.basename(file), guessType(file), url.searchParams.get('inline') === '1');
+        for (const [k, v] of Object.entries(fh)) res.setHeader(k, v);
         res.setHeader('Content-Length', String(s.size));
         res.setHeader('Cache-Control', 'no-store');
         return fs.createReadStream(file).pipe(res);
