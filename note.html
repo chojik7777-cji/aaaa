@@ -44,8 +44,6 @@
     @media (max-width:720px) { .top { grid-template-columns:1fr; } textarea{min-height:46vh;} header,.panel{padding:16px;} }
     .file .fname { color:#2b6cb0; font-weight:800; text-align:left; cursor:pointer; text-decoration:underline; text-underline-offset:3px; word-break:break-all; }
     .file .kind { font-size:18px; margin-right:4px; }
-    .hover-pv { position:fixed; z-index:20; pointer-events:none; background:white; padding:6px; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.35); }
-    .hover-pv img { display:block; max-width:280px; max-height:240px; border-radius:8px; }
     .footer { text-align:center; margin:18px 0 6px; color:#e2e8f0; font-size:14px; }
     .footer a { color:#2b6cb0; font-weight:700; text-decoration:underline; text-underline-offset:3px; }
   </style>
@@ -103,6 +101,7 @@
     </form>
   </div>
 
+<script src="/note-attachment-preview.js"></script>
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
@@ -128,6 +127,7 @@ function setEditingLocked(value) {
 }
 function showLock(msg) {
   locked = true;
+  preview?.close();
   clearTimeout(saveTimer);
   setEditingLocked(true);
   $('lock').hidden = false;
@@ -157,8 +157,8 @@ async function api(action, body) {
     body: action === 'state' ? undefined : JSON.stringify({ room, ...(body || {}) }),
     cache: 'no-store',
   });
+  if (res.status === 401 && action !== 'login') { showLock(); throw new Error('비밀번호를 다시 입력해 주세요.'); }
   const data = action === 'file' ? null : await res.json();
-  if (res.status === 401 && action !== 'login') { showLock(); throw new Error(data && data.error); }
   if (!res.ok || (data && !data.ok)) throw new Error((data && data.error) || '서버 오류');
   return data;
 }
@@ -228,7 +228,7 @@ function renderFiles(files) {
   box.innerHTML = files.map((f) => {
     const kind = pvKind(f);
     const name = kind
-      ? `<a class="fname" href="${fileUrl(f, true)}" target="_blank" rel="noopener" data-preview="${esc(f.id)}" title="새 탭에서 열기"><span class="kind">${PV_ICON[kind]}</span>${esc(f.name)}</a>`
+      ? `<a class="fname" href="${fileUrl(f, true)}" data-preview="${esc(f.id)}" title="미리보기 열기"><span class="kind">${PV_ICON[kind]}</span>${esc(f.name)}</a>`
       : `<b>${esc(f.name)}</b>`;
     return `
     <div class="file">
@@ -265,53 +265,18 @@ async function deleteFile(id) {
 }
 
 // ===== 첨부파일 미리보기 =====
-// 사진: 마우스를 올리면 작은 미리보기 / 사진·PDF·영상·음악·텍스트: 이름을 클릭·터치하면 새 탭에서 열기
-const PV_EXT = { image: /\.(jpe?g|png|gif|webp|bmp|heic)$/i, pdf: /\.pdf$/i, video: /\.(mp4|webm|mov)$/i, audio: /\.(mp3|m4a|wav|ogg|aac)$/i, text: /\.(txt|md|csv|log)$/i };
+// 파일 이름을 클릭·터치하면 중앙 미리보기 창에서 열립니다.
 const PV_ICON = { image: '🖼️', pdf: '📕', video: '🎬', audio: '🎵', text: '📄' };
-function pvKind(f) {
-  const t = String(f.type || '').toLowerCase();
-  for (const [k, re] of Object.entries(PV_EXT)) if (re.test(f.name || '')) return k;
-  if (t.startsWith('image/') && !t.includes('svg')) return 'image';
-  if (t === 'application/pdf') return 'pdf';
-  if (t.startsWith('video/')) return 'video';
-  if (t.startsWith('audio/')) return 'audio';
-  if (t.startsWith('text/plain')) return 'text';
-  return '';
-}
+function pvKind(f) { return window.NoteAttachmentPreview?.kind(f) || ''; }
 function fileUrl(f, inline) {
   const tk = token();
   return `${API}/file?room=${encodeURIComponent(room)}&id=${encodeURIComponent(f.id)}${tk ? `&token=${encodeURIComponent(tk)}` : ''}${inline ? '&inline=1' : ''}`;
 }
 let pvFiles = [];
-const hoverPv = document.createElement('div'); hoverPv.className = 'hover-pv'; hoverPv.hidden = true; document.body.appendChild(hoverPv);
-const canHover = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
-function hideHover() { hoverPv.hidden = true; hoverPv.innerHTML = ''; }
-let lastHoverEvt = null;
-function placeHover(e) {
-  lastHoverEvt = e;
-  const w = hoverPv.offsetWidth || 290, h = hoverPv.offsetHeight || 250;
-  let x = e.clientX + 18, y = e.clientY + 18;
-  if (x + w > innerWidth - 8) x = e.clientX - w - 18;
-  if (y + h > innerHeight - 8) y = Math.max(8, innerHeight - h - 8);
-  hoverPv.style.left = `${Math.max(8, x)}px`; hoverPv.style.top = `${y}px`;
-}
-if (canHover) {
-  $('fileList').addEventListener('mouseover', (e) => {
-    const b = e.target.closest('[data-preview]'); if (!b) return;
-    const f = pvFiles.find((x) => x.id === b.dataset.preview);
-    if (!f || pvKind(f) !== 'image') return;
-    if (hoverPv.dataset.id !== f.id || hoverPv.hidden) {
-      hoverPv.dataset.id = f.id;
-      hoverPv.innerHTML = `<img alt="" src="${fileUrl(f, true)}">`;
-      hoverPv.querySelector('img').onerror = hideHover;
-      hoverPv.querySelector('img').onload = () => { if (lastHoverEvt) placeHover(lastHoverEvt); };
-      hoverPv.hidden = false;
-    }
-    placeHover(e);
-  });
-  $('fileList').addEventListener('mousemove', (e) => { if (!hoverPv.hidden) placeHover(e); });
-  $('fileList').addEventListener('mouseout', (e) => { const b = e.target.closest('[data-preview]'); if (b && !b.contains(e.relatedTarget)) hideHover(); });
-}
+const preview = window.NoteAttachmentPreview?.create({
+  list: $('fileList'), files: () => pvFiles, fileUrl,
+  isLocked: () => locked, onUnauthorized: () => showLock()
+});
 $('lockForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('lockBtn').disabled = true; $('lockErr').textContent = '';
