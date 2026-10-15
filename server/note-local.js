@@ -11,25 +11,33 @@ async function hashPassword(password){
  return {algorithm:'scrypt',salt,hash:(await scrypt(password,salt,32,{N:32768,r:8,p:1,maxmem:64*1024*1024})).toString('hex')};
 }
 async function verify(password,v){return validPassword(password)&&equal((await scrypt(password,v.salt,32,{N:32768,r:8,p:1,maxmem:64*1024*1024})).toString('hex'),v.hash);}
+const {roomId}=require('./note-room');
 function createService(store,now=Date.now){
  async function get(id){if(!IDS.includes(id))throw Object.assign(new Error('잘못된 대상입니다.'),{status:400});try{const row=await store.get(id);if(!row)throw unavailable();return row;}catch{throw unavailable();}}
+ async function roomRow(room){
+  room=roomId(room);let custom;try{custom=store.getRoom?await store.getRoom(room):null;}catch{throw unavailable();}if(custom)return custom;
+  const template=await get('note2');
+  return {...template,room,token_key:crypto.createHmac('sha256',template.token_key).update('note2-room-v1:'+room).digest('hex')};
+ }
  const sign=(row,payload)=>crypto.createHmac('sha256',row.token_key).update(payload).digest('hex');
- function token(row){const p=Buffer.from(JSON.stringify({id:row.id,revision:row.revision,exp:now()+(row.id==='admin'?15*60*1000:7*24*60*60*1000)})).toString('base64url');return p+'.'+sign(row,p);}
- async function tokenOk(id,t){
+ function token(row){const p=Buffer.from(JSON.stringify({id:row.id,...(row.id==='note2'?{room:row.room}:{}),revision:row.revision,exp:now()+(row.id==='admin'?15*60*1000:7*24*60*60*1000)})).toString('base64url');return p+'.'+sign(row,p);}
+ async function tokenOk(id,t,room='default'){
   if(typeof t!=='string'||t.length>1024)return false;
-  const row=await get(id),parts=t.split('.');if(parts.length!==2||!equal(sign(row,parts[0]),parts[1]))return false;
-  try{const p=JSON.parse(Buffer.from(parts[0],'base64url'));return p.id===id&&p.revision===row.revision&&Number.isFinite(p.exp)&&p.exp>now();}catch{return false;}
+  const row=id==='note2'?await roomRow(room):await get(id),parts=t.split('.');if(parts.length!==2||!equal(sign(row,parts[0]),parts[1]))return false;
+  try{const p=JSON.parse(Buffer.from(parts[0],'base64url'));return p.id===id&&(id!=='note2'||p.room===room)&&p.revision===row.revision&&Number.isFinite(p.exp)&&p.exp>now();}catch{return false;}
  }
  return {
-  async login(id,password){if(id==='admin'&&!await store.consumeAdminAttempt())throw Object.assign(new Error('시도 횟수가 많습니다.'),{status:429});const row=await get(id);return await verify(password,row.verifier)?token(row):null;},
+  async login(id,password,room='default'){if(id==='admin'&&!await store.consumeAdminAttempt())throw Object.assign(new Error('시도 횟수가 많습니다.'),{status:429});const row=id==='note2'?await roomRow(room):await get(id);return await verify(password,row.verifier)?token(row):null;},
+  async hasRoom(room){roomId(room);try{return !!(store.getRoom&&await store.getRoom(room));}catch{throw unavailable();}},
   tokenOk,
-  async status(t){if(!await tokenOk('admin',t))throw {status:401};return Promise.all(['note','note2'].map(async id=>{const r=await get(id);return {id,revision:r.revision,updatedAt:r.updated_at};}));},
-  async rotate(t,id,password,confirmation,revision){
+  async rooms(t){if(!await tokenOk('admin',t))throw {status:401};return store.roomNames?await store.roomNames():[];},
+  async status(t,room='default'){if(!await tokenOk('admin',t))throw {status:401};return Promise.all(['note','note2'].map(async id=>{const r=id==='note2'?await roomRow(room):await get(id);return {id,...(id==='note2'?{room:r.room}:{}),revision:r.revision,updatedAt:r.updated_at};}));},
+  async rotate(t,id,password,confirmation,revision,room='default'){
    if(!await tokenOk('admin',t))throw {status:401};
    if(!['note','note2'].includes(id)||!validPassword(password)||password.length<8||password!==confirmation)throw {status:400};
-   const row=await get(id);if(revision!==row.revision)throw {status:409};
-   const next={id,revision:crypto.randomUUID(),verifier:await hashPassword(password),token_key:crypto.randomBytes(32).toString('hex'),updated_at:new Date(now()).toISOString()};
-   if(!await store.replace(id,revision,next))throw {status:409};return {id,revision:next.revision,updatedAt:next.updated_at};
+   const row=id==='note2'?await roomRow(room):await get(id);if(revision!==row.revision)throw {status:409};
+   const next={id,...(id==='note2'?{room:roomId(room)}:{}),revision:crypto.randomUUID(),verifier:await hashPassword(password),token_key:crypto.randomBytes(32).toString('hex'),updated_at:new Date(now()).toISOString()};
+   if(!await (id==='note2'?store.replaceRoom(room,revision,next):store.replace(id,revision,next)))throw {status:409};return {id,...(id==='note2'?{room}:{}),revision:next.revision,updatedAt:next.updated_at};
   }
  };
 }
@@ -40,9 +48,13 @@ function createFileStore(env=process.env){
  if(file===root||file.startsWith(root+path.sep))throw unavailable();
  function privatePath(p,kind){const st=fs.lstatSync(p);if(st.isSymbolicLink()||!(kind==='dir'?st.isDirectory():st.isFile())||st.uid!==process.getuid()||(st.mode&0o777)!==(kind==='dir'?0o700:0o600))throw unavailable();}
  function prepare(){fs.mkdirSync(dir,{recursive:true,mode:0o700});privatePath(dir,'dir');if(fs.realpathSync(dir)!==dir)throw unavailable();}
+ function validRow(r,id){return r?.id===id&&typeof r.revision==='string'&&r.revision.length>0&&r.verifier?.algorithm==='scrypt'&&/^[a-f0-9]{32}$/.test(r.verifier.salt)&&/^[a-f0-9]{64}$/.test(r.verifier.hash)&&/^[a-f0-9]{64}$/.test(r.token_key)&&typeof r.updated_at==='string';}
+ // Validate every room record before any lookup: old uppercase/case-conflicting keys
+ // must fail closed, never look like a missing custom password and inherit the template.
  function read(){
   prepare();privatePath(file,'file');const data=JSON.parse(fs.readFileSync(file,'utf8'));
-  if(data.version!==1||!data.rows||!IDS.every(id=>{const r=data.rows[id];return r?.id===id&&typeof r.revision==='string'&&r.revision.length>0&&r.verifier?.algorithm==='scrypt'&&/^[a-f0-9]{32}$/.test(r.verifier.salt)&&/^[a-f0-9]{64}$/.test(r.verifier.hash)&&/^[a-f0-9]{64}$/.test(r.token_key)&&typeof r.updated_at==='string';}))throw unavailable();return data;
+  if(data.version!==1||!data.rows||!IDS.every(id=>validRow(data.rows[id],id)))throw unavailable();
+  if(data.note2Rooms!==undefined&&(!data.note2Rooms||typeof data.note2Rooms!=='object'||Array.isArray(data.note2Rooms)||!Object.entries(data.note2Rooms).every(([room,r])=>roomId(room)===r.room&&validRow(r,'note2'))))throw unavailable();return data;
  }
  function write(data){
   const temp=file+'.'+crypto.randomUUID()+'.tmp';let fd;
@@ -57,6 +69,9 @@ function createFileStore(env=process.env){
   file,
   exists(){try{fs.lstatSync(file);return true;}catch(e){if(e.code==='ENOENT')return false;throw e;}},
   async get(id){return structuredClone(read().rows[id]);},
+  async getRoom(room){roomId(room);const rooms=read().note2Rooms;return rooms&&Object.hasOwn(rooms,room)?structuredClone(rooms[room]):null;},
+  async roomNames(){return Object.keys(read().note2Rooms||{});},
+  async replaceRoom(room,rev,row){roomId(room);return transaction(()=>{const data=read();const current=data.note2Rooms&&Object.hasOwn(data.note2Rooms,room)?data.note2Rooms[room]:data.rows.note2;if(current.revision!==rev)return false;data.note2Rooms??={};data.note2Rooms[room]=row;write(data);return true;});},
   async initialize(rows){return transaction(()=>{if(this.exists()){read();return false;}write({version:1,rows:Object.fromEntries(rows.map(r=>[r.id,r]))});return true;});},
   async replace(id,rev,row){return transaction(()=>{const data=read();if(data.rows[id]?.revision!==rev)return false;data.rows[id]=row;write(data);return true;});},
   async consumeAdminAttempt(){return transaction(()=>{const data=read(),now=Date.now();let a=data.adminAttempts;if(!a||a.until<=now)a={count:0,until:now+15*60*1000};a.count++;data.adminAttempts=a;write(data);return a.count<=10;});},

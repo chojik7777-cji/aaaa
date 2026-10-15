@@ -105,9 +105,12 @@
                 <p id="note-password-status"></p>
                 <form id="note-password-form">
                     <label>변경할 노트<select name="id"><option value="note">공유노트 A (note.html)</option><option value="note2">공유노트 B (note2.html)</option></select></label>
+                    <label id="note2-room-field" hidden>노트 B 방 선택 / 직접 입력<input name="room" list="note2-rooms" value="default" pattern="[a-z0-9_-]{1,50}" maxlength="50" autocomplete="off" disabled></label>
+                    <datalist id="note2-rooms"></datalist>
+                    <p>노트 B는 방별로 변경됩니다. 목록에서 고르거나 영문 소문자·숫자·_·- 1~50자의 방 이름을 직접 입력하세요. 대문자는 거부되며 자동 변환되지 않습니다. 기존 대문자 방은 운영자 이관이 필요합니다. 새 방은 관리자가 비밀번호를 저장한 뒤 사용할 수 있습니다.</p>
                     <label>새 비밀번호<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="256" required></label>
                     <label>새 비밀번호 확인<input name="confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="256" required></label>
-                    <p>8자 이상, 256바이트 이하로 입력해 주세요. 저장하면 해당 노트의 모든 기존 로그인 토큰이 무효화됩니다. Mac mini 로컬/터널 전용이며 Vercel 비밀번호는 변경·동기화되지 않습니다.</p>
+                    <p>8자 이상, 256바이트 이하로 입력해 주세요. 저장하면 노트 A 또는 선택한 노트 B 방의 기존 로그인만 해제됩니다. 다른 방과 관리자 로그인에는 영향이 없습니다. Mac mini 로컬/터널 전용이며 Vercel 비밀번호는 변경·동기화되지 않습니다.</p>
                     <button type="submit">새 비밀번호 저장</button>
                 </form>
                 <button id="note-admin-refresh" type="button">변경 상태 다시 조회</button>

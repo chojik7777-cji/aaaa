@@ -54,11 +54,11 @@ function createNoteAuth(opts = {}) {
   if (opts.localId) {
     const { runtimeService, validPassword } = require('./server/note-local');
     return {
-      async tokenOk(req, url) {
+      async tokenOk(req, url, room='default') {
         const t = String(req.headers?.['x-note-token'] || url?.searchParams.get('token') || '');
-        return runtimeService().tokenOk(opts.localId, t);
+        return runtimeService().tokenOk(opts.localId, t, room);
       },
-      async login(req, body) {
+      async login(req, body, room='default') {
 
         if (!validPassword(body?.password)) return [400, {ok:false,error:'비밀번호를 256바이트 이하로 입력해 주세요.'}];
         const ip = String(req.socket?.remoteAddress || 'remote');
@@ -75,7 +75,9 @@ function createNoteAuth(opts = {}) {
         f.pending++;
         const attempt = f.tail.then(async () => {
           if (f.lockedUntil > now()) return limited();
-          const token = await runtimeService().login(opts.localId, body.password);
+          const service=runtimeService();
+          const allowed=opts.localId!=='note2'||!opts.roomAllowed||await opts.roomAllowed(room,service);
+          const token = allowed?await service.login(opts.localId, body.password,room):null;
           if (token) { f.count=0; return [200,{ok:true,token}]; }
           f.count++; if (f.count >= MAX_FAILS) {f.count=0;f.lockedUntil=now()+LOCK_MS;}
           return [f.lockedUntil > now()?429:401,{ok:false,authRequired:true,error:'비밀번호가 맞지 않습니다.'}];
