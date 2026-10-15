@@ -1,5 +1,8 @@
 {
+  "buildCommand": "node scripts/build-static.js",
+  "outputDirectory": ".static-site",
   "rewrites": [
+    { "source": "/api/note-admin/:action", "destination": "/api/note-admin?action=:action" },
     { "source": "/api/note2/:action", "destination": "/api/note2?action=:action" },
     { "source": "/api/note/:action", "destination": "/api/note?action=:action" },
     { "source": "/api/math-control/:action", "destination": "/api/math-control?action=:action" },

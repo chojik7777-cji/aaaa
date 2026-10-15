@@ -51,6 +51,44 @@ function createNoteAuth(opts = {}) {
     if (f.lockedUntil > now()) return [429, { ok: false, locked: true, retryAfterMs: LOCK_MS, error: `비밀번호를 ${MAX_FAILS}번 틀려서 1시간 동안 잠겼어요.` }];
     return [401, { ok: false, authRequired: true, error: `비밀번호가 틀렸어요. (${MAX_FAILS - f.count}번 남음)` }];
   }
+  if (opts.localId) {
+    const { runtimeService, validPassword } = require('./server/note-local');
+    return {
+      async tokenOk(req, url) {
+        const t = String(req.headers?.['x-note-token'] || url?.searchParams.get('token') || '');
+        return runtimeService().tokenOk(opts.localId, t);
+      },
+      async login(req, body) {
+
+        if (!validPassword(body?.password)) return [400, {ok:false,error:'비밀번호를 256바이트 이하로 입력해 주세요.'}];
+        const ip = String(req.socket?.remoteAddress || 'remote');
+        const limited = () => [429, {ok:false,error:'시도 횟수가 많습니다. 1시간 뒤 다시 시도해 주세요.'}];
+        let f = fails.get(ip);
+        if (!f) {
+          // Never evict active locks or in-flight client budgets to admit a new IP.
+          if (fails.size >= 10000) return limited();
+          f = {count:0,lockedUntil:0,pending:0,tail:Promise.resolve()};
+          fails.set(ip,f);
+        }
+        if (f.lockedUntil > now() || f.pending >= MAX_FAILS) return limited();
+        // Reserve before any await; verify in order and recheck the lock when dequeued.
+        f.pending++;
+        const attempt = f.tail.then(async () => {
+          if (f.lockedUntil > now()) return limited();
+          const token = await runtimeService().login(opts.localId, body.password);
+          if (token) { f.count=0; return [200,{ok:true,token}]; }
+          f.count++; if (f.count >= MAX_FAILS) {f.count=0;f.lockedUntil=now()+LOCK_MS;}
+          return [f.lockedUntil > now()?429:401,{ok:false,authRequired:true,error:'비밀번호가 맞지 않습니다.'}];
+        });
+        f.tail = attempt.catch(() => {});
+        try { return await attempt; }
+        finally {
+          f.pending--;
+          if (!f.pending && !f.count && f.lockedUntil <= now()) fails.delete(ip);
+        }
+      }
+    };
+  }
   return { tokenOk, login };
 }
 

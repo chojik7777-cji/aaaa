@@ -1,0 +1,13 @@
+.git
+.vercel
+.env*
+**/.env*
+**/.note-password
+**/*.pem
+**/*.key
+pw
+family/
+note/
+note2/
+.static-site/
+tests/

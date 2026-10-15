@@ -10,9 +10,9 @@ async function call(method, url, body = {}) { const res = mockRes(); await handl
 
 (async () => {
   const setup = await call('GET', '/api/note2/setup');
-  assert.strictEqual(setup.status, 200);
-  assert.strictEqual(setup.data.ok, true);
-  assert.ok(setup.data.sql.includes('collab_notes'));
+  assert.strictEqual(setup.status, 401);
+  assert.strictEqual(setup.data.authRequired, true);
+  assert.strictEqual(setup.data.sql, undefined);
   assert.strictEqual((await call('GET', '/api/note2/state?room=test')).status, 401);
   const login = await call('POST', '/api/note2/login', { password: '1313' });
   assert.strictEqual(login.status, 200);

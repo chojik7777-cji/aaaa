@@ -125,8 +125,8 @@ function createNoteFolderHandler(rootDir, opts = {}) {
       const room = roomId(url.searchParams.get('room') || body.room);
       const dir = dirOf(room);
 
-      if (action === 'login' && req.method === 'POST') { const [st, data] = auth.login(req, body); return send(res, st, data); }
-      if (!auth.tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
+      if (action === 'login' && req.method === 'POST') { const [st, data] = await auth.login(req, body); return send(res, st, data); }
+      if (!await auth.tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
 
       if (!action || action === 'state') return send(res, 200, state(room));
 

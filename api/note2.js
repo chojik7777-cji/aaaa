@@ -116,11 +116,11 @@ module.exports = async function handler(req, res) {
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   });
   const { url, action } = actionFrom(req);
-  if (action === 'setup') return send(res, 200, { ok: true, configured: configured(), requiredEnv: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'], bucket: BUCKET, sql: setupSql });
-  if (action === 'login' && req.method === 'POST') { const [st, data] = auth.login(req, bodyOf(req)); return send(res, st, data); }
-  if (!auth.tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
-  if (!configured()) return notConfigured(res);
   try {
+    if (action === 'login' && req.method === 'POST') { const [st, data] = await auth.login(req, bodyOf(req)); return send(res, st, data); }
+    if (!await auth.tokenOk(req, url)) return send(res, 401, { ok: false, authRequired: true, error: '비밀번호가 필요해요.' });
+    if (action === 'setup') return send(res, 200, {ok:true,configured:configured()});
+    if (!configured()) return notConfigured(res);
     const body = bodyOf(req);
     const room = roomId(url.searchParams.get('room') || body.room);
 

@@ -52,6 +52,14 @@
             font-size: 14px; font-weight: 600; border: 1px solid #e2e8f0; transition: all 0.3s;
         }
         .more-links a:hover { background: #667eea; color: white; border-color: #667eea; }
+        .note-admin { margin-top:28px; padding-top:24px; border-top:1px solid #e2e8f0; text-align:left; }
+        .note-admin h2 { font-size:18px; margin-bottom:12px; color:#2d3748; }
+        .note-admin p { font-size:13px; line-height:1.7; color:#4a5568; margin:10px 0; }
+        .note-admin label { display:block; margin-top:12px; font-size:14px; color:#2d3748; }
+        .note-admin input, .note-admin select, .note-admin button { width:100%; padding:11px; margin-top:6px; border:1px solid #cbd5e0; border-radius:8px; font:inherit; }
+        .note-admin button { cursor:pointer; background:#667eea; color:white; }
+        .note-admin button:disabled { opacity:.5; cursor:wait; }
+        .note-admin [hidden] { display:none; }
         .footer { margin-top: 32px; font-size: 13px; color: #a0aec0; }
     </style>
 </head>
@@ -85,6 +93,29 @@
             <a href="https://youtu.be/5BacAuHIoQ4?si=G3ZoZCVpjbMejwNb" target="_blank" rel="noopener noreferrer">유튜브 영상</a>
             <a href="https://m.blog.naver.com/chojeongik" target="_blank" rel="noopener noreferrer">블로그</a>
         </div>
+        <section class="note-admin" aria-labelledby="note-admin-heading">
+            <h2 id="note-admin-heading">공유노트 비밀번호 관리</h2>
+            <p>Mac mini 로컬 전용입니다. 맥미니/터널에서만 변경되며 Vercel에는 동기화되지 않습니다.</p>
+            <p>노트 로그인과 별도로 관리자 인증이 필요합니다. 현재 비밀번호는 표시하지 않습니다.</p>
+            <form id="note-admin-login">
+                <label>관리자 비밀번호<input name="password" type="password" autocomplete="current-password" maxlength="256" required></label>
+                <button type="submit">관리자 로그인</button>
+            </form>
+            <div id="note-admin-panel" hidden>
+                <p id="note-password-status"></p>
+                <form id="note-password-form">
+                    <label>변경할 노트<select name="id"><option value="note">공유노트 A (note.html)</option><option value="note2">공유노트 B (note2.html)</option></select></label>
+                    <label>새 비밀번호<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="256" required></label>
+                    <label>새 비밀번호 확인<input name="confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="256" required></label>
+                    <p>8자 이상, 256바이트 이하로 입력해 주세요. 저장하면 해당 노트의 모든 기존 로그인 토큰이 무효화됩니다. Mac mini 로컬/터널 전용이며 Vercel 비밀번호는 변경·동기화되지 않습니다.</p>
+                    <button type="submit">새 비밀번호 저장</button>
+                </form>
+                <button id="note-admin-refresh" type="button">변경 상태 다시 조회</button>
+                <button id="note-admin-logout" type="button">관리자 로그아웃</button>
+            </div>
+            <p id="note-admin-message" role="status" aria-live="polite"></p>
+        </section>
+        <script src="note-password-admin.js" defer></script>
         <p class="footer">made by jeongik<br>문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
     </div>
 

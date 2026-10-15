@@ -2,3 +2,5 @@
 family/
 note/
 note2/
+.env*
+.static-site/

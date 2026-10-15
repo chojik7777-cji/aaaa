@@ -1,0 +1,28 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {initialize,createFileStore,createService}=require('../server/note-local');
+test('private atomic local store preserves passwords, survives reload and revokes revisions',async t=>{
+ const dir=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'note-local-')));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const env={NOTE_AUTH_FILE:path.join(dir,'private','note-auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_PASSWORD:'existing-A-test',NOTE2_PASSWORD:'existing-B-test'};
+ await assert.rejects(()=>initialize(env));assert.equal(fs.existsSync(env.NOTE_AUTH_FILE),false);
+ fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'admin-test-password\n',{mode:0o600});
+ await initialize(env);
+ const original=fs.readFileSync(env.NOTE_AUTH_FILE,'utf8');assert.doesNotMatch(original,/existing-A-test|existing-B-test|admin-test-password/);
+ assert.equal(fs.statSync(env.NOTE_AUTH_FILE).mode&0o777,0o600);assert.equal(fs.statSync(path.dirname(env.NOTE_AUTH_FILE)).mode&0o777,0o700);
+ assert.ok(Object.values(JSON.parse(original).rows).every(r=>r.verifier.algorithm==='scrypt'));
+ const a=createService(createFileStore(env)),b=createService(createFileStore(env));
+ const admin=await a.login('admin','admin-test-password'),old=await a.login('note','existing-A-test');assert.ok(admin);assert.ok(old);
+ assert.equal(await a.login('admin','wrong'),null);await assert.rejects(()=>a.status('fake'),{status:401});
+ const revision=(await a.status(admin))[0].revision;
+ const change=await a.rotate(admin,'note','changed-password','changed-password',revision);
+ assert.equal(await b.tokenOk('note',old),false);assert.equal(await b.login('note','existing-A-test'),null);
+ const next=await b.login('note','changed-password');assert.ok(next);
+ await assert.rejects(()=>b.rotate(admin,'note','changed-password','changed-password',revision),{status:409});
+ await b.rotate(admin,'note','changed-password','changed-password',change.revision);assert.equal(await a.tokenOk('note',next),false);
+ const before=fs.readFileSync(env.NOTE_AUTH_FILE,'utf8');await initialize({...env,NOTE_PASSWORD:'ignored-change'});assert.equal(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8'),before);
+ assert.ok(await createService(createFileStore(env)).tokenOk('admin',admin));
+ assert.ok(await b.login('note2','existing-B-test'));
+ for(let i=0;i<8;i++)await b.login('admin','wrong');await assert.rejects(()=>b.login('admin','wrong'),{status:429});
+ await assert.rejects(()=>createService(createFileStore(env)).login('admin','wrong'),{status:429});
+ fs.writeFileSync(env.NOTE_AUTH_FILE,'invalid');await assert.rejects(()=>a.login('note','changed-password'));await assert.rejects(()=>initialize(env));
+});
