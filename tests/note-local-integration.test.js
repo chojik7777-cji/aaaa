@@ -6,6 +6,7 @@ test('portal startup-only bootstrap, HTTP auth/revisions persist through restart
  const dir=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'note-http-')));let child,base;
  const env={...process.env,VERCEL:'',HOST:'127.0.0.1',PORT:'0',NOTE_AUTH_FILE:path.join(dir,'private','note-auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_DIR:path.join(dir,'note'),NOTE2_DIR:path.join(dir,'note2'),NOTE_PASSWORD:'existing-A-test',NOTE2_PASSWORD:'existing-B-test'};
  fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'admin-test-password\n',{mode:0o600});
+ fs.mkdirSync(path.join(env.NOTE2_DIR,'default'),{recursive:true});
  async function stop(){if(child){const c=child;child=null;const done=new Promise(r=>c.once('exit',r));c.kill();await done;}}
  t.after(async()=>{await stop();fs.rmSync(dir,{recursive:true,force:true});});
  async function start(){child=spawn(process.execPath,['portal-server.js'],{cwd:root,env,stdio:['ignore','pipe','pipe']});base=await new Promise((resolve,reject)=>{let out='';const timer=setTimeout(()=>reject(new Error('startup timeout')),10000);child.stdout.on('data',c=>{out+=c;const m=out.match(/Game portal server: (http:\/\/127\.0\.0\.1:\d+)/);if(m){clearTimeout(timer);resolve(m[1]);}});child.once('exit',()=>{clearTimeout(timer);reject(new Error('startup failed'));});});}

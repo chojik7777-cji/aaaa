@@ -11,8 +11,11 @@ async function hashPassword(password){
  return {algorithm:'scrypt',salt,hash:(await scrypt(password,salt,32,{N:32768,r:8,p:1,maxmem:64*1024*1024})).toString('hex')};
 }
 async function verify(password,v){return validPassword(password)&&equal((await scrypt(password,v.salt,32,{N:32768,r:8,p:1,maxmem:64*1024*1024})).toString('hex'),v.hash);}
-const {roomId}=require('./note-room');
-function createService(store,now=Date.now){
+const {roomId,roomRoot,existingRoom}=require('./note-room');
+function createService(store,now=Date.now,options={}){
+ const root=options.roomRoot||roomRoot();
+ const newRow=async(id,password,room)=>({id,...(id==='note2'?{room:roomId(room)}:{}),revision:crypto.randomUUID(),verifier:await hashPassword(password),token_key:crypto.randomBytes(32).toString('hex'),updated_at:new Date(now()).toISOString()});
+ const checkPassword=(password,confirmation)=>{if(!validPassword(password)||password.length<8||password!==confirmation)throw {status:400};};
  async function get(id){if(!IDS.includes(id))throw Object.assign(new Error('잘못된 대상입니다.'),{status:400});try{const row=await store.get(id);if(!row)throw unavailable();return row;}catch{throw unavailable();}}
  async function roomRow(room){
   room=roomId(room);let custom;try{custom=store.getRoom?await store.getRoom(room):null;}catch{throw unavailable();}if(custom)return custom;
@@ -20,11 +23,12 @@ function createService(store,now=Date.now){
   return {...template,room,token_key:crypto.createHmac('sha256',template.token_key).update('note2-room-v1:'+room).digest('hex')};
  }
  const sign=(row,payload)=>crypto.createHmac('sha256',row.token_key).update(payload).digest('hex');
- function token(row){const p=Buffer.from(JSON.stringify({id:row.id,...(row.id==='note2'?{room:row.room}:{}),revision:row.revision,exp:now()+(row.id==='admin'?15*60*1000:7*24*60*60*1000)})).toString('base64url');return p+'.'+sign(row,p);}
+ // User grants persist until revision/key rotation; only admin grants expire.
+ function token(row){const p=Buffer.from(JSON.stringify({id:row.id,...(row.id==='note2'?{room:row.room}:{}),revision:row.revision,...(row.id==='admin'?{exp:now()+15*60*1000}:{})})).toString('base64url');return p+'.'+sign(row,p);}
  async function tokenOk(id,t,room='default'){
   if(typeof t!=='string'||t.length>1024)return false;
   const row=id==='note2'?await roomRow(room):await get(id),parts=t.split('.');if(parts.length!==2||!equal(sign(row,parts[0]),parts[1]))return false;
-  try{const p=JSON.parse(Buffer.from(parts[0],'base64url'));return p.id===id&&(id!=='note2'||p.room===room)&&p.revision===row.revision&&Number.isFinite(p.exp)&&p.exp>now();}catch{return false;}
+  try{const p=JSON.parse(Buffer.from(parts[0],'base64url'));return p.id===id&&(id!=='note2'||p.room===room)&&p.revision===row.revision&&(id!=='admin'||(Number.isFinite(p.exp)&&p.exp>now()));}catch{return false;}
  }
  return {
   async login(id,password,room='default'){if(id==='admin'&&!await store.consumeAdminAttempt())throw Object.assign(new Error('시도 횟수가 많습니다.'),{status:429});const row=id==='note2'?await roomRow(room):await get(id);return await verify(password,row.verifier)?token(row):null;},
@@ -32,12 +36,22 @@ function createService(store,now=Date.now){
   tokenOk,
   async rooms(t){if(!await tokenOk('admin',t))throw {status:401};return store.roomNames?await store.roomNames():[];},
   async status(t,room='default'){if(!await tokenOk('admin',t))throw {status:401};return Promise.all(['note','note2'].map(async id=>{const r=id==='note2'?await roomRow(room):await get(id);return {id,...(id==='note2'?{room:r.room}:{}),revision:r.revision,updatedAt:r.updated_at};}));},
-  async rotate(t,id,password,confirmation,revision,room='default'){
+  async createRoom(t,room,password,confirmation,physicalRoot=root){
    if(!await tokenOk('admin',t))throw {status:401};
-   if(!['note','note2'].includes(id)||!validPassword(password)||password.length<8||password!==confirmation)throw {status:400};
+   roomId(room);checkPassword(password,confirmation);
+   const next=await newRow('note2',password,room);
+   // The physical existence check runs inside the same synchronous store transaction
+   // as create-if-absent. No public folder is created; first save/upload creates it.
+   if(!await store.createRoom(room,next,()=>existingRoom(physicalRoot,room)))throw {status:409};
+   return {room,updatedAt:next.updated_at};
+  },
+  async rotate(t,id,password,confirmation,revision,room='default',physicalRoot=root){
+   if(!await tokenOk('admin',t))throw {status:401};
+   if(!['note','note2'].includes(id))throw {status:400};checkPassword(password,confirmation);
+   if(id==='note2'&&!existingRoom(physicalRoot,room)&&!await this.hasRoom(room))throw {status:404};
    const row=id==='note2'?await roomRow(room):await get(id);if(revision!==row.revision)throw {status:409};
-   const next={id,...(id==='note2'?{room:roomId(room)}:{}),revision:crypto.randomUUID(),verifier:await hashPassword(password),token_key:crypto.randomBytes(32).toString('hex'),updated_at:new Date(now()).toISOString()};
-   if(!await (id==='note2'?store.replaceRoom(room,revision,next):store.replace(id,revision,next)))throw {status:409};return {id,...(id==='note2'?{room}:{}),revision:next.revision,updatedAt:next.updated_at};
+   const next=await newRow(id,password,room);
+   if(!await (id==='note2'?store.replaceRoom(room,revision,next,()=>existingRoom(physicalRoot,room)):store.replace(id,revision,next)))throw {status:409};return {id,...(id==='note2'?{room}:{}),revision:next.revision,updatedAt:next.updated_at};
   }
  };
 }
@@ -63,7 +77,7 @@ function createFileStore(env=process.env){
  }
  function transaction(fn){
   prepare();const lock=file+'.lock';let fd;
-  try{fd=fs.openSync(lock,'wx',0o600);return fn();}catch{throw unavailable();}finally{if(fd!==undefined){fs.closeSync(fd);fs.unlinkSync(lock);}}
+  try{fd=fs.openSync(lock,'wx',0o600);return fn();}catch(e){if(e.status===400)throw e;throw unavailable();}finally{if(fd!==undefined){fs.closeSync(fd);fs.unlinkSync(lock);}}
  }
  return {
   file,
@@ -71,7 +85,8 @@ function createFileStore(env=process.env){
   async get(id){return structuredClone(read().rows[id]);},
   async getRoom(room){roomId(room);const rooms=read().note2Rooms;return rooms&&Object.hasOwn(rooms,room)?structuredClone(rooms[room]):null;},
   async roomNames(){return Object.keys(read().note2Rooms||{});},
-  async replaceRoom(room,rev,row){roomId(room);return transaction(()=>{const data=read();const current=data.note2Rooms&&Object.hasOwn(data.note2Rooms,room)?data.note2Rooms[room]:data.rows.note2;if(current.revision!==rev)return false;data.note2Rooms??={};data.note2Rooms[room]=row;write(data);return true;});},
+  async createRoom(room,row,physicalExists){roomId(room);return transaction(()=>{const data=read();if(physicalExists()||(data.note2Rooms&&Object.hasOwn(data.note2Rooms,room)))return false;data.note2Rooms??={};data.note2Rooms[room]=row;write(data);return true;});},
+  async replaceRoom(room,rev,row,physicalExists=()=>false){roomId(room);return transaction(()=>{const data=read(),configured=data.note2Rooms&&Object.hasOwn(data.note2Rooms,room);if(!configured&&!physicalExists())return false;const current=configured?data.note2Rooms[room]:data.rows.note2;if(current.revision!==rev)return false;data.note2Rooms??={};data.note2Rooms[room]=row;write(data);return true;});},
   async initialize(rows){return transaction(()=>{if(this.exists()){read();return false;}write({version:1,rows:Object.fromEntries(rows.map(r=>[r.id,r]))});return true;});},
   async replace(id,rev,row){return transaction(()=>{const data=read();if(data.rows[id]?.revision!==rev)return false;data.rows[id]=row;write(data);return true;});},
   async consumeAdminAttempt(){return transaction(()=>{const data=read(),now=Date.now();let a=data.adminAttempts;if(!a||a.until<=now)a={count:0,until:now+15*60*1000};a.count++;data.adminAttempts=a;write(data);return a.count<=10;});},

@@ -18,7 +18,7 @@ test('real case-insensitive filesystem cannot alias custom alpha with template A
  assert.equal(fs.statSync(path.join(root,'alpha')).ino,fs.statSync(path.join(root,'ALPHA')).ino,'probe must exercise a real physical alias');
  const env={NOTE_AUTH_FILE:path.join(dir,'private','auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_PASSWORD:'test-note-pass',NOTE2_PASSWORD:'test-template-pass'};
  fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'test-admin-pass');await initialize(env);
- const service=createService(createFileStore(env)),adminToken=await service.login('admin','test-admin-pass');
+ const service=createService(createFileStore(env),Date.now,{roomRoot:root}),adminToken=await service.login('admin','test-admin-pass');
  const rev=(await service.status(adminToken,'alpha')).find(n=>n.id==='note2').revision;
  await service.rotate(adminToken,'note2','test-alpha-pass','test-alpha-pass',rev,'alpha');
  fs.writeFileSync(path.join(root,'alpha','.note-memo.txt'),'private-alpha');fs.writeFileSync(path.join(root,'alpha','x.txt'),'private-file');
@@ -45,12 +45,13 @@ test('real case-insensitive filesystem cannot alias custom alpha with template A
  assert.equal((await call('state','alpha',undefined,alpha)).data.text,'private-alpha');
  assert.equal(fs.readFileSync(path.join(root,'alpha','x.txt'),'utf8'),'private-file');assert.equal(fs.existsSync(path.join(root,'alpha','attack.txt')),false);
  // A lowercase request must not address an old uppercase physical directory, even with a custom record.
+ await service.createRoom(adminToken,'legacy','test-legacy-pass','test-legacy-pass');
+ const legacy=await service.login('note2','test-legacy-pass','legacy');
  fs.mkdirSync(path.join(root,'LEGACY'));fs.writeFileSync(path.join(root,'LEGACY','.note-memo.txt'),'legacy-private');
  assert.throws(()=>existingRoom(root,'legacy'),{status:400});assert.equal(listRooms(root).includes('LEGACY'),false);
  assert.equal((await call('login','legacy',{password:'test-template-pass'})).status,400);
  const legacyRev=(await service.status(adminToken,'legacy')).find(n=>n.id==='note2').revision;
- await service.rotate(adminToken,'note2','test-legacy-pass','test-legacy-pass',legacyRev,'legacy');
- const legacy=await service.login('note2','test-legacy-pass','legacy');
+ await assert.rejects(()=>service.rotate(adminToken,'note2','test-next-pass','test-next-pass',legacyRev,'legacy'),{status:400});
  assert.equal((await call('status','alpha',undefined,adminToken,true)).status,400,'discovery must reject customized names that alias uppercase physical folders');
  const authBefore=fs.readFileSync(env.NOTE_AUTH_FILE,'utf8');
  assert.equal((await call('login','legacy',{password:'test-legacy-pass'})).status,400,'custom record must not override physical case mismatch');

@@ -4,7 +4,8 @@ const {initialize,createFileStore,createService}=require('../server/note-local')
 test('room CAS is durable and only adds the selected room; template/admin/note remain unchanged',async t=>{
  const dir=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'note-room-cas-')));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const env={NOTE_AUTH_FILE:path.join(dir,'private','auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_PASSWORD:'old-note-pass',NOTE2_PASSWORD:'old-room-pass'};fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'admin-test-pass');await initialize(env);
- const a=createService(createFileStore(env)),b=createService(createFileStore(env)),admin=await a.login('admin','admin-test-pass');
+ const root=path.join(dir,'rooms');for(const room of ['alpha','beta'])fs.mkdirSync(path.join(root,room),{recursive:true});
+ const a=createService(createFileStore(env),Date.now,{roomRoot:root}),b=createService(createFileStore(env),Date.now,{roomRoot:root}),admin=await a.login('admin','admin-test-pass');
  const before=JSON.parse(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8')),note=await a.login('note','old-note-pass'),alpha=await a.login('note2','old-room-pass','alpha'),beta=await a.login('note2','old-room-pass','beta');
  const rev=(await a.status(admin,'alpha')).find(n=>n.id==='note2').revision;
  const result=await Promise.allSettled([a.rotate(admin,'note2','changed-alpha','changed-alpha',rev,'alpha'),b.rotate(admin,'note2','other-alpha-pass','other-alpha-pass',rev,'alpha'),b.rotate(admin,'note2','changed-beta','changed-beta',rev,'beta')]);

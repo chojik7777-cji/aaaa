@@ -1,8 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 test('admin browser selects/queries typed room and submits its revision, never a previous room revision',async()=>{
- function element(value=''){return {value,disabled:false,hidden:false,handlers:{},addEventListener(k,fn){this.handlers[k]=fn;},replaceChildren(...children){this.children=children;},querySelector(){return this.button??=(element());},reset(){}};}
- const ids=Object.fromEntries(['note-admin-login','note-password-form','note-admin-panel','note-admin-message','note2-room-field','note2-rooms','note-password-status','note-admin-refresh','note-admin-logout'].map(id=>[id,element()]));
+ function element(value=''){return {value,disabled:false,hidden:false,handlers:{},addEventListener(k,fn){this.handlers[k]=fn;},append(...children){(this.children??=[]).push(...children);},replaceChildren(...children){this.children=children;},querySelector(){return this.button??=(element());},reset(){}};}
+ const ids=Object.fromEntries(['note-admin-login','note-password-form','note-admin-panel','note-admin-message','note2-room-field','note2-rooms','note-password-status','note-admin-refresh','note-admin-logout','note2-create-form','note2-room-list'].map(id=>[id,element()]));
  const form=ids['note-password-form'],login=ids['note-admin-login'];form.elements={id:element('note'),room:element('default'),password:element(),confirmation:element()};form.elements.room.disabled=true;login.elements={password:element('admin-pass')};
  const calls=[],confirmations=[];
  async function fetch(url,options){const query=new URL(url,'http://test').searchParams,action=query.get('action'),room=query.get('room'),body=options.body?JSON.parse(options.body):undefined;calls.push({action,room,body});return {ok:true,json:async()=>action==='login'?{token:'admin-token'}:action==='status'?{notes:[{id:'note',revision:'note-rev',updatedAt:0},{id:'note2',room,revision:'rev-'+room,updatedAt:0}],rooms:['alpha','beta']}:{ok:true}};}

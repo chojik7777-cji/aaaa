@@ -1,0 +1,36 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
+const {initialize,createFileStore,createService}=require('../server/note-local');
+test('persistent users survive old expiry and service restart; admin expires and room rotations stay isolated',async t=>{
+ const dir=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'persistent-note-')));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const env={NOTE_AUTH_FILE:path.join(dir,'private','auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_PASSWORD:'fixture-note-pass',NOTE2_PASSWORD:'fixture-template-pass'};
+ fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'fixture-admin-pass');await initialize(env);
+ let now=Date.now();const clock=()=>now,options={roomRoot:path.join(dir,'rooms')};
+ let service=createService(createFileStore(env),clock,options);
+ const admin=await service.login('admin','fixture-admin-pass');
+ await service.createRoom(admin,'alpha','fixture-alpha-pass','fixture-alpha-pass');await service.createRoom(admin,'beta','fixture-beta-pass','fixture-beta-pass');
+ const a=await service.login('note2','fixture-alpha-pass','alpha'),b=await service.login('note2','fixture-beta-pass','beta'),note=await service.login('note','fixture-note-pass');
+ const data=JSON.parse(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8'));
+ function signed(row,payload){const p=Buffer.from(JSON.stringify(payload)).toString('base64url');return p+'.'+crypto.createHmac('sha256',row.token_key).update(p).digest('hex');}
+ const payload=JSON.parse(Buffer.from(a.split('.')[0],'base64url'));
+ const legacy=signed(data.note2Rooms.alpha,{...payload,exp:now+7*24*60*60*1000});
+ const legacyNote=signed(data.rows.note,{id:'note',revision:data.rows.note.revision,exp:now+7*24*60*60*1000});
+ now+=15*60*1000-1;assert.equal(await service.tokenOk('admin',admin),true);now++;assert.equal(await service.tokenOk('admin',admin),false);
+ now+=30*24*60*60*1000;service=createService(createFileStore(env),clock,options);
+ for(const token of [a,legacy])assert.equal(await service.tokenOk('note2',token,'alpha'),true,'room token remains valid after 30 days and service reconstruction');
+ for(const token of [note,legacyNote])assert.equal(await service.tokenOk('note',token),true);
+ assert.equal(await service.tokenOk('note2',a,'beta'),false);assert.equal(await service.tokenOk('note',a),false);assert.equal(await service.tokenOk('admin',a),false);
+ for(const altered of [{...payload,id:'note'},{...payload,room:'beta'},{...payload,revision:'stale'},{}])assert.equal(await service.tokenOk('note2',signed(data.note2Rooms.alpha,altered),'alpha'),false);
+ assert.equal(await service.tokenOk('note2',a.slice(0,-1)+(a.endsWith('0')?'1':'0'),'alpha'),false);
+ for(const exp of [undefined,null,'999999999999999',now,now-1])assert.equal(await service.tokenOk('admin',signed(data.rows.admin,{id:'admin',revision:data.rows.admin.revision,...(exp===undefined?{}:{exp})})),false);
+ const freshAdmin=await service.login('admin','fixture-admin-pass');
+ let revision=(await service.status(freshAdmin,'alpha')).find(r=>r.id==='note2').revision;
+ await service.rotate(freshAdmin,'note2','fixture-new-pass','fixture-new-pass',revision,'alpha');
+ for(const token of [a,legacy])assert.equal(await service.tokenOk('note2',token,'alpha'),false);
+ assert.equal(await service.login('note2','fixture-alpha-pass','alpha'),null);
+ const next=await service.login('note2','fixture-new-pass','alpha');assert.ok(next);
+ revision=(await service.status(freshAdmin,'alpha')).find(r=>r.id==='note2').revision;
+ await service.rotate(freshAdmin,'note2','fixture-new-pass','fixture-new-pass',revision,'alpha');assert.equal(await service.tokenOk('note2',next,'alpha'),false);
+ assert.equal(await service.tokenOk('note2',b,'beta'),true);assert.equal(await service.tokenOk('note',note),true);assert.equal(await service.tokenOk('admin',freshAdmin),true);
+ const final=JSON.parse(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8'));assert.deepEqual(final.rows,data.rows);assert.deepEqual(final.note2Rooms.beta,data.note2Rooms.beta);
+});

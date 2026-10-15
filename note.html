@@ -122,8 +122,14 @@ let lastLocalEdit = 0;
 let locked = false;
 const TOKEN_KEY = 'note-token';
 function token() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+function setEditingLocked(value) {
+  for (const id of ['editor','saveBtn','uploadBtn','fileInput','reloadBtn']) $(id).disabled = value;
+  for (const button of $('fileList').querySelectorAll('[data-delete]')) button.disabled = value;
+}
 function showLock(msg) {
   locked = true;
+  clearTimeout(saveTimer);
+  setEditingLocked(true);
   $('lock').hidden = false;
   if (msg) $('lockErr').textContent = msg;
   setBadge('bad', '● 비밀번호 필요');
@@ -144,6 +150,7 @@ function updateStatus(data) {
   $('countText').textContent = `${$('editor').value.length.toLocaleString()}자`;
 }
 async function api(action, body) {
+  if (locked && action !== 'login') throw new Error('비밀번호를 다시 입력해 주세요.');
   const res = await fetch(`${API}/${action}?room=${encodeURIComponent(room)}`, {
     method: action === 'state' ? 'GET' : 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Note-Token': token() },
@@ -151,11 +158,12 @@ async function api(action, body) {
     cache: 'no-store',
   });
   const data = action === 'file' ? null : await res.json();
-  if (res.status === 401 && data && data.authRequired && action !== 'login') { showLock(); throw new Error(data.error); }
+  if (res.status === 401 && action !== 'login') { showLock(); throw new Error(data && data.error); }
   if (!res.ok || (data && !data.ok)) throw new Error((data && data.error) || '서버 오류');
   return data;
 }
 function applyRemote(data, force = false) {
+  if (locked) return;
   const remoteNewer = data.version > state.version;
   state = data;
   // 맥미니(임시터널)로 열면 파일이 맥미니 폴더에 저장돼요
@@ -180,27 +188,29 @@ async function load(force = false) {
     const data = await api('state');
     applyRemote(data, force);
   } catch (e) {
-    setBadge('bad', '● 연결 오류');
+    if (!locked) setBadge('bad', '● 연결 오류');
     console.warn(e);
   }
 }
 async function saveNow() {
-  if (saving) return;
+  if (locked || saving) return;
   try {
     saving = true;
     $('saveBtn').disabled = true;
     setBadge('warn', '● 저장 중');
     const data = await api('save', { text: $('editor').value, user: user() });
+    if (locked) return;
     dirty = false;
     applyRemote(data, true);
   } catch (e) {
-    setBadge('bad', `● 저장 실패: ${e.message}`);
+    if (!locked) setBadge('bad', `● 저장 실패: ${e.message}`);
   } finally {
     saving = false;
-    $('saveBtn').disabled = false;
+    $('saveBtn').disabled = locked;
   }
 }
 function scheduleSave() {
+  if (locked) return;
   dirty = true;
   lastLocalEdit = Date.now();
   setBadge('warn', '● 저장 대기');
@@ -233,6 +243,7 @@ function renderFiles(files) {
 }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 async function uploadFile() {
+  if (locked) return;
   const file = $('fileInput').files[0];
   if (!file) return alert('업로드할 파일을 선택하세요.');
   const max = state.maxFileBytes || 900000;
@@ -244,9 +255,10 @@ async function uploadFile() {
     $('fileInput').value = '';
     applyRemote(data, false);
   } catch (e) { alert(e.message); }
-  finally { $('uploadBtn').disabled = false; }
+  finally { $('uploadBtn').disabled = locked; }
 }
 async function deleteFile(id) {
+  if (locked) return;
   if (!confirm('첨부파일을 삭제할까요?')) return;
   try { applyRemote(await api('delete-file', { id, user: user() }), false); }
   catch (e) { alert(e.message); }
@@ -307,7 +319,9 @@ $('lockForm').addEventListener('submit', async (e) => {
     const data = await api('login', { password: $('lockPw').value });
     try { localStorage.setItem(TOKEN_KEY, data.token || ''); } catch (err) {}
     locked = false; $('lock').hidden = true; $('lockPw').value = '';
-    load(true);
+    setEditingLocked(false);
+    await load(!dirty);
+    if (dirty && !locked) setBadge('warn', '● 미저장 내용 유지 · 지금 저장을 눌러 저장하세요');
   } catch (err) { $('lockErr').textContent = err.message; $('lockPw').select(); }
   finally { $('lockBtn').disabled = false; }
 });

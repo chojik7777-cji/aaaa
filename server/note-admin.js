@@ -14,7 +14,7 @@ function createAdminHandler(getService=runtimeService,options={}){
   const url=new URL(req.url,'http://localhost'),action=url.searchParams.get('action')||url.pathname.split('/').pop();
   if(action==='not-found')return send(res,404,{ok:false});
   try{
-   if(!['login','status','rotate'].includes(action))return send(res,404,{ok:false,error:'알 수 없는 요청입니다.'});
+   if(!['login','status','rotate','create'].includes(action))return send(res,404,{ok:false,error:'알 수 없는 요청입니다.'});
    if(req.method!==(action==='status'?'GET':'POST'))return send(res,405,{ok:false,error:'허용되지 않는 요청 방식입니다.'});
    const body=action==='status'?{}:await bodyOf(req);
    if(!body||typeof body!=='object'||Array.isArray(body))throw {status:400};
@@ -41,8 +41,9 @@ function createAdminHandler(getService=runtimeService,options={}){
     for(const name of rooms)existingRoom(root,name);
     return send(res,200,{ok:true,notes:await service.status(token,room),rooms});
    }
-   return send(res,200,{ok:true,note:await service.rotate(token,body.id,body.password,body.confirmation,body.revision,room)});
-  }catch(e){const status=[400,401,409,413,429].includes(e.status)?e.status:503;return send(res,status,{ok:false,error:({400:'입력 내용을 확인해 주세요.',401:'관리자 인증이 필요합니다. 다시 로그인해 주세요.',409:'다른 변경이 있습니다. 다시 조회해 주세요.',413:'요청이 너무 큽니다.',429:'시도 횟수가 많습니다. 15분 뒤 다시 시도해 주세요.',503:'맥미니 로컬 비밀번호 저장소를 사용할 수 없습니다. 관리자에게 문의해 주세요.'})[status]});}
+   if(action==='create')return send(res,201,{ok:true,room:await service.createRoom(token,room,body.password,body.confirmation,root)});
+   return send(res,200,{ok:true,note:await service.rotate(token,body.id,body.password,body.confirmation,body.revision,room,root)});
+  }catch(e){const status=[400,401,404,409,413,429].includes(e.status)?e.status:503;return send(res,status,{ok:false,error:({400:'입력 내용을 확인해 주세요.',401:'관리자 인증이 필요합니다. 다시 로그인해 주세요.',404:'등록되지 않은 방입니다. NEW ROOM에서 먼저 생성해 주세요.',409:'이미 존재하는 방이거나 다른 변경이 있습니다. 기존 비밀번호는 덮어쓰지 않았습니다. 다시 조회해 주세요.',413:'요청이 너무 큽니다.',429:'시도 횟수가 많습니다. 15분 뒤 다시 시도해 주세요.',503:'맥미니 로컬 비밀번호 저장소를 사용할 수 없습니다. 관리자에게 문의해 주세요.'})[status]});}
  };
 }
 module.exports={createAdminHandler};
