@@ -14,7 +14,7 @@ function createAdminHandler(getService=runtimeService,options={}){
   const url=new URL(req.url,'http://localhost'),action=url.searchParams.get('action')||url.pathname.split('/').pop();
   if(action==='not-found')return send(res,404,{ok:false});
   try{
-   if(!['login','status','rotate','create'].includes(action))return send(res,404,{ok:false,error:'알 수 없는 요청입니다.'});
+   if(!['login','status','rotate','create','reset-content'].includes(action))return send(res,404,{ok:false,error:'알 수 없는 요청입니다.'});
    if(req.method!==(action==='status'?'GET':'POST'))return send(res,405,{ok:false,error:'허용되지 않는 요청 방식입니다.'});
    const body=action==='status'?{}:await bodyOf(req);
    if(!body||typeof body!=='object'||Array.isArray(body))throw {status:400};
@@ -34,12 +34,24 @@ function createAdminHandler(getService=runtimeService,options={}){
    const service=getService();
    if(!await service.tokenOk('admin',token))throw {status:401};
    const room=requestRoom(url,body),root=options.roomRoot||roomRoot();
+   if(action==='reset-content'&&body.id==='note'){
+    if(room!=='default')throw {status:400};
+    const dir=options.noteDir||process.env.NOTE_DIR||require('node:path').join(__dirname,'..','note','family');
+    require('../note-folder').resetNoteAContent(dir);
+    return send(res,200,{ok:true,id:'note',room:'default',version:0});
+   }
    existingRoom(root,room);
    if(action==='status'){
     const rooms=[...new Set([...listRooms(root),...await service.rooms(token)])].sort();
     // Customized-only names may alias an invalid physical directory, too.
     for(const name of rooms)existingRoom(root,name);
     return send(res,200,{ok:true,notes:await service.status(token,room),rooms});
+   }
+   if(action==='reset-content'){
+    if(body.id!=='note2')throw {status:400};
+    if(!existingRoom(root,room)&&!await service.hasRoom(room))throw {status:404};
+    require('../note-folder').resetNoteContent(root,room);
+    return send(res,200,{ok:true,room,version:0});
    }
    if(action==='create')return send(res,201,{ok:true,room:await service.createRoom(token,room,body.password,body.confirmation,root)});
    return send(res,200,{ok:true,note:await service.rotate(token,body.id,body.password,body.confirmation,body.revision,room,root)});

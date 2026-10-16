@@ -27,7 +27,18 @@
       card.className='room-card';name.textContent=room;link.textContent='방 열기 ↗';link.href='note2.html?room='+encodeURIComponent(room);link.target='_blank';link.rel='noopener noreferrer';
       select.type='button';select.textContent='이 방 선택 / 비밀번호 변경';
       select.addEventListener('click',()=>{form.elements.id.value='note2';roomInput.value=room;form.elements.password.value='';form.elements.confirmation.value='';selectionChanged();});
-      card.append(name,link,select);return card;
+      const reset=document.createElement('button');reset.type='button';reset.textContent='내용·파일 초기화';
+      reset.addEventListener('click',()=>{
+        const auth=token;
+        if(!auth)return;
+        if(!window.confirm('노트 B / '+room+' 방의 본문과 모든 첨부파일을 삭제하고 버전을 0으로 초기화할까요? 복구할 수 없습니다. 방과 기존 비밀번호·로그인은 유지됩니다.'))return;
+        busy(reset,async()=>{
+          await api('reset-content',{id:'note2',room},room);if(token!==auth)return;
+          await refresh();if(token!==auth)return;
+          message.textContent='노트 B / '+room+' 방의 본문·첨부파일이 삭제되고 버전이 0으로 초기화되었습니다. 방과 비밀번호는 유지됩니다.';
+        });
+      });
+      card.append(name,link,select,reset);return card;
     });
     roomList.replaceChildren(...cards);
     if(!rooms.length)roomList.textContent='등록된 방이 없습니다. NEW ROOM에서 새 방을 생성하세요.';
@@ -79,5 +90,14 @@
   roomInput.addEventListener('change',selectionChanged);form.elements.id.addEventListener('change',selectionChanged);
   document.getElementById('note-admin-refresh').addEventListener('click',e=>busy(e.target,async()=>{await refresh();message.textContent='변경 상태를 다시 조회했습니다.';}));
   document.getElementById('note-admin-logout').addEventListener('click',()=>{logout();message.textContent='관리자 로그아웃되었습니다.';});
+  document.getElementById('note-a-reset-content')?.addEventListener('click',e=>{
+    const auth=token;if(!auth)return;
+    if(!window.confirm('노트 A (note.html) 기본방의 본문과 모든 첨부파일을 삭제하고 버전을 0으로 초기화할까요? 복구할 수 없습니다. 기존 비밀번호·로그인과 다른 방은 유지됩니다.'))return;
+    busy(e.currentTarget,async()=>{
+      await api('reset-content',{id:'note',room:'default'},'default');if(token!==auth)return;
+      await refresh();if(token!==auth)return;
+      message.textContent='노트 A 기본방의 본문·첨부파일이 삭제되고 버전이 0으로 초기화되었습니다. 비밀번호와 다른 방은 유지됩니다.';
+    });
+  });
   window.addEventListener('pagehide',logout);
 })();

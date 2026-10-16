@@ -165,6 +165,8 @@ async function api(action, body) {
 function applyRemote(data, force = false) {
   if (locked) return;
   const remoteNewer = data.version > state.version;
+  const remoteReset = data.version === 0 && state.version > 0 && data.updatedAt === 0 && !data.text;
+  if (remoteReset) { clearTimeout(saveTimer); dirty = false; force = true; }
   state = data;
   // 맥미니(임시터널)로 열면 파일이 맥미니 폴더에 저장돼요
   $('storageText').textContent = data.storage === 'folder'

@@ -195,4 +195,32 @@ function createNoteFolderHandler(rootDir, opts = {}) {
   };
 }
 
-module.exports = { createNoteFolderHandler, MAX_FILE_BYTES };
+// Called only after admin authorization and registered-room validation.
+// Like save/upload/delete above, the complete mutation is synchronous: no await
+// can interleave storage operations within this local portal process.
+function resetNoteContent(root,room){
+  root=path.resolve(root);
+  existingRoom(root,room);
+  const dir=path.join(root,room);
+  resetDirectoryContent(dir,false,[root]);
+}
+function resetNoteAContent(dir){
+  resetDirectoryContent(path.resolve(dir),true);
+}
+function resetDirectoryContent(dir,preserveDirectories,parents=[]){
+  // Validate every internal path before deleting anything. Attachment symlinks
+  // are unlinked by rmSync, never traversed; hidden credentials are untouched.
+  for(const p of [...parents,dir,path.join(dir,MEMO),path.join(dir,META)]){
+    try{const st=fs.lstatSync(p);if(st.isSymbolicLink()||fs.realpathSync(p)!==p||((parents.includes(p)||p===dir)?!st.isDirectory():!st.isFile()))throw {status:400};}
+    catch(e){if(e.code!=='ENOENT')throw e;}
+  }
+  fs.mkdirSync(dir,{recursive:true});
+  for(const name of fs.readdirSync(dir)){
+    if(name.startsWith('.')&&name!==MEMO&&name!==META)continue;
+    // note.html may have other rooms as subdirectories; they are not attachments.
+    if(preserveDirectories&&fs.lstatSync(path.join(dir,name)).isDirectory())continue;
+    fs.rmSync(path.join(dir,name),{recursive:true,force:true});
+  }
+  fs.writeFileSync(path.join(dir,META),JSON.stringify({version:0,updatedAt:0,updatedBy:'',uploads:{}}));
+}
+module.exports = { createNoteFolderHandler, resetNoteContent, resetNoteAContent, MAX_FILE_BYTES };
