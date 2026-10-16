@@ -90,6 +90,16 @@
   roomInput.addEventListener('change',selectionChanged);form.elements.id.addEventListener('change',selectionChanged);
   document.getElementById('note-admin-refresh').addEventListener('click',e=>busy(e.target,async()=>{await refresh();message.textContent='변경 상태를 다시 조회했습니다.';}));
   document.getElementById('note-admin-logout').addEventListener('click',()=>{logout();message.textContent='관리자 로그아웃되었습니다.';});
+  document.getElementById('note-a-select-password')?.addEventListener('click',()=>{
+    if(!token)return;
+    form.elements.id.value='note';
+    roomInput.value='default';
+    form.elements.password.value='';
+    form.elements.confirmation.value='';
+    selectionChanged();
+    form.scrollIntoView({behavior:'smooth',block:'center'});
+    form.elements.password.focus({preventScroll:true});
+  });
   document.getElementById('note-a-reset-content')?.addEventListener('click',e=>{
     const auth=token;if(!auth)return;
     if(!window.confirm('노트 A (note.html) 기본방의 본문과 모든 첨부파일을 삭제하고 버전을 0으로 초기화할까요? 복구할 수 없습니다. 기존 비밀번호·로그인과 다른 방은 유지됩니다.'))return;

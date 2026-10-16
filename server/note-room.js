@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path');
 // No normalization: identity must be the same on case-sensitive and insensitive filesystems.
 function roomId(value='default'){
- if(typeof value!=='string'||!/^[a-z0-9_-]{1,50}$/.test(value)||['__proto__','prototype','constructor'].includes(value))throw Object.assign(new Error('방 이름은 영문 소문자, 숫자, _ 또는 -로 1~50자 입력해 주세요. 대문자는 사용할 수 없습니다.'),{status:400});
+ if(typeof value!=='string'||!/^[a-z0-9_-]{1,50}$/.test(value)||['__proto__','prototype','constructor','backup'].includes(value))throw Object.assign(new Error('방 이름은 영문 소문자, 숫자, _ 또는 -로 1~50자 입력해 주세요. 대문자는 사용할 수 없습니다.'),{status:400});
  return value;
 }
 function requestRoom(url,body={}){

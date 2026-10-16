@@ -45,7 +45,12 @@ function readBody(req) {
     req.on('error', reject);
   });
 }
-function roomId(v) { return String(v || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50) || 'default'; }
+function roomId(v) {
+  const room = String(v || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50) || 'default';
+  // Keep legacy room spelling, but never expose the backup directory (including macOS case aliases).
+  if (room.toLowerCase() === 'backup') throw Object.assign(new Error('백업 폴더는 노트 방으로 사용할 수 없습니다.'), { status: 400 });
+  return room;
+}
 function safeName(v) {
   const n = path.basename(String(v || 'file')).replace(/[\\/\0\r\n:]/g, '_').replace(/^\.+/, '').slice(0, MAX_NAME);
   return n || 'file';
@@ -218,7 +223,8 @@ function resetDirectoryContent(dir,preserveDirectories,parents=[]){
   for(const name of fs.readdirSync(dir)){
     if(name.startsWith('.')&&name!==MEMO&&name!==META)continue;
     // note.html may have other rooms as subdirectories; they are not attachments.
-    if(preserveDirectories&&fs.lstatSync(path.join(dir,name)).isDirectory())continue;
+    // Backups are archives, not attachments. Never recurse into the reserved directory.
+    if((preserveDirectories||name.toLowerCase()==='backup')&&fs.lstatSync(path.join(dir,name)).isDirectory())continue;
     fs.rmSync(path.join(dir,name),{recursive:true,force:true});
   }
   fs.writeFileSync(path.join(dir,META),JSON.stringify({version:0,updatedAt:0,updatedBy:'',uploads:{}}));
