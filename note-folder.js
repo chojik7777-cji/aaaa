@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const { createNoteAuth } = require('./note-auth');
 const { fileHeaders } = require('./note-preview');
+const { preserveUploadCopy } = require('./server/note-upload-backup');
 const {requestRoom,existingRoom}=require('./server/note-room');
 
 const MAX_TEXT = 500_000;
@@ -70,9 +71,14 @@ function parseDataUrl(dataUrl) {
   return m[2] ? Buffer.from(m[3] || '', 'base64') : Buffer.from(decodeURIComponent(m[3] || ''));
 }
 function uniqueName(dir, name) {
-  if (!fs.existsSync(path.join(dir, name))) return name;
+  const occupied = (n) => {
+    if (n.toLowerCase() === 'backup') return true;
+    try { fs.lstatSync(path.join(dir, n)); return true; }
+    catch (e) { if (e.code === 'ENOENT') return false; throw e; }
+  };
+  if (!occupied(name)) return name;
   const ext = path.extname(name), base = name.slice(0, name.length - ext.length);
-  for (let i = 1; ; i++) { const n = `${base} (${i})${ext}`; if (!fs.existsSync(path.join(dir, n))) return n; }
+  for (let i = 1; ; i++) { const n = `${base} (${i})${ext}`; if (!occupied(n)) return n; }
 }
 
 // opts.password: 문자열 또는 문자열을 돌려주는 함수 (비우면 기본 비밀번호, 매 요청마다 읽음)
@@ -94,7 +100,7 @@ function createNoteFolderHandler(rootDir, opts = {}) {
     try { names = fs.readdirSync(dir); } catch (e) { return []; }
     const files = [];
     for (const name of names) {
-      if (name.startsWith('.')) continue;
+      if (name.startsWith('.') || name.toLowerCase() === 'backup') continue;
       let s; try { s = opts.localId==='note2'?fs.lstatSync(path.join(dir, name)):fs.statSync(path.join(dir, name)); } catch (e) { continue; }
       if (!s.isFile()) continue;
       files.push({ id: name, name, type: guessType(name), size: s.size, uploadedAt: s.mtimeMs, uploadedBy: (meta.uploads || {})[name] || '' });
@@ -113,7 +119,7 @@ function createNoteFolderHandler(rootDir, opts = {}) {
   // 파일 id(=파일 이름)가 폴더 밖이나 숨김 파일을 가리키지 않게
   function fileIn(dir, id) {
     const name = String(id || '');
-    if (!name || name !== path.basename(name) || name.startsWith('.')) return null;
+    if (!name || name !== path.basename(name) || name.startsWith('.') || name.toLowerCase() === 'backup') return null;
     if(opts.localId==='note2'){try{if(fs.lstatSync(path.join(dir,name)).isSymbolicLink())return null;}catch(e){if(e.code!=='ENOENT')throw e;}}
     return path.join(dir, name);
   }
@@ -162,7 +168,11 @@ function createNoteFolderHandler(rootDir, opts = {}) {
         if (buffer.length > MAX_FILE_BYTES) return send(res, 413, { ok: false, error: '파일은 50MB 이하만 업로드할 수 있습니다.' });
         fs.mkdirSync(dir, { recursive: true });
         const name = uniqueName(dir, safeName(body.name));
-        fs.writeFileSync(path.join(dir, name), buffer);
+        // Fail closed before publishing active bytes or advancing metadata.
+        preserveUploadCopy(dir, name, buffer);
+        fs.writeFileSync(path.join(dir, name), buffer, {
+          mode: 0o600, flag: fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW,
+        });
         const meta = readMeta(dir);
         meta.uploads = { ...(meta.uploads || {}), [name]: String(body.user || '').slice(0, 40) };
         meta.version += 1; meta.updatedAt = Date.now(); meta.updatedBy = meta.uploads[name];
