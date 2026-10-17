@@ -86,6 +86,7 @@
         <input id="fileInput" type="file">
         <button id="uploadBtn" type="button">업로드</button>
       </div>
+      <div class="upload"><label for="fileSort">목록 정렬</label><select id="fileSort" aria-label="첨부파일 정렬" style="font:inherit;max-width:100%;padding:8px 12px;border:1px solid #cbd5e0;border-radius:8px;background:#fff;color:#2d3748"><option value="date">날짜순 (최신 먼저)</option><option value="name">이름순 (가나다순)</option></select></div>
       <p class="hint" id="storageText">☁️ 임시 서버 저장 (오래 쉬면 사라질 수 있어요) · 파일당 900KB까지</p>
       <div class="file-list" id="fileList"></div>
     </section>
@@ -106,7 +107,13 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-const room = (params.get('room') || 'default').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'default';
+const room = params.has('room') ? params.get('room') : 'default';
+if (params.getAll('room').length > 1 || !/^[a-z0-9_-]{1,50}$/.test(room) || ['__proto__','prototype','constructor','backup'].includes(room)) {
+  const message = '방 이름은 영문 소문자, 숫자, _ 또는 -로 1~50자 입력해 주세요. 예약된 이름은 사용할 수 없습니다.';
+  $('lock').hidden = false;
+  $('lockErr').textContent = message;
+  throw new Error(message);
+}
 if (!params.get('room')) {
   params.set('room', room);
   history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
@@ -119,10 +126,10 @@ let saveTimer = null;
 let applyingRemote = false;
 let lastLocalEdit = 0;
 let locked = false;
-const TOKEN_KEY = 'note-token';
+const TOKEN_KEY = room === 'default' ? 'note-token' : 'note-token:' + room;
 function token() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
 function setEditingLocked(value) {
-  for (const id of ['editor','saveBtn','uploadBtn','fileInput','reloadBtn']) $(id).disabled = value;
+  for (const id of ['editor','saveBtn','uploadBtn','fileInput','reloadBtn','fileSort']) $(id).disabled = value;
   for (const button of $('fileList').querySelectorAll('[data-delete]')) button.disabled = value;
 }
 function showLock(msg) {
@@ -219,11 +226,30 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveNow, 1000);
 }
+const FILE_SORT_KEY = API + ':file-sort:' + room;
+let fileSort = 'date';
+try { if (localStorage.getItem(FILE_SORT_KEY) === 'name') fileSort = 'name'; } catch (e) {}
+$('fileSort').value = fileSort;
+$('fileSort').addEventListener('change', () => {
+  if (locked) return;
+  fileSort = $('fileSort').value === 'name' ? 'name' : 'date';
+  try { localStorage.setItem(FILE_SORT_KEY, fileSort); } catch (e) {}
+  renderFiles(state.files || []);
+});
+const fileNameOrder = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
+function fileDate(value) {
+  const number = Number(value);
+  if (Number.isFinite(number)) return number;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 function renderFiles(files) {
+  const byName = (a, b) => fileNameOrder.compare(String(a.name ?? ''), String(b.name ?? '')) || String(a.id ?? '').localeCompare(String(b.id ?? ''));
+  files = [...files].sort((a, b) => fileSort === 'name' ? byName(a, b) : fileDate(b.uploadedAt) - fileDate(a.uploadedAt) || byName(a, b));
   pvFiles = files;
   const box = $('fileList');
   // 목록이 바뀌었을 때만 다시 그리기 (1.5초마다 그리면 미리보기가 깜빡여요)
-  const sig = JSON.stringify([token(), files.map((f) => [f.id, f.size, f.uploadedAt, f.uploadedBy])]);
+  const sig = JSON.stringify([fileSort, token(), files.map((f) => [f.id, f.name, f.type, f.size, f.uploadedAt, f.uploadedBy])]);
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
   if (!files.length) { box.innerHTML = '<div class="hint">아직 첨부파일이 없습니다.</div>'; return; }

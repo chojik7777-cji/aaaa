@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 for(const file of ['note.html','note2.html'])test(file+' reload uses stored token; polling 401 locks editing and reauthentication retains draft',async()=>{
  const source=fs.readFileSync(path.join(__dirname,'..',file),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
- const key=file==='note2.html'?'note2-token:alpha':'note-token',storage=new Map([[key,'existing-token']]);let revoked=false;
+ const key=file==='note2.html'?'note2-token:alpha':'note-token:alpha',storage=new Map([[key,'existing-token']]);let revoked=false;
  const calls=[];const flush=async()=>{for(let i=0;i<8;i++)await new Promise(r=>setImmediate(r));};
  function boot(){
   const elements=new Map();function el(){return {value:'',hidden:true,disabled:false,style:{},dataset:{},handlers:{},files:[],addEventListener(k,f){this.handlers[k]=f;},focus(){},select(){},appendChild(){},querySelectorAll(){return []}};}

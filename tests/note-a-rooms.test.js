@@ -1,0 +1,98 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {initialize,createFileStore,createService}=require('../server/note-local');
+const {createAdminHandler}=require('../server/note-admin');
+const {createNoteFolderHandler}=require('../note-folder');
+async function fixture(t){
+ const dir=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'note-a-rooms-')));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const noteDir=path.join(dir,'a'),roomRoot=path.join(dir,'b');
+ for(const p of [noteDir,path.join(noteDir,'legacy'),path.join(noteDir,'backup'),path.join(roomRoot,'default')])fs.mkdirSync(p,{recursive:true});
+ fs.writeFileSync(path.join(noteDir,'legacy','keep.txt'),'keep');
+ const env={NOTE_AUTH_FILE:path.join(dir,'private','auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_PASSWORD:'old-note-password',NOTE2_PASSWORD:'old-note2-password',NOTE_DIR:noteDir,NOTE2_DIR:roomRoot};
+ fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'admin-password');await initialize(env);
+ const service=createService(createFileStore(env),Date.now,{noteDir,roomRoot}),token=await service.login('admin','admin-password');
+ const admin=createAdminHandler(()=>service,{noteDir,roomRoot});
+ async function invoke(handler,url,body,headers={}){const req={url,method:body===undefined?'GET':'POST',body,headers,socket:{remoteAddress:'fixture'}};const res={setHeader(){},end(v){this.data=JSON.parse(v);}};await handler(req,res);return {status:res.statusCode,data:res.data};}
+ const call=(action,room='default',body)=>invoke(admin,'/api/note-admin?action='+action+'&room='+encodeURIComponent(room),body,{authorization:'Bearer '+token});
+ const saved={};for(const k of Object.keys(env)){saved[k]=process.env[k];process.env[k]=env[k];}t.after(()=>{for(const[k,v]of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v;}});
+ const folder=createNoteFolderHandler(noteDir,{localId:'note'});
+ const user=(action,room='default',body,grant='')=>invoke(folder,'/api/note/'+action+'?room='+encodeURIComponent(room),body,{'x-note-token':grant});
+ return {dir,noteDir,roomRoot,env,service,token,call,user};
+}
+const creation=(room,password='new-room-password',id='note')=>({id,room,password,confirmation:password});
+test('creation is namespace-local and never places credentials in external note data roots',async t=>{
+ const {noteDir,roomRoot,env,call}=await fixture(t);
+ fs.symlinkSync(noteDir,path.join(roomRoot,'separate'));
+ assert.equal((await call('create','separate',creation('separate'))).status,201);
+ for(const root of [noteDir,roomRoot])assert.throws(()=>createFileStore({...env,NOTE_AUTH_FILE:path.join(root,'private','auth.json')}),{status:503});
+});
+test('duplicate/racing creates and invalid requests cannot reset any room password',async t=>{
+ const {env,noteDir,roomRoot,service,token,call}=await fixture(t);
+ const other=createService(createFileStore(env),Date.now,{noteDir,roomRoot});
+ const results=await Promise.allSettled([service.createRoom(token,'race','winner-one','winner-one',noteDir,'note'),other.createRoom(token,'race','winner-two','winner-two',noteDir,'note')]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.status,409);
+ const winner=results[0].status==='fulfilled'?'winner-one':'winner-two';assert.ok(await other.login('note',winner,'race'));
+ const saved=fs.readFileSync(env.NOTE_AUTH_FILE,'utf8');
+ for(const room of ['race','legacy','default'])assert.equal((await call('create',room,creation(room))).status,409);
+ for(const room of ['UPPER','../bad','backup','BACKUP','__proto__','constructor','prototype','','x'.repeat(51)])assert.equal((await call('create',room,creation(room))).status,400);
+ for(const [password,confirmation]of [['short','short'],['valid-password','mismatch'],['한'.repeat(86),'한'.repeat(86)],[null,null]])assert.equal((await call('create','invalid',{id:'note',room:'invalid',password,confirmation})).status,400);
+ assert.equal((await call('create','query',creation('different'))).status,400);
+ assert.equal(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8'),saved);assert.equal(fs.readFileSync(path.join(noteDir,'legacy','keep.txt'),'utf8'),'keep');
+ const corrupted=JSON.parse(saved);corrupted.noteRooms.RACE=corrupted.noteRooms.race;fs.writeFileSync(env.NOTE_AUTH_FILE,JSON.stringify(corrupted));await assert.rejects(()=>other.login('note','old-note-password','legacy'),{status:503});
+});
+test('room and default rotations revoke only selected grants, preserve inherited passwords and upload archives after reload',async t=>{
+ const {noteDir,env,service,token,call,user}=await fixture(t);
+ await call('create','fresh',creation('fresh'));
+ const fresh=(await user('login','fresh',{password:'new-room-password'})).data.token,legacy=(await user('login','legacy',{password:'old-note-password'})).data.token,def=(await user('login','default',{password:'old-note-password'})).data.token;
+ assert.equal((await user('upload','fresh',{name:'archive.txt',dataUrl:'data:text/plain;base64,YXJjaGl2ZQ=='},fresh)).status,200);
+ const archive=path.join(noteDir,'fresh','backup'),backupNames=fs.readdirSync(archive),backupBytes=backupNames.map(n=>fs.readFileSync(path.join(archive,n)));
+ const rotate=async(room,password)=>{const status=await call('status',room),revision=status.data.notes.find(r=>r.id==='note').revision;return call('rotate',room,{...creation(room,password),revision});};
+ assert.equal((await rotate('fresh','rotated-fresh-password')).status,200);
+ assert.equal((await user('state','fresh',undefined,fresh)).status,401);assert.equal((await user('state','legacy',undefined,legacy)).status,200);assert.equal((await user('state','default',undefined,def)).status,200);
+ const renewed=(await user('login','fresh',{password:'rotated-fresh-password'})).data.token;
+ assert.equal((await rotate('default','rotated-default-password')).status,200);
+ assert.equal((await user('state','default',undefined,def)).status,401);
+ assert.equal((await user('state','legacy',undefined,legacy)).status,200);
+ assert.equal((await user('login','legacy',{password:'old-note-password'})).status,200);
+ assert.equal((await user('state','fresh',undefined,renewed)).status,200);
+ const reload=createService(createFileStore(env),Date.now,{noteDir});assert.ok(await reload.tokenOk('admin',token));assert.ok(await reload.tokenOk('note',legacy,'legacy'));assert.ok(await reload.tokenOk('note',renewed,'fresh'));
+ assert.equal(fs.readFileSync(path.join(noteDir,'legacy','keep.txt'),'utf8'),'keep');assert.deepEqual(fs.readdirSync(archive),backupNames);assert.deepEqual(backupNames.map(n=>fs.readFileSync(path.join(archive,n))),backupBytes);
+ assert.equal((await rotate('missing','not-created-password')).status,404);
+});
+test('local note A denies unknown/case-alias/symlink rooms and scopes all operation grants',async t=>{
+ const {noteDir,call,user,service}=await fixture(t);
+ assert.equal((await user('login','missing',{password:'old-note-password'})).status,401);
+ await call('create','fresh',creation('fresh'));
+ const grant=(await user('login','fresh',{password:'new-room-password'})).data.token;
+ const legacy=(await user('login','legacy',{password:'old-note-password'})).data.token;
+ const def=await service.login('note','old-note-password');
+ assert.notEqual(legacy,def);assert.ok(await service.tokenOk('note',legacy,'legacy'));assert.equal(await service.tokenOk('note',def,'legacy'),false);
+ const note2=await service.login('note2','old-note2-password','fresh');
+ for(const wrong of [legacy,def,note2])for(const [action,body]of [['state',undefined],['save',{text:'bad'}],['upload',{name:'bad.txt',dataUrl:'data:text/plain;base64,YmFk'}],['delete-file',{id:'keep.txt'}],['file',undefined]])assert.equal((await user(action,'fresh',body,wrong)).status,401,action);
+ assert.equal((await user('state','Fresh',undefined,grant)).status,400);
+ assert.equal((await user('login','../fresh',{password:'new-room-password'})).status,400);
+ fs.mkdirSync(path.join(noteDir,'Alias'));assert.equal((await user('login','alias',{password:'old-note-password'})).status,400);
+ fs.symlinkSync(path.join(noteDir,'legacy'),path.join(noteDir,'linked'));assert.equal((await user('login','linked',{password:'old-note-password'})).status,400);
+ assert.equal((await call('create','linked',creation('linked'))).status,400);
+ fs.symlinkSync(path.join(noteDir,'legacy','keep.txt'),path.join(noteDir,'legacy','linked.txt'));
+ assert.equal((await user('delete-file','legacy',{id:'linked.txt'},legacy)).status,404);
+ const state=await user('state','legacy',undefined,legacy);assert.equal(state.data.files.some(f=>f.name==='linked.txt'),false);
+ assert.equal(fs.readFileSync(path.join(noteDir,'legacy','keep.txt'),'utf8'),'keep');
+});
+test('note A creation lists logical rooms, keeps default mapping/password and isolates note2 namespace',async t=>{
+ const {env,noteDir,service,call,user}=await fixture(t),before=JSON.parse(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8'));
+ assert.equal((await call('create','fresh',creation('fresh'))).status,201);
+ const status=await call('status','fresh');assert.equal(status.status,200);assert.deepEqual(status.data.noteRooms,['default','fresh','legacy']);assert.deepEqual(status.data.rooms,['default']);
+ const row=status.data.notes.find(r=>r.id==='note');assert.equal(row.room,'fresh');assert.doesNotMatch(JSON.stringify(status),/verifier|token_key|salt|new-room-password/);
+ assert.equal((await user('login','fresh',{password:'old-note-password'})).status,401);
+ const login=await user('login','fresh',{password:'new-room-password'});assert.equal(login.status,200);
+ assert.equal((await user('save','fresh',{text:'new memo'},login.data.token)).status,200);
+ assert.equal(fs.readFileSync(path.join(noteDir,'fresh','.note-memo.txt'),'utf8'),'new memo');
+ const def=await user('login','default',{password:'old-note-password'});assert.equal(def.status,200);
+ assert.equal((await user('save','default',{text:'default memo'},def.data.token)).status,200);assert.equal(fs.readFileSync(path.join(noteDir,'.note-memo.txt'),'utf8'),'default memo');assert.equal(fs.existsSync(path.join(noteDir,'default')),false);
+ assert.deepEqual(JSON.parse(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8')).rows,before.rows);
+ assert.equal((await call('create','fresh',creation('fresh','separate-note2','note2'))).status,201);
+ assert.ok(await service.login('note2','separate-note2','fresh'));assert.equal(await service.login('note2','new-room-password','fresh'),null);
+ const persisted=JSON.parse(fs.readFileSync(env.NOTE_AUTH_FILE,'utf8'));assert.equal(persisted.noteRooms.fresh.id,'note');assert.equal(persisted.note2Rooms.fresh.id,'note2');
+ assert.equal((await call('create','bad',creation('bad','new-room-password','unknown'))).status,400);
+});

@@ -32,6 +32,6 @@ function existingRoom(root,room){
 }
 function listRooms(root){
  let names;try{names=fs.readdirSync(root);}catch(e){if(e.code==='ENOENT')return [];throw e;}
- return names.filter(name=>{try{roomId(name);}catch{return false;}return existingRoom(root,name);}).sort();
+ return names.filter(name=>{try{roomId(name);}catch{return false;}if(fs.lstatSync(path.join(root,name)).isFile())return false;return existingRoom(root,name);}).sort();
 }
 module.exports={roomId,requestRoom,roomRoot,existingRoom,listRooms};

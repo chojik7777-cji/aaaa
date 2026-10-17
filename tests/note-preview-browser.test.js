@@ -23,7 +23,7 @@ test('isolated browser: both pages preview safely, close, trap focus, clear on 4
       const files = [{id:'photo',name,type:'image/jpeg'}, {id:'text',name:'memo.txt',type:'text/plain'}, {id:'pdf',name:'paper.pdf'}, {id:'video',name:'clip.mp4'}, {id:'audio',name:'music.mp3'}, {id:'bad',name:'x.svg',type:'image/png'}].map(f=>({...f,size:100,uploadedAt:1}));
       let denied=false, denyFile=false;
       const requests=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
-      await page.addInitScript(() => {if(window!==window.top)return;window.revokedPreviewUrls=[];const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{window.revokedPreviewUrls.push(url);revoke(url);};localStorage.setItem('note-token','fixture-token');localStorage.setItem('note2-token:alpha','fixture-token');});
+      await page.addInitScript(() => {if(window!==window.top)return;window.revokedPreviewUrls=[];const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{window.revokedPreviewUrls.push(url);revoke(url);};localStorage.setItem('note-token','fixture-token');localStorage.setItem('note-token:alpha','fixture-token');localStorage.setItem('note2-token:alpha','fixture-token');});
       await page.route('**/api/**', async route => {
         const url = new URL(route.request().url());requests.push(url);
         if (url.pathname.endsWith('/file')) {

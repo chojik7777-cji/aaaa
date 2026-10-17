@@ -13,6 +13,7 @@ const { createNoteAuth } = require('./note-auth');
 const { fileHeaders } = require('./note-preview');
 const { preserveUploadCopy } = require('./server/note-upload-backup');
 const {requestRoom,existingRoom}=require('./server/note-room');
+const {existingNoteRoom}=require('./server/note-a-room');
 
 const MAX_TEXT = 500_000;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
@@ -86,7 +87,9 @@ function uniqueName(dir, name) {
 // opts.label: 화면에 보여 줄 폴더 이름
 function createNoteFolderHandler(rootDir, opts = {}) {
   const ROOT = path.resolve(rootDir);
-  const auth = createNoteAuth({...opts,roomAllowed:async(room,service)=>existingRoom(ROOT,room)||await service.hasRoom(room)||room==='default'});
+  const local = ['note','note2'].includes(opts.localId);
+  const roomExists = opts.localId==='note'?existingNoteRoom:existingRoom;
+  const auth = createNoteAuth({...opts,roomAllowed:async(room,service)=>roomExists(ROOT,room)||await service.hasRoom(room,opts.localId)||room==='default'});
   const dirOf = (room) => (room === 'default' && !opts.roomFolders) ? ROOT : path.join(ROOT, room);
   const label = opts.label || path.basename(ROOT);
   const labelOf = (room) => (room === 'default' && !opts.roomFolders) ? label : `${label}/${room}`;
@@ -101,7 +104,7 @@ function createNoteFolderHandler(rootDir, opts = {}) {
     const files = [];
     for (const name of names) {
       if (name.startsWith('.') || name.toLowerCase() === 'backup') continue;
-      let s; try { s = opts.localId==='note2'?fs.lstatSync(path.join(dir, name)):fs.statSync(path.join(dir, name)); } catch (e) { continue; }
+      let s; try { s = local?fs.lstatSync(path.join(dir, name)):fs.statSync(path.join(dir, name)); } catch (e) { continue; }
       if (!s.isFile()) continue;
       files.push({ id: name, name, type: guessType(name), size: s.size, uploadedAt: s.mtimeMs, uploadedBy: (meta.uploads || {})[name] || '' });
     }
@@ -120,7 +123,7 @@ function createNoteFolderHandler(rootDir, opts = {}) {
   function fileIn(dir, id) {
     const name = String(id || '');
     if (!name || name !== path.basename(name) || name.startsWith('.') || name.toLowerCase() === 'backup') return null;
-    if(opts.localId==='note2'){try{if(fs.lstatSync(path.join(dir,name)).isSymbolicLink())return null;}catch(e){if(e.code!=='ENOENT')throw e;}}
+    if(local){try{if(fs.lstatSync(path.join(dir,name)).isSymbolicLink())return null;}catch(e){if(e.code!=='ENOENT')throw e;}}
     return path.join(dir, name);
   }
 
@@ -135,11 +138,11 @@ function createNoteFolderHandler(rootDir, opts = {}) {
       const i = parts.indexOf('api');
       const action = url.searchParams.get('action') || (i >= 0 ? parts.slice(i + 2).join('/') : '');
       const body = await readBody(req);
-      const room = opts.localId==='note2'?requestRoom(url,body):roomId(url.searchParams.get('room') || body.room);
+      const room = local?requestRoom(url,body):roomId(url.searchParams.get('room') || body.room);
       const dir = dirOf(room);
-      if(opts.localId==='note2'){
+      if(local){
         // Reject physical case aliases/conflicts before custom/default credential fallback.
-        existingRoom(ROOT,room);
+        roomExists(ROOT,room);
         // Reject links before any login, read or mutation, including internal memo/meta files.
         for(const p of [ROOT,dir,path.join(dir,MEMO),path.join(dir,META)]){
           try{if(fs.lstatSync(p).isSymbolicLink()||fs.realpathSync(p)!==p)throw {status:400};}catch(e){if(e.code!=='ENOENT')throw e;}

@@ -1,6 +1,7 @@
 'use strict';
 const {runtimeService,validPassword}=require('./note-local');
 const {requestRoom,roomRoot,listRooms,existingRoom}=require('./note-room');
+const {noteRoot,listNoteRooms,existingNoteRoom}=require('./note-a-room');
 function send(res,status,data){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.end(JSON.stringify(data));}
 async function bodyOf(req){
  if(req.body && typeof req.body==='object') {if(Buffer.byteLength(JSON.stringify(req.body))>2048)throw {status:413};return req.body;}
@@ -33,19 +34,24 @@ function createAdminHandler(getService=runtimeService,options={}){
    if(!token)return send(res,401,{ok:false,error:'관리자 인증이 필요합니다.'});
    const service=getService();
    if(!await service.tokenOk('admin',token))throw {status:401};
-   const room=requestRoom(url,body),root=options.roomRoot||roomRoot();
+   const room=requestRoom(url,body),root=options.roomRoot||roomRoot(),noteDir=options.noteDir||noteRoot();
    if(action==='reset-content'&&body.id==='note'){
     if(room!=='default')throw {status:400};
     const dir=options.noteDir||process.env.NOTE_DIR||require('node:path').join(__dirname,'..','note','family');
     require('../note-folder').resetNoteAContent(dir);
     return send(res,200,{ok:true,id:'note',room:'default',version:0});
    }
-   existingRoom(root,room);
+   if(action!=='status'&&body.id!=='note')existingRoom(root,room);
    if(action==='status'){
+    const ids=url.searchParams.getAll('id'),id=ids[0]||'note2';
+    if(ids.length>1||!['note','note2'].includes(id))throw {status:400};
+    (id==='note'?existingNoteRoom:existingRoom)(id==='note'?noteDir:root,room);
     const rooms=[...new Set([...listRooms(root),...await service.rooms(token)])].sort();
     // Customized-only names may alias an invalid physical directory, too.
     for(const name of rooms)existingRoom(root,name);
-    return send(res,200,{ok:true,notes:await service.status(token,room),rooms});
+    const noteRooms=[...new Set([...listNoteRooms(noteDir),...await service.rooms(token,'note')])].sort();
+    for(const name of noteRooms)existingNoteRoom(noteDir,name);
+    return send(res,200,{ok:true,notes:await service.status(token,room),rooms,noteRooms});
    }
    if(action==='reset-content'){
     if(body.id!=='note2')throw {status:400};
@@ -53,8 +59,11 @@ function createAdminHandler(getService=runtimeService,options={}){
     require('../note-folder').resetNoteContent(root,room);
     return send(res,200,{ok:true,room,version:0});
    }
-   if(action==='create')return send(res,201,{ok:true,room:await service.createRoom(token,room,body.password,body.confirmation,root)});
-   return send(res,200,{ok:true,note:await service.rotate(token,body.id,body.password,body.confirmation,body.revision,room,root)});
+   if(action==='create'){
+    const id=body.id===undefined?'note2':body.id;if(!['note','note2'].includes(id))throw {status:400};
+    return send(res,201,{ok:true,room:await service.createRoom(token,room,body.password,body.confirmation,id==='note'?noteDir:root,id)});
+   }
+   return send(res,200,{ok:true,note:await service.rotate(token,body.id,body.password,body.confirmation,body.revision,room,body.id==='note'?noteDir:root)});
   }catch(e){const status=[400,401,404,409,413,429].includes(e.status)?e.status:503;return send(res,status,{ok:false,error:({400:'입력 내용을 확인해 주세요.',401:'관리자 인증이 필요합니다. 다시 로그인해 주세요.',404:'등록되지 않은 방입니다. NEW ROOM에서 먼저 생성해 주세요.',409:'이미 존재하는 방이거나 다른 변경이 있습니다. 기존 비밀번호는 덮어쓰지 않았습니다. 다시 조회해 주세요.',413:'요청이 너무 큽니다.',429:'시도 횟수가 많습니다. 15분 뒤 다시 시도해 주세요.',503:'맥미니 로컬 비밀번호 저장소를 사용할 수 없습니다. 관리자에게 문의해 주세요.'})[status]});}
  };
 }

@@ -76,7 +76,7 @@ function createNoteAuth(opts = {}) {
         const attempt = f.tail.then(async () => {
           if (f.lockedUntil > now()) return limited();
           const service=runtimeService();
-          const allowed=opts.localId!=='note2'||!opts.roomAllowed||await opts.roomAllowed(room,service);
+          const allowed=!opts.roomAllowed||await opts.roomAllowed(room,service);
           const token = allowed?await service.login(opts.localId, body.password,room):null;
           if (token) { f.count=0; return [200,{ok:true,token}]; }
           f.count++; if (f.count >= MAX_FAILS) {f.count=0;f.lockedUntil=now()+LOCK_MS;}

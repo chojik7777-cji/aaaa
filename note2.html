@@ -22,7 +22,7 @@
       <textarea id="editor" placeholder="여기에 함께 수정할 텍스트를 입력하세요."></textarea>
       <div class="bar"><div class="hint">입력 후 약 1초 뒤 자동 저장, 다른 사람의 변경은 약 1.5초마다 반영됩니다.</div><div class="hint" id="countText">0자</div></div>
     </section>
-    <section class="panel files"><h2>첨부파일</h2><div class="upload"><input id="fileInput" type="file"><button id="uploadBtn" type="button">업로드</button></div><p class="hint" id="storageText">☁️ Supabase 저장소 · 파일당 8MB까지</p><div class="file-list" id="fileList"></div></section>
+    <section class="panel files"><h2>첨부파일</h2><div class="upload"><input id="fileInput" type="file"><button id="uploadBtn" type="button">업로드</button></div><div class="upload"><label for="fileSort">목록 정렬</label><select id="fileSort" aria-label="첨부파일 정렬" style="font:inherit;max-width:100%;padding:8px 12px;border:1px solid #cbd5e0;border-radius:8px;background:#fff;color:#2d3748"><option value="date">날짜순 (최신 먼저)</option><option value="name">이름순 (가나다순)</option></select></div><p class="hint" id="storageText">☁️ Supabase 저장소 · 파일당 8MB까지</p><div class="file-list" id="fileList"></div></section>
   </main>
   <div class="lock" id="lock" hidden><form id="lockForm"><h2>🔒 비밀번호</h2><p class="hint">공유노트 비밀번호를 입력하세요.</p><input id="lockPw" type="password" autocomplete="current-password" aria-label="비밀번호"><button type="submit" id="lockBtn">들어가기</button><p class="err" id="lockErr"></p></form></div>
 <script src="/note-attachment-preview.js"></script>
@@ -33,7 +33,7 @@ if(params.getAll('room').length>1||!/^[a-z0-9_-]{1,50}$/.test(room)||Object.hasO
 if(!params.has('room')){params.set('room',room); history.replaceState(null,'',`${location.pathname}?${params.toString()}`)}
 const API='/api/note2'; let state={version:-1,text:'',files:[]}; let dirty=false,saving=false,saveTimer=null,applyingRemote=false,lastLocalEdit=0,locked=false;
 const TOKEN_KEY='note2-token:'+room; function token(){try{return localStorage.getItem(TOKEN_KEY)||''}catch(e){return ''}}
-function setEditingLocked(value){for(const id of ['editor','saveBtn','uploadBtn','fileInput','reloadBtn'])$(id).disabled=value;for(const button of $('fileList').querySelectorAll('[data-delete]'))button.disabled=value;}
+function setEditingLocked(value){for(const id of ['editor','saveBtn','uploadBtn','fileInput','reloadBtn','fileSort'])$(id).disabled=value;for(const button of $('fileList').querySelectorAll('[data-delete]'))button.disabled=value;}
 function showLock(msg){locked=true;preview?.close();clearTimeout(saveTimer);setEditingLocked(true);$('lock').hidden=false;if(msg)$('lockErr').textContent=msg;setBadge('bad','● 비밀번호 필요');setTimeout(()=>$('lockPw').focus(),50)}
 function user(){const v=$('userName').value.trim(); try{localStorage.setItem('note-user-name',v)}catch(e){} return v||'익명'}
 function fmtTime(ts){return ts?new Date(ts).toLocaleString('ko-KR',{hour12:false}):'-'} function fmtSize(n){return n<1024?`${n}B`:n<1048576?`${(n/1024).toFixed(1)}KB`:`${(n/1048576).toFixed(1)}MB`} function setBadge(k,t){$('liveBadge').className=`badge ${k}`;$('liveBadge').textContent=t} function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -44,11 +44,30 @@ function applyRemote(d,force=false){if(locked)return;$('setupBox').style.display
 async function load(force=false){if(locked)return;try{applyRemote(await api('state'),force)}catch(e){if(!locked&&!$('setupBox').style.display)setBadge('bad','● 연결 오류');console.warn(e)}}
 async function saveNow(){if(locked||saving)return;try{saving=true;$('saveBtn').disabled=true;setBadge('warn','● 저장 중');const d=await api('save',{text:$('editor').value,user:user()});if(locked)return;dirty=false;applyRemote(d,true)}catch(e){if(!locked)setBadge('bad',`● 저장 실패: ${e.message}`)}finally{saving=false;$('saveBtn').disabled=locked}}
 function scheduleSave(){if(locked)return;dirty=true;lastLocalEdit=Date.now();setBadge('warn','● 저장 대기');clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,1000)}
+const FILE_SORT_KEY = API + ':file-sort:' + room;
+let fileSort = 'date';
+try { if (localStorage.getItem(FILE_SORT_KEY) === 'name') fileSort = 'name'; } catch (e) {}
+$('fileSort').value = fileSort;
+$('fileSort').addEventListener('change', () => {
+  if (locked) return;
+  fileSort = $('fileSort').value === 'name' ? 'name' : 'date';
+  try { localStorage.setItem(FILE_SORT_KEY, fileSort); } catch (e) {}
+  renderFiles(state.files || []);
+});
+const fileNameOrder = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
+function fileDate(value) {
+  const number = Number(value);
+  if (Number.isFinite(number)) return number;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 function renderFiles(files) {
+  const byName = (a, b) => fileNameOrder.compare(String(a.name ?? ''), String(b.name ?? '')) || String(a.id ?? '').localeCompare(String(b.id ?? ''));
+  files = [...files].sort((a, b) => fileSort === 'name' ? byName(a, b) : fileDate(b.uploadedAt) - fileDate(a.uploadedAt) || byName(a, b));
   pvFiles = files;
   const box = $('fileList');
   // 목록이 바뀌었을 때만 다시 그리기 (1.5초마다 그리면 미리보기가 깜빡여요)
-  const sig = JSON.stringify([token(), files.map((f) => [f.id, f.size, f.uploadedAt, f.uploadedBy])]);
+  const sig = JSON.stringify([fileSort, token(), files.map((f) => [f.id, f.name, f.type, f.size, f.uploadedAt, f.uploadedBy])]);
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
   if (!files.length) { box.innerHTML = '<div class="hint">아직 첨부파일이 없습니다.</div>'; return; }
