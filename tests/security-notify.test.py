@@ -37,6 +37,13 @@ def event(index=1, **extra):
 
 
 class NotifierTests(unittest.TestCase):
+    def test_math_auth_pages_are_named_in_alerts(self):
+        m = load()
+        for page in ['math-control.html', 'math-level.html']:
+            e = event()
+            e['page'] = page
+            self.assertIn('페이지: ' + page, m.format_alert(e))
+
     def test_state_symlinks_fail_closed_without_send_or_target_chmod(self):
         m = load()
         with tempfile.TemporaryDirectory() as d, contextlib.redirect_stderr(io.StringIO()):

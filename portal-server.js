@@ -32,6 +32,7 @@ fs.mkdirSync(NOTE2_DIR, { recursive: true });
 const adminHandler = require('./server/note-admin').createAdminHandler();
 const dashboardAuthHandler = require('./server/dashboard-auth').createDashboardAuth();
 const securityAuditHandler = require('./server/security-audit-api').createSecurityAuditHandler();
+const mathControlHandler = require('./server/math-control').createMathControl();
 
 const TARGETS = {
   '/api/room': 'http://127.0.0.1:8791',   // yut-server.js
@@ -104,6 +105,7 @@ const server = http.createServer((req, res) => {
     return send(res, 200, JSON.stringify({ ok: true, portal: true, yut: '8791', omok: '8792' }), 'application/json; charset=utf-8');
   }
   if (pathname === '/api/dashboard-auth') return dashboardAuthHandler(req, res);
+  if (pathname === '/api/math-control' || pathname.startsWith('/api/math-control/')) return mathControlHandler(req, res);
   if (pathname === '/api/note-admin' || pathname.startsWith('/api/note-admin/')) return adminHandler(req, res);
   if (pathname === '/api/note' || pathname.startsWith('/api/note/')) return noteHandler(req, res);
   if (pathname === '/api/note2' || pathname.startsWith('/api/note2/')) return note2Handler(req, res);

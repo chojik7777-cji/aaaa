@@ -94,6 +94,7 @@
     <script>
         const AUTH_KEY = 'dashboard-auth-v1';
         const LOCK_KEY = 'dashboard-auth-lock-v1';
+        const serverIpLock = !location.hostname.endsWith('.vercel.app');
         const MAX_FAILS = 5;
         const LOCK_MS = 60 * 60 * 1000;
         function readLock() {
@@ -114,7 +115,7 @@
         }
         async function requireDashboardPassword(page = location.pathname) {
             if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
-            const left = lockMinutesLeft();
+            const left = serverIpLock ? 0 : lockMinutesLeft();
             if (left) {
                 alert(`비밀번호를 ${MAX_FAILS}번 틀려서 이 기기에서는 입력이 잠겨 있어요.
 ${left}분 뒤에 다시 시도해 주세요.`);
@@ -136,12 +137,23 @@ ${left}분 뒤에 다시 시도해 주세요.`);
                 }
                 if (res.ok) {
                     sessionStorage.setItem(AUTH_KEY, 'ok');
-                    clearLock();
+                    if (!serverIpLock) clearLock();
                     return true;
+                }
+                if (serverIpLock && res.status === 429) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.error || '해당 IP의 로그인이 1시간 동안 잠겼습니다.');
+                    return false;
                 }
                 if (res.status !== 403) {
                     alert('비밀번호를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
                     return false;
+                }
+                if (serverIpLock) {
+                    const data = await res.json().catch(() => ({}));
+                    const remaining = Number.isInteger(data.remaining) ? ` (남은 기회 ${data.remaining}번)` : '';
+                    alert((data.error || '비밀번호가 맞지 않습니다.') + remaining);
+                    continue;
                 }
                 const v = readLock();
                 v.fails += 1;

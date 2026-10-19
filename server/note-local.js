@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {promisify}=require('node:util');
+const {isIP}=require('node:net');
 const scrypt=promisify(crypto.scrypt), IDS=['admin','note','note2'];
 const validPassword=v=>typeof v==='string'&&v.length>0&&Buffer.byteLength(v)<=256;
 const equal=(a,b)=>typeof a==='string'&&typeof b==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
@@ -43,7 +44,7 @@ function createService(store,now=Date.now,options={}){
   }catch{return false;}
  }
  return {
-  async login(id,password,room='default'){if(id==='admin'&&!await store.consumeAdminAttempt())throw Object.assign(new Error('시도 횟수가 많습니다.'),{status:429});const row=['note','note2'].includes(id)?await roomRow(room,id):await get(id);return await verify(password,row.verifier)?token(row):null;},
+  async login(id,password,room='default',visitorIp){if(visitorIp!==undefined&&!isIP(visitorIp))throw {status:400};if(id==='admin'&&!await store.consumeAdminAttempt(visitorIp))throw Object.assign(new Error('시도 횟수가 많습니다.'),{status:429});const row=['note','note2'].includes(id)?await roomRow(room,id):await get(id);return await verify(password,row.verifier)?token(row):null;},
   async hasRoom(room,id='note2'){roomId(room);try{return !!(store.getRoom&&await store.getRoom(room,id));}catch{throw unavailable();}},
   tokenOk,
   async rooms(t,id='note2'){if(!await tokenOk('admin',t))throw {status:401};return store.roomNames?await store.roomNames(id):[];},
@@ -113,7 +114,20 @@ function createFileStore(env=process.env){
    }
    data.rows[id]=row;write(data);return true;
   });},
-  async consumeAdminAttempt(){return transaction(()=>{const data=read(),now=Date.now();let a=data.adminAttempts;if(!a||a.until<=now)a={count:0,until:now+15*60*1000};a.count++;data.adminAttempts=a;write(data);return a.count<=10;});},
+  async consumeAdminAttempt(visitorIp){
+   if(visitorIp!==undefined&&!isIP(visitorIp))throw {status:400};
+   return transaction(()=>{
+    const data=read(),now=Date.now();let a;
+    if(visitorIp===undefined){
+     a=data.adminAttempts;if(!a||!Number.isFinite(a.until)||!Number.isInteger(a.count)||a.until<=now)a={...a,count:0,until:now+15*60*1000};data.adminAttempts=a;
+    }else{
+     data.adminAttempts??={};const visitors=data.adminAttempts.visitors??={};
+     for(const [ip,v]of Object.entries(visitors))if(v.until<=now)delete visitors[ip];
+     a=visitors[visitorIp];if(!a){if(Object.keys(visitors).length>=10000)return false;a=visitors[visitorIp]={count:0,until:now+15*60*1000};}
+    }
+    a.count=Math.min(11,a.count+1);write(data);return a.count<=10;
+   });
+  },
   validate(){read();}
  };
 }

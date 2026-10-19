@@ -1,6 +1,7 @@
 'use strict';
 const {runtimeService,validPassword}=require('./note-local');
 const {recordAuth}=require('./security-audit');
+const {runtimePasswordLock,LOCK_MESSAGE}=require('./password-lock');
 const {requestRoom,roomRoot,listRooms,existingRoom}=require('./note-room');
 const {noteRoot,listNoteRooms,existingNoteRoom}=require('./note-a-room');
 function send(res,status,data){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.end(JSON.stringify(data));}
@@ -11,11 +12,11 @@ async function bodyOf(req){
  try{return parts.length?JSON.parse(Buffer.concat(parts).toString('utf8')):{};}catch{throw {status:400};}
 }
 function createAdminHandler(getService=runtimeService,options={}){
- const attempts=new Map();
+ const lock=options.lock||runtimePasswordLock;
  return async(req,res)=>{
   const url=new URL(req.url,'http://localhost'),action=url.searchParams.get('action')||url.pathname.split('/').pop();
   let verifiedInput=false;
-  const audit=outcome=>recordAuth(req,{page:'detail-admin-jik-2026.html',outcome},options.audit);
+  const audit=outcome=>recordAuth(req,{page:'detail-admin-jik-2026.html',outcome,scope:'admin'},options.audit);
   if(action==='not-found')return send(res,404,{ok:false});
   try{
    if(!['login','status','rotate','create','reset-content'].includes(action))return send(res,404,{ok:false,error:'알 수 없는 요청입니다.'});
@@ -25,14 +26,10 @@ function createAdminHandler(getService=runtimeService,options={}){
    if(action==='login'){
     if(!validPassword(body.password))return send(res,400,{ok:false,error:'관리자 비밀번호를 입력해 주세요.'});
     verifiedInput=true;
-    // Socket-based guard supplements the durable global admin attempt budget.
-    const key=String(req.socket?.remoteAddress||'remote');const now=Date.now();
-    if(attempts.size>10000)attempts.clear();
-    let a=attempts.get(key);if(!a||a.until<=now)a={count:0,until:now+15*60*1000};
-    a.count++;attempts.set(key,a);if(a.count>10){audit('rate_limit');return send(res,429,{ok:false,error:'시도 횟수가 많습니다. 15분 뒤 다시 시도해 주세요.'});}
-    const token=await getService().login('admin',body.password);
-    audit(token?'success':'failure');
-    return send(res,token?200:401,token?{ok:true,token}:{ok:false,error:'관리자 비밀번호가 맞지 않습니다.'});
+    const result=await lock(req,'admin',ip=>getService().login('admin',body.password,'default',ip));
+    audit(result.verified?(result.value?'success':'failure'):'rate_limit');
+    if(result.locked)return send(res,429,{ok:false,error:LOCK_MESSAGE,remaining:0});
+    return send(res,result.value?200:401,result.value?{ok:true,token:result.value}:{ok:false,error:'관리자 비밀번호가 맞지 않습니다.',remaining:result.remaining});
    }
    const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
    // Authenticate before any read/write, not a browser/sessionStorage flag.

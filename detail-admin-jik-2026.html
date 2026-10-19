@@ -97,6 +97,8 @@
             <a href="index.html">카페 운영 게임</a>
             <a href="church.html">교회학교 운영 게임</a>
             <a href="math-academy.html">수학학원 운영 게임</a>
+            <a href="math-control.html" class="dashboard-link">수학관리</a>
+            <a href="math-level.html">수학게임</a>
         </div>
         <div class="more-links">
             <h2>더 보기</h2>
@@ -107,7 +109,7 @@
             <h2 id="note-admin-heading">공유노트 비밀번호 관리</h2>
             <p>Mac mini 로컬 전용입니다. 맥미니/터널에서만 변경되며 Vercel에는 동기화되지 않습니다.</p>
             <p>노트 로그인과 별도로 관리자 인증이 필요합니다. 현재 비밀번호는 표시하지 않습니다.</p>
-            <p>보안 기록·알림은 맥미니/터널의 관리자·현황판·노트 A/B 인증에 적용됩니다. Vercel에서 발생한 비밀번호 오류는 수집되지 않습니다.</p>
+            <p>보안 기록·알림과 서버 IP 잠금은 맥미니/터널의 관리자·현황판·노트 A/B·수학관리·수학게임 인증에 적용됩니다. 동일 실제 IP에서 해당 인증 비밀번호를 5회 틀리면 1시간 동안 로그인이 잠깁니다. 브라우저가 아닌 서버가 남은 기회와 잠금을 판정합니다. Vercel은 기존 브라우저 잠금을 유지하며 비밀번호 오류는 수집되지 않습니다.</p>
             <form id="note-admin-login">
                 <label>관리자 비밀번호<input name="password" type="password" autocomplete="current-password" maxlength="256" required></label>
                 <button type="submit">관리자 로그인</button>
@@ -167,6 +169,7 @@
     <script>
         const AUTH_KEY = 'dashboard-auth-v1';
         const LOCK_KEY = 'dashboard-auth-lock-v1';
+        const serverIpLock = !location.hostname.endsWith('.vercel.app');
         const MAX_FAILS = 5;
         const LOCK_MS = 60 * 60 * 1000;
         function readLock() {
@@ -187,7 +190,7 @@
         }
         async function requireDashboardPassword(page) {
             if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
-            const left = lockMinutesLeft();
+            const left = serverIpLock ? 0 : lockMinutesLeft();
             if (left) {
                 alert(`비밀번호를 ${MAX_FAILS}번 틀려서 이 기기에서는 입력이 잠겨 있어요.
 ${left}분 뒤에 다시 시도해 주세요.`);
@@ -209,12 +212,23 @@ ${left}분 뒤에 다시 시도해 주세요.`);
                 }
                 if (res.ok) {
                     sessionStorage.setItem(AUTH_KEY, 'ok');
-                    clearLock();
+                    if (!serverIpLock) clearLock();
                     return true;
+                }
+                if (serverIpLock && res.status === 429) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.error || '해당 IP의 로그인이 1시간 동안 잠겼습니다.');
+                    return false;
                 }
                 if (res.status !== 403) {
                     alert('비밀번호를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
                     return false;
+                }
+                if (serverIpLock) {
+                    const data = await res.json().catch(() => ({}));
+                    const remaining = Number.isInteger(data.remaining) ? ` (남은 기회 ${data.remaining}번)` : '';
+                    alert((data.error || '비밀번호가 맞지 않습니다.') + remaining);
+                    continue;
                 }
                 const v = readLock();
                 v.fails += 1;

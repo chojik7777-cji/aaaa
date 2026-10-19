@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{isIP}=require('node:net');
 const WINDOW=15*60*1000,RETENTION=30*86400000;
 const TRUSTED_TUNNEL='inn-analytical-split-juice.trycloudflare.com';
-const PAGES=new Set(['detail-admin-jik-2026.html','omok-dashboard.html','baduk-dashboard.html','yut-dashboard.html','note.html','note2.html']);
+const PAGES=new Set(['detail-admin-jik-2026.html','omok-dashboard.html','baduk-dashboard.html','yut-dashboard.html','note.html','note2.html','math-control.html','math-level.html']);
 const clean=v=>String(v||'').replace(/[\x00-\x1f\x7f]/g,'').slice(0,256);
 function requestInfo(req){
  const raw=req.socket?.remoteAddress||'',peer=isIP(raw)?raw:'unknown',host=req.headers?.host;
@@ -42,12 +42,12 @@ function createSecurityAudit(options={}){
  // Exclusive lock rejects concurrent processes rather than silently losing updates.
  function transaction(fn){prepare();const lock=path.join(dir,'audit.lock');let fd;try{fd=fs.openSync(lock,'wx',0o600);return fn();}finally{if(fd!==undefined){fs.closeSync(fd);fs.unlinkSync(lock);}}}
  return {
-  record(req,{page,room,outcome}){
+  record(req,{page,room,outcome,scope}){
    if(!PAGES.has(page)&&page!=='dashboard')throw new Error('Invalid audit page');
    if(room!==undefined&&room!==null)require('./note-room').roomId(room);
    if(!['failure','success','rate_limit'].includes(outcome))return;
    return transaction(()=>{
-    const data=read(),time=now(),info=requestInfo(req),key=JSON.stringify([info.ip,page,room||null]);prune(data,time);
+    const data=read(),time=now(),info=requestInfo(req),key=JSON.stringify([info.ip,scope==='admin'?'admin':page,room||null]);prune(data,time);
     if(outcome==='success')delete data.counters[key];
     let c=data.counters[key],alertEligible=false;
     if(outcome==='failure'){

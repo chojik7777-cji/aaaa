@@ -6,6 +6,16 @@ const host='inn-analytical-split-juice.trycloudflare.com';
 function req(ip,peer='127.0.0.1',requestHost=host){return {url:'/api/note/login',headers:{host:requestHost,'cf-connecting-ip':ip},socket:{remoteAddress:peer}};}
 const service={login:async(id,p)=>p==='fixture-correct'?'fixture-token':null};
 for(const id of ['note','note2']){
+ test(id+': room-scoped lock matches the IP/page/room audit counter',async()=>{
+  const auth=createNoteAuth({localId:id,getService:()=>service,audit:{record(){}}}),r=req('203.0.113.7');
+  for(let i=0;i<5;i++)await auth.login(r,{password:'wrong'},'church');
+  assert.equal((await auth.login(r,{password:'fixture-correct'},'family'))[0],200);
+  assert.equal((await auth.login(r,{password:'fixture-correct'},'church'))[0],429);
+ });
+ test(id+': spaced failures outside the audit window must not create an unrecorded lock',async()=>{
+  let time=Date.now();const auth=createNoteAuth({localId:id,getService:()=>service,now:()=>time,audit:{record(){}}});
+  for(let i=0;i<5;i++){assert.equal((await auth.login(req('203.0.113.8'),{password:'wrong'}))[0],401);time+=14*60*1000;}
+ });
  test(id+': fifth failure locks only trusted visitor IP, not other tunnel users',async()=>{
   let time=Date.now();const observed=[];
   const auth=createNoteAuth({localId:id,getService:()=>service,now:()=>time,audit:{record:(r,d)=>observed.push({...d,ip:requestInfo(r).ip})}});

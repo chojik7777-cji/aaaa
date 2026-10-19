@@ -114,6 +114,7 @@
 
     const AUTH_KEY = 'dashboard-auth-v1';
     const LOCK_KEY = 'dashboard-auth-lock-v1';
+    const serverIpLock = !location.hostname.endsWith('.vercel.app');
     const MAX_FAILS = 5;
     const LOCK_MS = 60 * 60 * 1000;
     function readLock() { const empty = { fails: 0, until: 0, last: 0 }; try { const v = JSON.parse(localStorage.getItem(LOCK_KEY)) || {}; if (!v.last || Date.now() - v.last > LOCK_MS) return empty; return { fails: v.fails || 0, until: v.until || 0, last: v.last }; } catch (e) { return empty; } }
@@ -122,7 +123,7 @@
     function lockMinutesLeft() { const v = readLock(); return v.until > Date.now() ? Math.ceil((v.until - Date.now()) / 60000) : 0; }
     async function requireDashboardPassword() {
     if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
-    const left = lockMinutesLeft();
+    const left = serverIpLock ? 0 : lockMinutesLeft();
     if (left) { alert(`비밀번호를 ${MAX_FAILS}번 틀려서 이 기기에서는 입력이 잠겨 있어요.
 ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'intro.html'; return false; }
     for (let i = 0; i < 3; i++) {
@@ -131,8 +132,19 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'intro.html'; r
     let res;
     try { res = await fetch('/api/dashboard-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input, page: location.pathname }) }); }
     catch (e) { alert('비밀번호 확인 서버에 연결할 수 없습니다.'); return false; }
-    if (res.ok) { sessionStorage.setItem(AUTH_KEY, 'ok'); clearLock(); return true; }
+    if (res.ok) { sessionStorage.setItem(AUTH_KEY, 'ok'); if (!serverIpLock) clearLock(); return true; }
+    if (serverIpLock && res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '해당 IP의 로그인이 1시간 동안 잠겼습니다.');
+        return false;
+    }
     if (res.status !== 403) { alert('비밀번호를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'); return false; }
+    if (serverIpLock) {
+        const data = await res.json().catch(() => ({}));
+        const remaining = Number.isInteger(data.remaining) ? ` (남은 기회 ${data.remaining}번)` : '';
+        alert((data.error || '비밀번호가 맞지 않습니다.') + remaining);
+        continue;
+    }
     const v = readLock(); v.fails += 1; v.last = Date.now();
     if (v.fails >= MAX_FAILS) { writeLock({ fails: 0, until: v.last + LOCK_MS, last: v.last }); alert(`비밀번호를 ${MAX_FAILS}번 틀렸어요.
 이 기기에서는 1시간 동안 비밀번호를 입력할 수 없어요.`); location.href = 'intro.html'; return false; }

@@ -173,6 +173,10 @@
 const SAVE_KEY = 'math-level-game-v1';
 const CONTROL_BYPASS_KEY = 'math-level-control-bypass-v1';
 const LIMIT_UNLOCK_KEY = 'math-level-limit-unlock-v1';
+// Local/tunnel grants come only from this page's successful server verification.
+const serverIpLock = !location.hostname.endsWith('.vercel.app');
+let localControlUnlockVersion = -1;
+let localLimitUnlockVersion = -1;
 const CONTROL_STATUS_URL = '/api/math-control?action=status';
 const CONTROL_UNLOCK_URL = '/api/math-control?action=unlock';
 const LIMIT_UNLOCK_URL = '/api/math-control?action=limit-unlock';
@@ -399,9 +403,11 @@ function nextProblem() {
     updatePauseUi();
     render();
 }
-function currentLimitUnlockVersion() { return Number(sessionStorage.getItem(LIMIT_UNLOCK_KEY) || -1); }
+function currentLimitUnlockVersion() { return serverIpLock ? localLimitUnlockVersion : Number(sessionStorage.getItem(LIMIT_UNLOCK_KEY) || -1); }
 function shouldShowQuestionLimitLock() {
-    return Number(questionLimit) > 0 && state.asked >= Number(questionLimit) && currentLimitUnlockVersion() < Number(lastControlVersion ?? 0);
+    const version = Number(lastControlVersion ?? 0);
+    const unlockedVersion = currentLimitUnlockVersion();
+    return Number(questionLimit) > 0 && state.asked >= Number(questionLimit) && (serverIpLock ? unlockedVersion !== version : unlockedVersion < version);
 }
 function setQuestionLimitFromControl(data) {
     if (data.questionLimit == null) return;
@@ -434,7 +440,8 @@ async function unlockQuestionLimit() {
         if (!res.ok || !data.limitUnlocked) throw new Error(data.error || '비밀번호가 맞지 않습니다.');
         setQuestionLimitFromControl(data);
         if (data.version != null) lastControlVersion = data.version;
-        sessionStorage.setItem(LIMIT_UNLOCK_KEY, String(lastControlVersion ?? 0));
+        if (serverIpLock) localLimitUnlockVersion = Number(lastControlVersion ?? 0);
+        else sessionStorage.setItem(LIMIT_UNLOCK_KEY, String(lastControlVersion ?? 0));
         hideQuestionLimitLock();
         nextProblem();
     } catch (e) {
@@ -483,8 +490,8 @@ function applyMathControl(data) {
     lastControlVersion = data.version ?? lastControlVersion;
     questionLimit = Number(data.questionLimit ?? questionLimit);
     setQuestionLimitFromControl(data);
-    const bypassVersion = Number(localStorage.getItem(CONTROL_BYPASS_KEY) || -1);
-    centralLocked = !!data.locked && Number(data.version ?? 0) > bypassVersion;
+    const bypassVersion = serverIpLock ? localControlUnlockVersion : Number(localStorage.getItem(CONTROL_BYPASS_KEY) || -1);
+    centralLocked = !!data.locked && (serverIpLock ? Number(data.version ?? 0) !== bypassVersion : Number(data.version ?? 0) > bypassVersion);
     $('mathLockMessage').textContent = data.message || '비번을 입력하세요';
     $('mathLockOverlay').classList.toggle('show', centralLocked);
     document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn, #menuBtn').forEach(b => { b.disabled = centralLocked || (b.id !== 'menuBtn' && b.id !== 'pauseBtn' && paused); });
@@ -507,7 +514,9 @@ async function unlockMathControl() {
         const data = await res.json();
         if (!res.ok || !data.unlocked) throw new Error(data.error || '비밀번호가 맞지 않습니다.');
         centralLocked = false;
-        if (lastControlVersion != null) localStorage.setItem(CONTROL_BYPASS_KEY, String(lastControlVersion));
+        if (data.version != null) lastControlVersion = data.version;
+        if (serverIpLock) localControlUnlockVersion = Number(lastControlVersion ?? 0);
+        else if (lastControlVersion != null) localStorage.setItem(CONTROL_BYPASS_KEY, String(lastControlVersion));
         $('mathLockOverlay').classList.remove('show');
         $('mathUnlockPassword').value = '';
         updatePauseUi();

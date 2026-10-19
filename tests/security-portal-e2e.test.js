@@ -29,10 +29,16 @@ test('real isolated portal: fifth dashboard/note failure, admin-only history, re
  assert.equal((await fetch(base+'/api/security-audit')).status,401);
  assert.deepEqual(await events(),[]);
  for(let i=1;i<=5;i++){
-  const r=await post('/api/dashboard-auth',{password:'e2e-wrong-never-log-this',page:'/omok-dashboard.html'});assert.equal(r.status,403);
+  const r=await post('/api/dashboard-auth',{password:'e2e-wrong-never-log-this',page:'/omok-dashboard.html'});assert.equal(r.status,i<5?403:429);
   const list=await events();assert.equal(list.filter(e=>e.outcome==='failure').length,i<5?0:1);
  }
  let list=await events();assert.equal(list[0].page,'omok-dashboard.html');assert.equal(list[0].ip,'203.0.113.71');assert.equal(list[0].count,5);assert.equal(list[0].alertEligible,true);
+ for(const page of ['omok-dashboard.html','baduk-dashboard.html','yut-dashboard.html','math-control.html']){
+  assert.equal((await post('/api/dashboard-auth',{password,page})).status,429);
+  assert.equal((await post('/api/dashboard-auth',{password,page},'203.0.113.72')).status,200);
+ }
+ assert.equal((await post('/api/note-admin/login',{password})).status,429);
+ assert.equal((await post('/api/note-admin/login',{password},'203.0.113.73')).status,200);
  for(const id of ['note','note2']){
   for(let i=1;i<=5;i++){
    const r=await post('/api/'+id+'/login?room=default',{password:'e2e-wrong-never-log-this'});assert.equal(r.status,i<5?401:429);

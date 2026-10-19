@@ -31,6 +31,7 @@
   <main class="card">
     <h1>🔐 수학게임 중앙 통제</h1>
     <p class="sub">잠금을 켜면 학생들의 수학게임 화면에 비밀번호 입력 오버레이가 뜹니다.<br>문제 제한 수를 바꾸면 학생 화면이 약 5초마다 새 설정을 반영합니다.</p>
+    <p class="sub">맥미니/터널에서는 동일 실제 IP에서 해당 인증 비밀번호를 5회 틀리면 서버가 1시간 동안 로그인을 잠급니다. 수학게임 해제 인증도 서버에서 확인하며, Vercel의 기존 동작은 유지됩니다.</p>
 
     <label>관리자 비밀번호
       <input id="adminPassword" type="password" autocomplete="current-password" placeholder="관리자 비밀번호">

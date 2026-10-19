@@ -65,14 +65,14 @@ function createNoteAuth(opts = {}) {
         if (!validPassword(body?.password)) return [400, {ok:false,error:'비밀번호를 256바이트 이하로 입력해 주세요.'}];
         // Use exactly the audit's validated visitor identity: trust CF only
         // through our loopback tunnel + configured Host, never arbitrary XFF.
-        const ip = requestInfo(req).ip;
+        const ip = JSON.stringify([requestInfo(req).ip,room]);
         const audit=outcome=>recordAuth(req,{page:opts.localId+'.html',room,outcome},opts.audit);
         const limited = () => {audit('rate_limit');return [429, {ok:false,error:'시도 횟수가 많습니다. 1시간 뒤 다시 시도해 주세요.'}];};
         let f = fails.get(ip);
         if (!f) {
           // Never evict active locks or in-flight client budgets to admit a new IP.
           if (fails.size >= 10000) return limited();
-          f = {count:0,lockedUntil:0,pending:0,tail:Promise.resolve()};
+          f = {count:0,times:[],lockedUntil:0,pending:0,tail:Promise.resolve()};
           fails.set(ip,f);
         }
         if (f.lockedUntil > now() || f.pending >= MAX_FAILS) return limited();
@@ -80,13 +80,14 @@ function createNoteAuth(opts = {}) {
         f.pending++;
         const attempt = f.tail.then(async () => {
           if (f.lockedUntil > now()) return limited();
+          f.times=f.times.filter(t=>t>now()-15*60*1000);f.count=f.times.length;
           const service=getService();
           const allowed=!opts.roomAllowed||await opts.roomAllowed(room,service);
           if(!allowed)return [401,{ok:false,authRequired:true,error:'비밀번호가 맞지 않습니다.'}];
           let token;try{token=await service.login(opts.localId, body.password,room);}catch(e){if(e.status===429)audit('rate_limit');throw e;}
           audit(token?'success':'failure');
-          if (token) { f.count=0; return [200,{ok:true,token}]; }
-          f.count++; if (f.count >= MAX_FAILS) {f.count=0;f.lockedUntil=now()+LOCK_MS;}
+          if (token) { f.count=0;f.times=[]; return [200,{ok:true,token}]; }
+          f.times.push(now());f.count=f.times.length; if (f.count >= MAX_FAILS) {f.count=0;f.lockedUntil=now()+LOCK_MS;}
           return [f.lockedUntil > now()?429:401,{ok:false,authRequired:true,error:'비밀번호가 맞지 않습니다.'}];
         });
         f.tail = attempt.catch(() => {});
