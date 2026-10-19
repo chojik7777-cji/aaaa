@@ -129,7 +129,7 @@ ${left}분 뒤에 다시 시도해 주세요.`); location.href = 'intro.html'; r
     const input = prompt('현황판 비밀번호를 입력하세요.');
     if (input === null) break;
     let res;
-    try { res = await fetch('/api/dashboard-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input }) }); }
+    try { res = await fetch('/api/dashboard-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input, page: location.pathname }) }); }
     catch (e) { alert('비밀번호 확인 서버에 연결할 수 없습니다.'); return false; }
     if (res.ok) { sessionStorage.setItem(AUTH_KEY, 'ok'); clearLock(); return true; }
     if (res.status !== 403) { alert('비밀번호를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'); return false; }

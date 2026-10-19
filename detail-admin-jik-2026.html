@@ -65,6 +65,11 @@
         .room-card strong { display:block; margin-bottom:8px; }
         .room-card a { display:inline-block; padding:8px; color:#434190; }
         #note2-create-form, #note-a-create-form { margin-top:24px; padding-top:8px; border-top:2px solid #e2e8f0; }
+        #security-audit { margin-top:24px; padding-top:8px; border-top:2px solid #e2e8f0; }
+        .security-event { min-width:0; border:1px solid #cbd5e0; border-radius:10px; padding:12px; margin:10px 0; overflow-wrap:anywhere; font-size:13px; line-height:1.7; }
+        .security-event dt { font-weight:600; color:#2d3748; }
+        .security-event dd { margin:0 0 6px; white-space:pre-wrap; }
+        .security-event summary { cursor:pointer; color:#434190; }
         .footer { margin-top: 32px; font-size: 13px; color: #a0aec0; }
     </style>
 </head>
@@ -102,6 +107,7 @@
             <h2 id="note-admin-heading">공유노트 비밀번호 관리</h2>
             <p>Mac mini 로컬 전용입니다. 맥미니/터널에서만 변경되며 Vercel에는 동기화되지 않습니다.</p>
             <p>노트 로그인과 별도로 관리자 인증이 필요합니다. 현재 비밀번호는 표시하지 않습니다.</p>
+            <p>보안 기록·알림은 맥미니/터널의 관리자·현황판·노트 A/B 인증에 적용됩니다. Vercel에서 발생한 비밀번호 오류는 수집되지 않습니다.</p>
             <form id="note-admin-login">
                 <label>관리자 비밀번호<input name="password" type="password" autocomplete="current-password" maxlength="256" required></label>
                 <button type="submit">관리자 로그인</button>
@@ -117,10 +123,9 @@
                     <p>노트 A 새 방에 사용할 별도의 초기 비밀번호를 설정합니다. 방 이름은 영문 소문자·숫자·_·- 1~50자, 비밀번호는 8자 이상·256바이트 이하입니다. 기존 방과 비밀번호는 유지됩니다.</p>
                     <button type="submit">새 방 생성</button>
                 </form>
-                <h3>노트 A 기본방 관리</h3>
+                <h3>노트 A 기본방 빠른 선택</h3>
                 <button id="note-a-select-password" type="button">이 방 선택 / 비밀번호 변경</button>
-                <button id="note-a-reset-content" type="button">노트 A 내용·파일 초기화</button>
-                <p>노트 A 기본방의 본문·첨부파일을 삭제하고 버전을 0으로 초기화합니다. 비밀번호·로그인과 다른 방은 유지됩니다. 실행 전 확인창이 표시됩니다.</p>
+                <p>노트 A·B 모두 각 방 카드에서 비밀번호 변경과 내용·파일 초기화를 처리합니다. 초기화는 해당 방에만 적용되며 다른 방·비밀번호·로그인·백업은 유지됩니다.</p>
                 <h3>노트 B 방 목록 (note2.html)</h3>
                 <div id="note2-room-list" aria-label="등록된 노트 B 방"></div>
                 <p>방을 열거나 선택해 비밀번호를 변경하세요. 목록에 없는 방은 아래 NEW ROOM에서 먼저 생성해 주세요. 내용·파일 초기화는 방을 유지하며 본문과 첨부파일만 삭제합니다.</p>
@@ -143,12 +148,19 @@
                     <p>방 이름은 영문 소문자·숫자·_·- 1~50자, 비밀번호는 8자 이상·256바이트 이하입니다. 기존 방은 덮어쓰지 않습니다. 생성 즉시 지정한 비밀번호로 로그인할 수 있고 목록에도 나타납니다. 데이터 폴더는 첫 저장 또는 파일 업로드 시 만들어집니다.</p>
                     <button type="submit">새 방 생성 및 초기 비밀번호 설정</button>
                 </form>
+                <section id="security-audit" aria-labelledby="security-audit-heading">
+                    <h3 id="security-audit-heading">보안 기록</h3>
+                    <p>15분 이내 동일 IP·페이지·방에서 비밀번호가 연속 5회 이상 실패하면 기록합니다. Mac mini 로컬/터널 전용입니다.</p>
+                    <button id="security-audit-refresh" type="button">보안 기록 새로고침</button>
+                    <p id="security-audit-status" role="status" aria-live="polite"></p>
+                    <div id="security-audit-list" aria-label="최근 보안 기록"></div>
+                </section>
                 <button id="note-admin-refresh" type="button">변경 상태 다시 조회</button>
                 <button id="note-admin-logout" type="button">관리자 로그아웃</button>
             </div>
             <p id="note-admin-message" role="status" aria-live="polite"></p>
         </section>
-        <script src="note-password-admin.js" defer></script>
+        <script src="note-password-admin.js?v=security-audit-20261019" defer></script>
         <p class="footer">made by jeongik<br>문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
     </div>
 
@@ -173,7 +185,7 @@
             const v = readLock();
             return v.until > Date.now() ? Math.ceil((v.until - Date.now()) / 60000) : 0;
         }
-        async function requireDashboardPassword() {
+        async function requireDashboardPassword(page) {
             if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
             const left = lockMinutesLeft();
             if (left) {
@@ -189,7 +201,7 @@ ${left}분 뒤에 다시 시도해 주세요.`);
                     res = await fetch('/api/dashboard-auth', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ password: input })
+                        body: JSON.stringify({ password: input, page })
                     });
                 } catch (e) {
                     alert('비밀번호 확인 서버에 연결할 수 없습니다.');
@@ -221,7 +233,7 @@ ${left}분 뒤에 다시 시도해 주세요.`);
         document.querySelectorAll('.dashboard-link').forEach((a) => {
             a.addEventListener('click', async (e) => {
                 e.preventDefault();
-                if (await requireDashboardPassword()) location.href = a.href;
+                if (await requireDashboardPassword(new URL(a.href).pathname.slice(1))) location.href = a.href;
             });
         });
     </script>

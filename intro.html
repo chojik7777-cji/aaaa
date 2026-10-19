@@ -112,7 +112,7 @@
             const v = readLock();
             return v.until > Date.now() ? Math.ceil((v.until - Date.now()) / 60000) : 0;
         }
-        async function requireDashboardPassword() {
+        async function requireDashboardPassword(page = location.pathname) {
             if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
             const left = lockMinutesLeft();
             if (left) {
@@ -128,7 +128,7 @@ ${left}분 뒤에 다시 시도해 주세요.`);
                     res = await fetch('/api/dashboard-auth', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ password: input })
+                        body: JSON.stringify({ password: input, page })
                     });
                 } catch (e) {
                     alert('비밀번호 확인 서버에 연결할 수 없습니다.');
@@ -160,7 +160,7 @@ ${left}분 뒤에 다시 시도해 주세요.`);
         document.querySelectorAll('.dashboard-link').forEach((a) => {
             a.addEventListener('click', async (e) => {
                 e.preventDefault();
-                if (await requireDashboardPassword()) location.href = a.href;
+                if (await requireDashboardPassword(new URL(a.href, location.href).pathname)) location.href = a.href;
             });
         });
     </script>

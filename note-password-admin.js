@@ -5,7 +5,37 @@
   const roomField=document.getElementById('note2-room-field'),roomInput=form.elements.room;
   const create=document.getElementById('note2-create-form'),roomList=document.getElementById('note2-room-list');
   const noteCreate=document.getElementById('note-a-create-form'),noteRoomList=document.getElementById('note-a-room-list');
+  const auditList=document.getElementById('security-audit-list'),auditStatus=document.getElementById('security-audit-status'),auditRefresh=document.getElementById('security-audit-refresh');
+  let auditSequence=0;
   let token='',notes=[],rooms=[],noteRooms=[],sequence=0;
+  function renderAudit(events){
+    auditList.replaceChildren(...events.map(event=>{
+      const card=document.createElement('article'),fields=document.createElement('dl');card.className='security-event';
+      for(const [label,value] of [['시각 (한국 시간)',event.timeKst||(event.time?new Date(event.time).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'—')],['IP',event.ip],['페이지',event.page],['방',event.room],['연속 실패 횟수',event.count],['IP 출처',event.ipSource]]){
+        const term=document.createElement('dt'),description=document.createElement('dd');term.textContent=label;description.textContent=String(value??'—');fields.append(term,description);
+      }
+      card.append(fields);
+      const details=document.createElement('details'),summary=document.createElement('summary'),info=document.createElement('p');summary.textContent='요청 상세';
+      info.textContent=['엔드포인트: '+(event.endpoint??'—'),'연결 IP: '+(event.peerIp??event.peer??'—'),'유형: '+(event.type??event.outcome??'—'),'User-Agent: '+(event.userAgent??'—')].join('\n');details.append(summary,info);card.append(details);return card;
+    }));
+    auditStatus.textContent=events.length?'최근 보안 기록 '+events.length+'건입니다.':'보안 기록이 없습니다.';
+  }
+  async function refreshAudit(){
+    if(!token||!auditList)return;
+    const auth=token,seq=++auditSequence;auditRefresh.disabled=true;auditStatus.textContent='보안 기록을 조회하고 있습니다…';
+    try{
+      const response=await fetch('/api/security-audit',{method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+auth}});
+      if(auth!==token||seq!==auditSequence)return;
+      if(response.status===401){logout();message.textContent='관리자 인증이 만료되었습니다. 다시 로그인해 주세요.';return;}
+      const data=await response.json();
+      if(auth!==token||seq!==auditSequence)return;
+      if(response.status===503){auditList.replaceChildren();auditStatus.textContent=data.code==='LOCAL_ONLY'?'보안 기록은 Mac mini 로컬/터널에서만 사용할 수 있습니다.':'보안 기록 저장소 또는 인증 서비스 장애입니다. 권한·잠금 상태와 서버 로그를 확인해 주세요.';return;}
+      if(!response.ok)throw new Error('보안 기록을 조회하지 못했습니다.');
+      renderAudit(Array.isArray(data.records)?data.records:Array.isArray(data.events)?data.events:[]);
+    }catch(e){if(auth===token&&seq===auditSequence)auditStatus.textContent='보안 기록을 조회하지 못했습니다. 잠시 후 다시 시도해 주세요.';}
+    finally{if(seq===auditSequence)auditRefresh.disabled=false;}
+  }
+  auditRefresh?.addEventListener('click',refreshAudit);
   function validRoom(room){
     if(!/^[a-z0-9_-]{1,50}$/.test(room)||Object.hasOwn(Object.prototype,room)||room==='prototype')throw new Error('방 이름은 영문 소문자, 숫자, _ 또는 -로 1~50자 입력해 주세요. 대문자는 사용할 수 없습니다.');
     return room;
@@ -18,7 +48,21 @@
     if(password.length<8||new TextEncoder().encode(password).length>256)throw new Error('비밀번호는 8자 이상, 256바이트 이하로 입력해 주세요.');
     return {password,confirmation};
   }
-  function logout(){sequence++;token='';notes=[];rooms=[];noteRooms=[];panel.hidden=true;login.hidden=false;form.reset();create.reset();noteCreate?.reset();roomField.hidden=true;roomInput.disabled=true;roomList.replaceChildren();noteRoomList?.replaceChildren();document.getElementById('note2-rooms').replaceChildren();document.getElementById('note-password-status').textContent='';}
+  function logout(){auditSequence++;auditList?.replaceChildren();if(auditStatus)auditStatus.textContent='';if(auditRefresh)auditRefresh.disabled=false;sequence++;token='';notes=[];rooms=[];noteRooms=[];panel.hidden=true;login.hidden=false;form.reset();create.reset();noteCreate?.reset();roomField.hidden=true;roomInput.disabled=true;roomList.replaceChildren();noteRoomList?.replaceChildren();document.getElementById('note2-rooms').replaceChildren();document.getElementById('note-password-status').textContent='';}
+  function roomResetButton(id,room){
+    const reset=document.createElement('button');reset.type='button';reset.textContent='내용·파일 초기화';
+    reset.addEventListener('click',()=>{
+      const auth=token,label=id==='note'?'노트 A':'노트 B';if(!auth||reset.disabled)return;
+      if(!window.confirm(label+' / '+room+' 방의 본문과 첨부파일을 삭제하고 버전을 0으로 초기화할까요? 다른 방과 방별 비밀번호·로그인·백업은 유지됩니다.'))return;
+      busy(reset,async()=>{
+        if(token!==auth)return;
+        await api('reset-content',{id,room},room);if(token!==auth)return;
+        await refresh();if(token!==auth)return;
+        message.textContent=label+' / '+room+' 방의 본문·첨부파일이 삭제되고 버전이 0으로 초기화되었습니다. 다른 방·비밀번호·로그인·백업은 유지됩니다.';
+      });
+    });
+    return reset;
+  }
   function renderNoteRooms(){
     if(!noteRoomList)return;
     noteRoomList.replaceChildren(...noteRooms.map(room=>{
@@ -26,7 +70,7 @@
       card.className='room-card';name.textContent=room;link.textContent='방 열기 ↗';link.href='note.html?room='+encodeURIComponent(room);link.target='_blank';link.rel='noopener noreferrer';
       select.type='button';select.textContent='이 방 선택 / 비밀번호 변경';
       select.addEventListener('click',()=>{form.elements.id.value='note';roomInput.value=room;form.elements.password.value='';form.elements.confirmation.value='';selectionChanged();});
-      card.append(name,link,select);return card;
+      card.append(name,link,select,roomResetButton('note',room));return card;
     }));
   }
   function renderRoomOptions(){
@@ -43,18 +87,7 @@
       card.className='room-card';name.textContent=room;link.textContent='방 열기 ↗';link.href='note2.html?room='+encodeURIComponent(room);link.target='_blank';link.rel='noopener noreferrer';
       select.type='button';select.textContent='이 방 선택 / 비밀번호 변경';
       select.addEventListener('click',()=>{form.elements.id.value='note2';roomInput.value=room;form.elements.password.value='';form.elements.confirmation.value='';selectionChanged();});
-      const reset=document.createElement('button');reset.type='button';reset.textContent='내용·파일 초기화';
-      reset.addEventListener('click',()=>{
-        const auth=token;
-        if(!auth)return;
-        if(!window.confirm('노트 B / '+room+' 방의 본문과 모든 첨부파일을 삭제하고 버전을 0으로 초기화할까요? 복구할 수 없습니다. 방과 기존 비밀번호·로그인은 유지됩니다.'))return;
-        busy(reset,async()=>{
-          await api('reset-content',{id:'note2',room},room);if(token!==auth)return;
-          await refresh();if(token!==auth)return;
-          message.textContent='노트 B / '+room+' 방의 본문·첨부파일이 삭제되고 버전이 0으로 초기화되었습니다. 방과 비밀번호는 유지됩니다.';
-        });
-      });
-      card.append(name,link,select,reset);return card;
+      card.append(name,link,select,roomResetButton('note2',room));return card;
     });
     roomList.replaceChildren(...cards);
     if(!rooms.length)roomList.textContent='등록된 방이 없습니다. NEW ROOM에서 새 방을 생성하세요.';
@@ -71,7 +104,7 @@
   async function busy(button,work){button.disabled=true;message.textContent='처리 중입니다…';try{await work();}catch(e){message.textContent=e.message||'서버에 연결할 수 없습니다.';}finally{button.disabled=false;}}
   login.addEventListener('submit',e=>{
     e.preventDefault();const password=login.elements.password.value;login.reset();
-    busy(login.querySelector('button'),async()=>{token=(await api('login',{password})).token;await refresh();message.textContent='관리자 인증이 완료되었습니다. 인증은 15분간 유효합니다.';});
+    busy(login.querySelector('button'),async()=>{token=(await api('login',{password})).token;await refresh();if(token)void refreshAudit();message.textContent='관리자 인증이 완료되었습니다. 인증은 15분간 유효합니다.';});
   });
   form.addEventListener('submit',e=>{
     e.preventDefault();
@@ -129,15 +162,6 @@
     selectionChanged();
     form.scrollIntoView({behavior:'smooth',block:'center'});
     form.elements.password.focus({preventScroll:true});
-  });
-  document.getElementById('note-a-reset-content')?.addEventListener('click',e=>{
-    const auth=token;if(!auth)return;
-    if(!window.confirm('노트 A (note.html) 기본방의 본문과 모든 첨부파일을 삭제하고 버전을 0으로 초기화할까요? 복구할 수 없습니다. 기존 비밀번호·로그인과 다른 방은 유지됩니다.'))return;
-    busy(e.currentTarget,async()=>{
-      await api('reset-content',{id:'note',room:'default'},'default');if(token!==auth)return;
-      await refresh();if(token!==auth)return;
-      message.textContent='노트 A 기본방의 본문·첨부파일이 삭제되고 버전이 0으로 초기화되었습니다. 비밀번호와 다른 방은 유지됩니다.';
-    });
   });
   window.addEventListener('pagehide',logout);
 })();

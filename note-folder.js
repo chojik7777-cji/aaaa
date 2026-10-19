@@ -183,6 +183,33 @@ function createNoteFolderHandler(rootDir, opts = {}) {
         return send(res, 200, state(room));
       }
 
+      if (action === 'rename-file' && req.method === 'POST') {
+        const file = fileIn(dir, body.id);
+        let stat; try { stat = file && fs.lstatSync(file); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        if (!stat || !stat.isFile()) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
+        const name = require('./server/note-file-name').renameFileName(body.name, path.basename(file), MAX_NAME);
+        if (name === body.id) return send(res, 200, state(room));
+        const target = path.join(dir, name);
+        try { fs.lstatSync(target); return send(res, 409, { ok: false, error: '이미 같은 이름이 있습니다.' }); }
+        catch (e) { if (e.code !== 'ENOENT') throw e; }
+        const meta = readMeta(dir);
+        meta.uploads = { ...(meta.uploads || {}), [name]: Object.hasOwn(meta.uploads || {}, body.id) ? meta.uploads[body.id] : '' };
+        delete meta.uploads[body.id];
+        meta.version += 1; meta.updatedAt = Date.now(); meta.updatedBy = String(body.user || '').slice(0, 40);
+        const metaPath = path.join(dir, META);
+        let previousMeta; try { previousMeta = fs.readFileSync(metaPath); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        try { fs.linkSync(file, target); } // Atomic no-clobber publication, including races/case aliases.
+        catch (e) { if (e.code === 'EEXIST') e.status = 409; throw e; }
+        try { writeMeta(dir, meta); fs.unlinkSync(file); }
+        catch (e) {
+          // Source still exists. Restore exact metadata bytes before dropping our link.
+          try { if (previousMeta) fs.writeFileSync(metaPath, previousMeta); else fs.rmSync(metaPath, { force: true }); }
+          finally { fs.unlinkSync(target); }
+          throw e;
+        }
+        return send(res, 200, state(room));
+      }
+
       if (action === 'delete-file' && req.method === 'POST') {
         const file = fileIn(dir, body.id);
         if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
@@ -222,8 +249,11 @@ function resetNoteContent(root,room){
   const dir=path.join(root,room);
   resetDirectoryContent(dir,false,[root]);
 }
-function resetNoteAContent(dir){
-  resetDirectoryContent(path.resolve(dir),true);
+function resetNoteAContent(root,room='default'){
+  root=path.resolve(root);
+  existingNoteRoom(root,room);
+  const dir=room==='default'?root:path.join(root,room);
+  resetDirectoryContent(dir,room==='default',[root]);
 }
 function resetDirectoryContent(dir,preserveDirectories,parents=[]){
   // Validate every internal path before deleting anything. Attachment symlinks

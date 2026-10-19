@@ -108,6 +108,17 @@ module.exports = async function handler(req, res) {
       return send(res, 200, meta(note));
     }
 
+    if (action === 'rename-file' && req.method === 'POST') {
+      const file = note.files.find(f => f.id === body.id);
+      if (!file) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
+      const name = require('../server/note-file-name').renameFileName(body.name, file.name, MAX_NAME);
+      if (name === file.name) return send(res, 200, meta(note));
+      if (note.files.some(f => f.id !== file.id && f.name === name)) return send(res, 409, { ok: false, error: '이미 같은 이름이 있습니다.' });
+      file.name = name;
+      note.version += 1; note.updatedAt = Date.now(); note.updatedBy = String(body.user || '').slice(0, 40);
+      return send(res, 200, meta(note));
+    }
+
     if (action === 'delete-file' && req.method === 'POST') {
       const id = String(body.id || '');
       const before = note.files.length;

@@ -7,7 +7,7 @@ async function fixture(t){
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.mkdirSync(path.join(root,'alpha'),{recursive:true});
  const env={NOTE_AUTH_FILE:path.join(dir,'private','auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_PASSWORD:'fixture-note',NOTE2_PASSWORD:'fixture-template'};
  fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'fixture-admin');await initialize(env);
- const service=createService(createFileStore(env),Date.now,{roomRoot:root}),token=await service.login('admin','fixture-admin'),handler=createAdminHandler(()=>service,{roomRoot:root});
+ const service=createService(createFileStore(env),Date.now,{roomRoot:root}),token=await service.login('admin','fixture-admin'),handler=createAdminHandler(()=>service,{roomRoot:root,noteDir:path.join(dir,'note')});
  async function call(body={id:'note2',room:'alpha'},auth=token,method='POST',query=''){
   const res={setHeader(){},end(v){this.data=JSON.parse(v);}};
   await handler({url:'/api/note-admin?action=reset-content'+query,method,headers:{authorization:auth?'Bearer '+auth:''},body},res);return res;
@@ -30,7 +30,7 @@ test('reset removes body and every attachment, resets metadata, preserves room, 
 test('reset rejects unauthorized, invalid, missing and non-note2 requests without mutation',async t=>{
  const {root,call}=await fixture(t),memo=path.join(root,'alpha','.note-memo.txt');fs.writeFileSync(memo,'keep');
  for(const auth of ['', 'invalid'])assert.equal((await call({id:'note2',room:'alpha'},auth)).statusCode,401);
- assert.equal((await call({id:'note',room:'alpha'})).statusCode,400);
+ assert.equal((await call({id:'note',room:'alpha'})).statusCode,404);
  assert.equal((await call({id:'note2',room:'missing'})).statusCode,404);
  for(const room of ['../alpha','ALPHA','__proto__',''])assert.equal((await call({id:'note2',room})).statusCode,400);
  assert.equal((await call({id:'note2',room:'alpha'},undefined,'POST','&room=beta')).statusCode,400);
@@ -61,7 +61,7 @@ test('isolated Chromium: room reset confirmation, cancel, success refresh and 40
  const {root,handler}=await fixture(t),http=require('node:http'),repo=path.join(__dirname,'..'),room=path.join(root,'alpha');
  fs.writeFileSync(path.join(room,'.note-memo.txt'),'browser-body');fs.writeFileSync(path.join(room,'attachment.txt'),'browser-file');
  let denied=false,resets=0,statuses=0;
- const html=fs.readFileSync(path.join(repo,'detail-admin-jik-2026.html'),'utf8').match(/<section class="note-admin"[\s\S]*?<\/section>/)[0];
+ const html=fs.readFileSync(path.join(repo,'detail-admin-jik-2026.html'),'utf8').match(/<section class="note-admin"[\s\S]*?<\/section>(?=\s*<script src="note-password-admin)/)[0];
  const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://fixture');
   if(url.pathname==='/api/note-admin'){
@@ -77,8 +77,8 @@ test('isolated Chromium: room reset confirmation, cancel, success refresh and 40
  await page.goto('http://127.0.0.1:'+server.address().port+'/detail-admin-jik-2026.html');
  await page.locator('#note-admin-login input').fill('fixture-admin');await page.getByRole('button',{name:'관리자 로그인',exact:true}).click();
  await page.locator('#note-admin-panel').waitFor({state:'visible'});
- const reset=page.getByRole('button',{name:'내용·파일 초기화',exact:true});assert.equal(await reset.count(),1);
- page.once('dialog',async dialog=>{assert.match(dialog.message(),/alpha/);assert.match(dialog.message(),/본문/);assert.match(dialog.message(),/모든 첨부파일/);assert.match(dialog.message(),/복구/);await dialog.dismiss();});
+ const reset=page.locator('#note2-room-list .room-card').filter({has:page.locator('strong',{hasText:/^alpha$/})}).getByRole('button',{name:'내용·파일 초기화',exact:true});assert.equal(await reset.count(),1);
+ page.once('dialog',async dialog=>{assert.match(dialog.message(),/alpha/);assert.match(dialog.message(),/본문/);assert.match(dialog.message(),/첨부파일/);assert.match(dialog.message(),/백업은 유지/);await dialog.dismiss();});
  await reset.click();assert.equal(resets,0);assert.equal(fs.readFileSync(path.join(room,'.note-memo.txt'),'utf8'),'browser-body');
  const previous=statuses;page.once('dialog',d=>d.accept());await reset.click();
  await page.waitForFunction(()=>document.getElementById('note-admin-message').textContent.includes('초기화되었습니다'));

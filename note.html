@@ -42,6 +42,12 @@
     .lock button { width:100%; }
     .lock .err { color:#c53030; font-size:13px; min-height:18px; margin:8px 0 0; }
     @media (max-width:720px) { .top { grid-template-columns:1fr; } textarea{min-height:46vh;} header,.panel{padding:16px;} }
+    .file-info{min-width:0;max-width:100%;overflow-wrap:anywhere}
+
+    .file-actions{align-items:center;flex-wrap:nowrap;max-width:100%}
+    .file-actions>a{display:flex;align-items:center;line-height:1;text-decoration:none}
+    .file-actions button{display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;margin:0;line-height:1;white-space:nowrap}
+    @media(max-width:600px){.file-actions{gap:3px}.file-actions button{font-size:13px;padding:0 4px}}
     .file .fname { color:#2b6cb0; font-weight:800; text-align:left; cursor:pointer; text-decoration:underline; text-underline-offset:3px; word-break:break-all; }
     .file .kind { font-size:18px; margin-right:4px; }
     .footer { text-align:center; margin:18px 0 6px; color:#e2e8f0; font-size:14px; }
@@ -102,7 +108,7 @@
     </form>
   </div>
 
-<script src="/note-attachment-preview.js"></script>
+<script src="/note-attachment-preview.js?v=modal80-4"></script>
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
@@ -260,9 +266,10 @@ function renderFiles(files) {
       : `<b>${esc(f.name)}</b>`;
     return `
     <div class="file">
-      <div>${name}<br><small>${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)} · ${esc(f.uploadedBy || '익명')}</small></div>
+      <div class="file-info">${name}<br><small>${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)} · ${esc(f.uploadedBy || '익명')}</small></div>
       <div class="file-actions">
-        ${kind ? `<a href="${fileUrl(f, true)}" target="_blank" rel="noopener"><button type="button" class="secondary">👁 새 탭에서 보기</button></a>` : ''}
+        ${kind ? `<button type="button" class="secondary" data-preview-button="${esc(f.id)}">미리보기</button>` : ''}
+        <button type="button" class="secondary" data-rename="${esc(f.id)}">이름변경</button>
         <a href="${fileUrl(f, false)}" download="${esc(f.name)}"><button type="button" class="secondary">다운로드</button></a>
         <button type="button" class="danger" data-delete="${esc(f.id)}">삭제</button>
       </div>
@@ -285,11 +292,30 @@ async function uploadFile() {
   } catch (e) { alert(e.message); }
   finally { $('uploadBtn').disabled = locked; }
 }
+let renamingFile = false;
+async function renameFile(id) {
+  if (locked || renamingFile) return;
+  const file = state.files?.find(file => String(file.id) === String(id));
+  if (!file || !preview) return;
+  renamingFile = true;
+  try {
+    await preview.editName(file, async name => {
+      if (locked) throw new Error('비밀번호를 다시 입력해 주세요.');
+      applyRemote(await api('rename-file', { id, name, user: user() }), false);
+    });
+  } finally { renamingFile = false; }
+}
+$('fileList').addEventListener('click', event => {const button = event.target.closest('[data-rename]');if (button) renameFile(button.dataset.rename);});
+let deletingFile = false;
 async function deleteFile(id) {
-  if (locked) return;
-  if (!confirm('첨부파일을 삭제할까요?')) return;
-  try { applyRemote(await api('delete-file', { id, user: user() }), false); }
-  catch (e) { alert(e.message); }
+  if (locked || deletingFile) return;
+  deletingFile = true;
+  try {
+    const file = state.files?.find(file => String(file.id) === String(id));
+    if (!file || !preview || !await preview.confirmDelete(file) || locked) return;
+    applyRemote(await api('delete-file', { id, user: user() }), false);
+  } catch (e) { alert(e.message); }
+  finally { deletingFile = false; }
 }
 
 // ===== 첨부파일 미리보기 =====

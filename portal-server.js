@@ -31,6 +31,7 @@ fs.mkdirSync(NOTE2_DIR, { recursive: true });
 
 const adminHandler = require('./server/note-admin').createAdminHandler();
 const dashboardAuthHandler = require('./server/dashboard-auth').createDashboardAuth();
+const securityAuditHandler = require('./server/security-audit-api').createSecurityAuditHandler();
 
 const TARGETS = {
   '/api/room': 'http://127.0.0.1:8791',   // yut-server.js
@@ -88,6 +89,8 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  const pathname = new URL(req.url, 'http://localhost').pathname;
+  if (pathname === '/api/security-audit') return securityAuditHandler(req, res);
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -96,7 +99,7 @@ const server = http.createServer((req, res) => {
     });
     return res.end();
   }
-  const pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
+
   if (pathname === '/api/health') {
     return send(res, 200, JSON.stringify({ ok: true, portal: true, yut: '8791', omok: '8792' }), 'application/json; charset=utf-8');
   }

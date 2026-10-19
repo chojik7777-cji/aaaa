@@ -54,7 +54,7 @@ test('isolated browser: both pages preview safely, close, trap focus, clear on 4
       for(const [id,tag] of [['pdf','iframe'],['video','video'],['audio','audio']]){await page.locator(`[data-preview="${id}"]`).click();await dialog.locator(tag).waitFor();if(id==='pdf')assert.equal(await dialog.locator(tag).getAttribute('sandbox'),'');else assert.equal(await dialog.locator(tag).getAttribute('controls'),'');await page.keyboard.press('Escape');assert.equal(await dialog.locator(tag).count(),0);}
       assert.equal(await page.locator('[data-preview="bad"]').count(),0);
       assert.equal(await page.locator('[download]').count(),files.length);
-      if(file==='note2.html')assert.equal(await page.getByText('새 창에서 보기',{exact:false}).count(),5);
+      if(file==='note2.html')assert.equal(await page.getByRole('button',{name:'미리보기',exact:true}).count(),5);
       await page.setViewportSize({width:390,height:844});await trigger.click();await page.waitForFunction(()=>document.querySelector('dialog img')?.naturalWidth>0);
       const mobile=await dialog.boundingBox();assert.ok(mobile.width<=351);assert.ok(mobile.height<=718);assert.ok(mobile.x>=0&&mobile.y>=0);
       assert.equal(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth),true);

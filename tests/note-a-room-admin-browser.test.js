@@ -40,7 +40,7 @@ test('actual browser: note A list → own-password create → selected-room rota
     assert.equal(await link.getAttribute('href'),'note.html?room='+encodeURIComponent(room));
     assert.equal(await link.getAttribute('target'),'_blank');assert.match(await link.getAttribute('rel'),/noopener/);
   }
-  assert.equal(await list.getByRole('button',{name:'내용·파일 초기화',exact:true}).count(),0);
+  assert.equal(await list.getByRole('button',{name:'내용·파일 초기화',exact:true}).count(),2);
   await form.locator('[name=id]').selectOption('note2');await settled(page);
   const create=page.locator('#note-a-create-form');await create.locator('[name=room]').fill('new-a');await credentials(create,'new-a-password');
   page.once('dialog',d=>d.accept());await create.getByRole('button',{name:'새 방 생성',exact:true}).click();
@@ -49,7 +49,7 @@ test('actual browser: note A list → own-password create → selected-room rota
   assert.equal(await form.locator('[name=id]').inputValue(),'note');assert.equal(await form.locator('[name=room]').inputValue(),'new-a');
   assert.match(await page.locator('#note2-room-field').textContent(),/노트 A 방 선택/);
   assert.equal(await create.locator('[name=password]').inputValue(),'');assert.equal(await create.locator('[name=confirmation]').inputValue(),'');
-  await list.locator('.room-card').filter({hasText:'legacy-room'}).getByRole('button').click();await settled(page);
+  await list.locator('.room-card').filter({hasText:'legacy-room'}).getByRole('button',{name:'이 방 선택 / 비밀번호 변경',exact:true}).click();await settled(page);
   await credentials(form,'legacy-new-password');page.once('dialog',d=>d.accept());await form.getByRole('button').click();
   await page.waitForFunction(()=>document.querySelector('#note-admin-message').textContent.includes('비밀번호가 변경'));
   assert.deepEqual(calls.filter(c=>c.action==='rotate'),[{action:'rotate',room:'legacy-room',body:{id:'note',room:'legacy-room',password:'legacy-new-password',confirmation:'legacy-new-password',revision:'a-legacy-room'}}]);

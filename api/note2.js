@@ -160,6 +160,26 @@ module.exports = async function handler(req, res) {
       return send(res, 200, await state(room));
     }
 
+    if (action === 'rename-file' && req.method === 'POST') {
+      const id = String(body.id || '');
+      const scope = `id=eq.${encodeURIComponent(id)}&room=eq.${encodeURIComponent(room)}`;
+      const rows = await sb(`/rest/v1/collab_files?${scope}&select=*`);
+      if (!rows.length) return send(res, 404, { ok: false, error: '파일을 찾을 수 없습니다.' });
+      const name = require('../server/note-file-name').renameFileName(body.name, rows[0].name, MAX_NAME);
+      if (name === rows[0].name) return send(res, 200, await state(room));
+      const files = await getFiles(room);
+      if (files.some(f => f.id !== id && f.name === name)) return send(res, 409, { ok: false, error: '이미 같은 이름이 있습니다.' });
+      const current = await getNote(room);
+      await sb(`/rest/v1/collab_files?${scope}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ name }),
+      });
+      await sb(`/rest/v1/collab_notes?room=eq.${encodeURIComponent(room)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ version: Number(current.version || 0) + 1, updated_at: new Date().toISOString(), updated_by: String(body.user || '').slice(0, 50) }),
+      });
+      return send(res, 200, await state(room));
+    }
+
     if (action === 'delete-file' && req.method === 'POST') {
       const id = String(body.id || '');
       const rows = await sb(`/rest/v1/collab_files?id=eq.${encodeURIComponent(id)}&room=eq.${encodeURIComponent(room)}&select=*`);

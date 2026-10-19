@@ -10,5 +10,5 @@ test('Korean admin page offers separate authentication, new password and confirm
  assert.match(html,/Mac mini 로컬 전용/);
  assert.match(html,/Vercel에는 동기화되지 않습니다/);
  assert.doesNotMatch(html,/Mac mini와 Vercel에 함께 적용/);
- assert.match(html,/<script src="note-password-admin.js" defer><\/script>/);
+ assert.match(html,/<script src="note-password-admin\.js\?v=[a-z0-9-]+" defer><\/script>/);
 });
