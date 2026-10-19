@@ -10,7 +10,7 @@
         body {
             font-family: 'Segoe UI', '맑은 고딕', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; display: flex;
+            min-height: 100vh; display: flex; flex-direction: column;
             justify-content: center; align-items: center; padding: 16px;
         }
         .card {
@@ -250,6 +250,7 @@
         <p class="footer">made by jeongik<br>문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
     </div>
 
+    <script src="game-transfer.js?v=game-transfer-v1"></script>
     <script>
         // ---------- 판 구조 ----------
         // 0 = 참먹이(출발·도착), 1~19 = 바깥 둘레(시계 반대 방향), 5 = 모, 10 = 뒷모, 15 = 찌모
@@ -345,6 +346,9 @@
         }
 
         // ---------- 게임 상태 ----------
+        const TRANSFER_SAVE_KEY = 'yut-transfer-save-v1';
+        let importedView = false;
+        let persistTransferredGame = false;
         let G = null;
         const NET = { active: false, roomId: null, playerId: null, playerIndex: null, role: null, canUndo: false, teamCounts: [], spectatorCount: 0, timer: null };
         let HISTORY = [];
@@ -426,6 +430,7 @@
 
         // ---------- 진행 ----------
         async function doThrow() {
+            if (importedView) return;
             if (NET.active) return netThrow();
             if (!G || G.phase !== 'throw' || G.busy) return;
             const game = G;
@@ -456,7 +461,7 @@
 
         function settle() {
             G.selected = null;
-            if (G.winner) { G.phase = 'over'; render(); return; }
+            if (G.winner !== null) { G.phase = 'over'; render(); return; }
             if (G.throwsLeft > 0) { G.phase = 'throw'; render(); return; }
             if (G.pending.length && !allOptions(G.cur).length) {
                 addLog(`움직일 말이 없어서 ${G.pending.map((r) => NAMES[r]).join(', ')}은(는) 버립니다.`);
@@ -485,6 +490,7 @@
         }
 
         async function doMove(opt) {
+            if (importedView) return;
             if (NET.active) return netMove(opt);
             if (G.busy || G.phase !== 'move') return;
             saveLocalHistory();
@@ -609,7 +615,7 @@
 
         function scheduleAi() {
             clearTimeout(aiTimer);
-            if (!G || G.winner !== null || G.busy) return;
+            if (importedView || !G || G.winner !== null || G.busy) return;
             if (!G.players[G.cur].ai) return;
             aiTimer = setTimeout(() => {
                 if (G.phase === 'throw') doThrow();
@@ -673,6 +679,7 @@
             return NET.playerIndex === G.cur;
         }
         function humanTurn() {
+            if (importedView) return false;
             if (!G || G.winner !== null || G.busy) return false;
             if (NET.active && !canControlCurrentTeam()) return false;
             return !G.players[G.cur].ai;
@@ -850,7 +857,7 @@
             }
 
             const undoBtn = document.getElementById('undoBtn');
-            if (undoBtn) undoBtn.disabled = NET.active ? (!NET.canUndo || NET.role === 'spectator') : !HISTORY.length;
+            if (undoBtn) undoBtn.disabled = importedView || (NET.active ? (!NET.canUndo || NET.role === 'spectator') : !HISTORY.length);
 
             const logEl = document.getElementById('log');
             logEl.innerHTML = '';
@@ -863,6 +870,7 @@
 
         function renderStatus() {
             const st = document.getElementById('status');
+            if (importedView) { st.classList.remove('win'); st.textContent = '불러온 기록(오프라인 보기)'; return; }
             st.classList.toggle('win', G.winner !== null);
             const pl = G.players[G.cur];
             const role = NET.role === 'spectator' ? '관전자' : (NET.playerIndex === null ? '공동참여자' : `${G.players[NET.playerIndex]?.name || '?'}팀`);
@@ -881,6 +889,9 @@
             renderPanel();
             renderStatus();
             scheduleAi();
+            if (persistTransferredGame && !G.busy && !NET.active) {
+                try { localStorage.setItem(TRANSFER_SAVE_KEY,JSON.stringify(captureYutTransfer())); } catch (e) { /* 저장 불가 */ }
+            }
         }
 
         // ---------- 온라인 방 ----------
@@ -991,6 +1002,7 @@
             catch (e) { alert(e.message); }
         }
         function undoGame() {
+            if (importedView) return;
             if (NET.active) return netUndo();
             undoLocal();
         }
@@ -1018,6 +1030,7 @@
         countEl.addEventListener('change', renderSetup);
 
         document.getElementById('startBtn').addEventListener('click', () => {
+            importedView = false; persistTransferredGame = false; localStorage.removeItem(TRANSFER_SAVE_KEY);
             NET.active = false; clearInterval(NET.timer);
             const n = +countEl.value, pieces = +piecesEl.value;
             const config = Array.from({ length: n }, (_, i) => ({ ai: saved[i] === 'ai', pieces }));
@@ -1029,6 +1042,8 @@
 
         document.getElementById('newGame').addEventListener('click', async () => {
             if (NET.active) { await netReset(); return; }
+            importedView = false; persistTransferredGame = false; localStorage.removeItem(TRANSFER_SAVE_KEY);
+            document.getElementById('transferExitView').hidden = true;
             clearTimeout(aiTimer);
             G = null;
             document.getElementById('game').hidden = true;
@@ -1043,6 +1058,90 @@
         document.getElementById('throwBtn').addEventListener('click', doThrow);
         document.getElementById('undoBtn').addEventListener('click', undoGame);
         renderSetup();
+
+        // Board data only: never copy NET, server identifiers or player credentials.
+        function validateYutTransfer(raw) {
+            const fail = () => { throw new Error('윷놀이 기록 형식이나 범위가 올바르지 않습니다.'); };
+            const obj = v => { if (!v || typeof v !== 'object' || Array.isArray(v)) fail(); return v; };
+            const num = (v, min, max) => { if (!Number.isInteger(v) || v < min || v > max) fail(); return v; };
+            const bool = v => { if (typeof v !== 'boolean') fail(); return v; };
+            const text = (v, max) => { if (typeof v !== 'string' || v.length > max) fail(); return v; };
+            const array = (v, min, max) => { if (!Array.isArray(v) || v.length < min || v.length > max) fail(); return v; };
+            const game = value => {
+                obj(value);
+                const players = array(value.players,2,4).map(pl => {
+                    obj(pl);
+                    return {ai:bool(pl.ai),pieces:array(pl.pieces,2,4).map(p => {
+                        obj(p);
+                        if (!Object.hasOwn(PATHS,p.path)) fail();
+                        const done = bool(p.done);
+                        const idx = num(p.idx,0,PATHS[p.path].length);
+                        if (done !== (idx === PATHS[p.path].length)) fail();
+                        if (!done && p.path !== 'OUT' && idx === 0) fail();
+                        return {path:p.path,idx,done};
+                    })};
+                });
+                if (!['throw','move','over'].includes(value.phase)) fail();
+                const winner = value.winner === null ? null : num(value.winner,0,players.length-1);
+                if ((value.phase === 'over') !== (winner !== null)) fail();
+                const cur=num(value.cur,0,players.length-1),throwsLeft=num(value.throwsLeft,0,100);
+                const pending=array(value.pending,0,100).map(r => { if (![-1,1,2,3,4,5].includes(r)) fail(); return r; });
+                if (value.phase==='throw' && throwsLeft<1) fail();
+                if (value.phase==='move' && (throwsLeft!==0 || !pending.length || !players[cur].pieces.some(p=>pending.some(r=>simulate(p,r))))) fail();
+                if (players.some((pl,i)=>pl.pieces.every(p=>p.done) !== (i===winner))) fail();
+                if (winner!==null && winner!==cur) fail();
+                return {players,cur,phase:value.phase,pending,throwsLeft,winner,
+                    log:array(value.log,0,30).map(v=>text(v,500)),
+                    faces:value.faces === null ? null : array(value.faces,4,4).map(bool),lastResult:text(value.lastResult,100)};
+            };
+            obj(raw); const settings = obj(raw.settings);
+            if (!['local','offline-view'].includes(raw.mode)) fail();
+            const normalized = {mode:raw.mode, game:raw.game === null ? null : game(raw.game),
+                history:array(raw.history,0,30).map(game), settings:{count:num(settings.count,2,4),pieces:num(settings.pieces,2,4),
+                    players:array(settings.players,4,4).map(v=>{if (!['human','ai'].includes(v)) fail(); return v;})}};
+            return normalized;
+        }
+        function boardSnapshot(value) {
+            if (!value) return null;
+            return {players:value.players.map(pl=>({ai:pl.ai,pieces:pl.pieces.map(p=>({path:p.path,idx:p.idx,done:p.done}))})),
+                cur:value.cur,phase:value.phase,pending:[...value.pending],throwsLeft:value.throwsLeft,winner:value.winner,
+                log:[...value.log],faces:value.faces && [...value.faces],lastResult:value.lastResult};
+        }
+        function captureYutTransfer() {
+            if (G && G.busy) throw new Error('윷 던지기나 말 이동이 끝난 뒤 저장하세요.');
+            return validateYutTransfer({mode:NET.active || importedView ? 'offline-view' : 'local',game:boardSnapshot(G),
+                history:NET.active ? [] : HISTORY.map(boardSnapshot),settings:{count:+countEl.value,pieces:+piecesEl.value,players:[...saved]}});
+        }
+        function restoreYutTransfer(raw) {
+            if (NET.active) throw new Error('온라인 방에서 나간 뒤 불러오세요.');
+            const data = validateYutTransfer(raw);
+            window.GameTransfer.persist({[TRANSFER_SAVE_KEY]:JSON.stringify(data)});
+            clearTimeout(aiTimer); clearInterval(NET.timer);
+            importedView = data.mode === 'offline-view'; persistTransferredGame = true;
+            countEl.value = String(data.settings.count); piecesEl.value = String(data.settings.pieces);
+            saved.splice(0,4,...data.settings.players); renderSetup();
+            const hydrate = game => game && ({...game,players:game.players.map((pl,i)=>({...pl,...PLAYER_DEFS[i]})),selected:null,busy:false});
+            G = hydrate(data.game); HISTORY = data.history.map(hydrate);
+            document.getElementById('setup').hidden = !!G;
+            document.getElementById('game').hidden = !G;
+            document.getElementById('transferExitView').hidden = !importedView;
+            if (G) { drawBoardBase(document.getElementById('board')); render(); }
+        }
+        window.GameTransfer.mount({gameId:'yut',title:'윷놀이',capture:captureYutTransfer,validate:validateYutTransfer,
+            restore:restoreYutTransfer,canImport:()=>NET.active ? '온라인 방에서 나간 뒤 불러오세요.' : true});
+        const exitView = document.createElement('button');
+        exitView.id = 'transferExitView'; exitView.type = 'button'; exitView.hidden = true;
+        exitView.textContent = '불러온 기록 닫기 · 처음 화면';
+        exitView.addEventListener('click', () => {
+            clearTimeout(aiTimer); importedView = false; persistTransferredGame = false;
+            localStorage.removeItem(TRANSFER_SAVE_KEY); G = null; HISTORY = [];
+            document.getElementById('game').hidden = true; document.getElementById('setup').hidden = false;
+            document.getElementById('status').textContent = '인원과 말 수를 정하고 시작하세요';
+            exitView.hidden = true;
+        });
+        (document.getElementById('game-transfer-panel') || document.querySelector('.card')).append(exitView);
+        try { const savedTransfer = localStorage.getItem(TRANSFER_SAVE_KEY); if (savedTransfer) restoreYutTransfer(JSON.parse(savedTransfer)); }
+        catch (e) { /* 손상된 로컬 기록은 적용하지 않음 */ }
     </script>
 </body>
 </html>

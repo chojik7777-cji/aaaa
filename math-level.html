@@ -168,6 +168,7 @@
     </div>
 </div>
 
+<script src="game-transfer.js?v=game-transfer-v1"></script>
 <script>
 'use strict';
 const SAVE_KEY = 'math-level-game-v1';
@@ -379,9 +380,9 @@ function startGame(level = Number($('startLevel').value)) {
 function resumeGame() {
     $('setupPanel').hidden = true;
     $('gamePanel').hidden = false;
-    nextProblem();
+    nextProblem(true);
 }
-function nextProblem() {
+function nextProblem(preserveLevel = false) {
     if (nextTimer) { clearTimeout(nextTimer); nextTimer = null; }
     if (shouldShowQuestionLimitLock()) {
         showQuestionLimitLock();
@@ -390,7 +391,7 @@ function nextProblem() {
     paused = false;
     pausedTotal = 0;
     pauseStarted = 0;
-    current = generateProblem(chooseNextLevel());
+    current = generateProblem(preserveLevel ? state.nextLevel : chooseNextLevel());
     startedAt = Date.now();
     $('problemNo').textContent = `${state.asked + 1}번째 문제`;
     const topicPart = current.type === current.meta.topic ? '' : ` · ${current.type}`;
@@ -568,6 +569,7 @@ function render() {
     document.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('on', Number(b.dataset.level) === Number($('startLevel').value)));
     renderHistory();
 }
+function escapeTransferText(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function renderHistory() {
     const recent = state.history.slice(-20);
     $('historyChart').innerHTML = recent.length ? recent.map(h => `<div class="bar ${h.correct ? 'ok' : ''}" data-lv="${h.level}" title="Lv.${h.level} ${h.correct ? '정답' : '오답'} · ${h.seconds}초" style="height:${12 + h.level * 5}px"></div>`).join('') : '<span style="grid-column:1/-1;text-align:center;color:#a0aec0;font-size:13px">풀이 기록이 여기에 표시됩니다.</span>';
@@ -576,7 +578,7 @@ function renderHistory() {
     const conf = confidencePercent();
     const band = curriculumLabel(state.theta);
     $('analysisText').innerHTML = `현재 추정치는 <b>Lv.${state.theta.toFixed(1)}</b> (${band})입니다. 수렴도는 <b>${conf}%</b>이고, 다음 문제는 <b>${curriculumLabel(state.nextLevel)}</b> 근처로 출제됩니다.`;
-    $('log').innerHTML = state.history.slice(-8).reverse().map(h => `<div>${h.correct ? '✅' : '❌'} ${curriculumLabel(h.level)} · ${h.q} = ${fmt(h.answer)} · ${h.seconds}초 · 추정 Lv.${h.theta}</div>`).join('');
+    $('log').innerHTML = state.history.slice(-8).reverse().map(h => `<div>${h.correct ? '✅' : '❌'} ${curriculumLabel(h.level)} · ${escapeTransferText(h.q)} = ${fmt(h.answer)} · ${h.seconds}초 · 추정 Lv.${h.theta}</div>`).join('');
 }
 function buildControls() {
     $('levelButtons').innerHTML = Array.from({ length: MAX_LEVEL }, (_, i) => `<button type="button" data-level="${i + 1}" title="${CURRICULUM[i].grade} · ${CURRICULUM[i].topic}">Lv.${i + 1}<br><small>${CURRICULUM[i].grade}</small></button>`).join('');
@@ -617,9 +619,50 @@ $('resetBtn').addEventListener('click', () => {
 setInterval(() => { if (current && !$('gamePanel').hidden) render(); }, 1000);
 setInterval(pollMathControl, 5000);
 buildControls();
-if (state.asked > 0) { $('startLevel').value = String(clamp(Math.round(state.theta), MIN_LEVEL, MAX_LEVEL)); resumeGame(); }
+if (state.asked > 0) $('startLevel').value = String(clamp(Math.round(state.theta), MIN_LEVEL, MAX_LEVEL));
+try { const level = Number(localStorage.getItem('math-level-start-v1')); if (Number.isInteger(level) && level >= 1 && level <= 18) $('startLevel').value = String(level); } catch (e) { /* 기본 설정 */ }
+if (state.asked > 0) { resumeGame(); }
 else render();
 pollMathControl();
+
+// Only educational data crosses the transfer boundary. Server grants stay in memory.
+function validateMathTransfer(raw) {
+    const fail = () => { throw new Error('수학게임 기록 형식이나 범위가 올바르지 않습니다.'); };
+    const obj = v => { if (!v || typeof v !== 'object' || Array.isArray(v)) fail(); return v; };
+    const num = (v, min, max, integer = false) => {
+        if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max || (integer && !Number.isInteger(v))) fail();
+        return v;
+    };
+    obj(raw); const p = obj(raw.progress);
+    const asked = num(p.asked, 0, 1000000, true);
+    if (!Array.isArray(p.history) || p.history.length > 80 || p.history.length > asked) fail();
+    const history = p.history.map(h => {
+        obj(h);
+        if (typeof h.q !== 'string' || h.q.length > 500 || typeof h.correct !== 'boolean') fail();
+        return {q:h.q, answer:num(h.answer,-1e12,1e12), level:num(h.level,1,18,true), correct:h.correct,
+            seconds:num(h.seconds,1,100000000,true), theta:num(h.theta,1,18), expected:num(h.expected,0,100)};
+    });
+    return {progress:{theta:num(p.theta,1,18), nextLevel:num(p.nextLevel,1,18,true), asked,
+        correct:num(p.correct,0,asked,true), streak:num(p.streak,-asked,asked,true),
+        uncertainty:num(p.uncertainty,0.45,3.2),history}, startLevel:num(raw.startLevel,1,18,true)};
+}
+window.GameTransfer.mount({
+    gameId:'math-level', title:'수학게임',
+    capture:() => validateMathTransfer({progress:state,startLevel:Number($('startLevel').value)}),
+    validate:validateMathTransfer,
+    canImport:() => true,
+    restore:raw => {
+        const data = validateMathTransfer(raw);
+        // Importing an older backup must not refund questions already consumed here.
+        data.progress.asked = Math.max(state.asked, data.progress.asked);
+        window.GameTransfer.persist({[SAVE_KEY]:JSON.stringify(data.progress),'math-level-start-v1':String(data.startLevel)});
+        state = data.progress;
+        $('startLevel').value = String(data.startLevel);
+        goMenu();
+        if (state.asked > 0) resumeGame();
+        if (centralLocked || limitLocked) document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn').forEach(b => { b.disabled = true; });
+    }
+});
 </script>
 </body>
 </html>

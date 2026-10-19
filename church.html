@@ -214,6 +214,7 @@
 <div class="selbar" id="selBar" hidden></div>
 <div class="modal-bg" id="modalBg" hidden><div class="modal" id="modal"></div></div>
 
+<script src="game-transfer.js?v=game-transfer-v1"></script>
 <script>
 'use strict';
 
@@ -468,7 +469,12 @@ function load() {
         const raw = localStorage.getItem(SAVE_KEY);
         if (raw) {
             const s = JSON.parse(raw);
-            if (s && Array.isArray(s.students)) { nextStudentId = s.nextId || 100; return Object.assign(newState(), s, { students: s.students }); }
+            if (s && Array.isArray(s.students)) {
+                const loaded = Object.assign(newState(), s, { students: s.students });
+                nextStudentId = Math.max(s.nextId || 1, ...s.students.map(st => (Number(st.id) || 0) + 1));
+                loaded.nextId = nextStudentId;
+                return loaded;
+            }
         }
     } catch (e) { /* 저장소 사용 불가 */ }
     return newState();
@@ -698,7 +704,13 @@ const Sound = (() => {
     }
     function toggleSfx() { pref.sfx = !pref.sfx; savePref(); init(); renderButtons(); play('click'); }
 
-    return { init, play, setIntensity, toggleMusic, toggleSfx, renderButtons };
+    function capturePref() { return { music: !!pref.music, sfx: !!pref.sfx }; }
+    function restorePref(value) {
+        stopMusic(); pref.music = value.music; pref.sfx = value.sfx;
+        savePref(); renderButtons();
+        if (pref.music && ctx) startMusic();
+    }
+    return { init, play, setIntensity, toggleMusic, toggleSfx, renderButtons, capturePref, restorePref };
 })();
 
 // ===== 교육관 예배실 장면 (캔버스 애니메이션) =====
@@ -1237,7 +1249,10 @@ function startWeek() {
     Scene.setWeekday(VERSES[(S.week - 1) % VERSES.length]);
     Sound.setIntensity(1);
     renderWeek();
-    if (S.week === MEETING_WEEK && !S.meetingDone) setTimeout(showMeeting, 300);
+    if (S.week === MEETING_WEEK && !S.meetingDone) {
+        const scheduledState = S;
+        setTimeout(() => { if (S === scheduledState && !S.meetingDone && !SUN) showMeeting(); }, 300);
+    }
     if (S.energy < 25) toast('😮‍💨 선생님이 많이 지쳤어요. 이번 주 행동이 줄어요. 기도와 쉼이 필요해요.', 'bad', 3200);
 }
 
@@ -1739,6 +1754,60 @@ Sound.renderButtons();
 applyDeptName();
 if (S.over) { renderStats(); Scene.setWeekday(''); showEnding(); } else startWeek();
 requestAnimationFrame(frame);
+
+// 게임 전용 데이터만 공유 전송 패널에 전달합니다 (인증 저장소는 읽지 않음).
+function validateTransfer(raw) {
+    const fail = () => { throw new Error('가져올 교회학교 데이터의 형식이나 값이 올바르지 않습니다.'); };
+    const num = (lo, hi, integer = false) => v => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi && (!integer || Number.isInteger(v)) ? v : fail();
+    const bool = v => typeof v === 'boolean' ? v : fail();
+    const text = max => v => typeof v === 'string' && v.length > 0 && v.length <= max && !/[<>"'`&\u0000-\u001f\u007f]/.test(v) ? v : fail();
+    const choice = values => v => values.includes(v) ? v : fail();
+    const nullable = check => v => v === null ? null : check(v);
+    const array = (check, max) => v => Array.isArray(v) && v.length <= max ? v.map(check) : fail();
+    const object = schema => v => {
+        if (!v || typeof v !== 'object' || Array.isArray(v)) return fail();
+        const out = {};
+        for (const [key, check] of Object.entries(schema)) out[key] = check(v[key]);
+        return out;
+    };
+    const optional = (check, fallback) => v => v === undefined ? fallback : check(v);
+    const id = num(1, 1000000, true), count = num(0, 1000000, true), percent = num(0, 100);
+    const color = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : fail();
+    const look = object({ skin: color, hair: color, style: num(0, 3, true), top: choice(TOPS_P), shirt: color, shirt2: color,
+        short: bool, pants: color, shoes: color, scarf: nullable(color), bag: nullable(color), h: num(0.8, 1.2) });
+    const studentData = object({ id, name: text(24), grade: choice(GRADES), trait: choice(TRAITS.map(t => t.key)),
+        bond: percent, faith: percent, issue: nullable(object({ type: choice(Object.keys(ISSUES)), weeks: num(0, 12, true), known: bool })),
+        birthday: num(1, TOTAL_WEEKS, true), absent: count, attended: count, isNew: bool, look });
+    const student = value => { const data=studentData(value); if(value.bdayDone!==undefined)data.bdayDone=bool(value.bdayDone); return data; };
+    const state = object({ week: num(1, TOTAL_WEEKS, true), energy: percent, budget: num(-1e12, 1e12), atmos: percent,
+        ap: num(0, 5, true), apMax: num(3, 5, true), lesson: percent, worship: percent, snack: bool, invite: num(0, 2, true), retreatPrep: percent,
+        focus: nullable(choice(['attend', 'word', 'relation'])), meetingDone: bool,
+        students: array(student, 500), history: array(object({ week: num(1, TOTAL_WEEKS, true), att: num(0, 500, true), total: num(0, 500, true), retreat: bool }), TOTAL_WEEKS),
+        newFriends: count, nextId: id, weekStarted: bool, over: bool, usedQ: optional(array(num(0, QUESTIONS.length - 1, true), QUESTIONS.length), []) })(raw?.state);
+    const ids = state.students.map(s => s.id);
+    if (new Set(ids).size !== ids.length || state.nextId <= Math.max(0, ...ids) || state.ap > state.apMax) return fail();
+    return object({ state: () => state, name: text(NAME_MAX), audio: object({ music: bool, sfx: bool }) })(raw);
+}
+function canImportTransfer() {
+    if (SUN) return '주일 예배가 진행 중입니다. 예배와 결산을 마친 뒤 가져오세요.';
+    if (!$('modalBg').hidden && !S.over) return '열려 있는 대화를 마친 뒤 가져오세요.';
+    return true;
+}
+window.GameTransfer?.mount({
+    gameId: 'church', title: '교회학교 운영 게임',
+    capture: () => validateTransfer({ state: SUN ? JSON.parse(localStorage.getItem(SAVE_KEY)) : { ...S, nextId: nextStudentId }, name: deptName, audio: Sound.capturePref() }),
+    validate: validateTransfer,
+    canImport: canImportTransfer,
+    restore(raw) {
+        const allowed = canImportTransfer();
+        if (allowed !== true) throw new Error(allowed);
+        const data = validateTransfer(raw);
+        window.GameTransfer.persist({[SAVE_KEY]:JSON.stringify(data.state),[NAME_KEY]:data.name,'church-game-audio-v1':JSON.stringify(data.audio)});
+        S = data.state; nextStudentId = S.nextId; selected = null; SUN = null;
+        deptName = data.name; applyDeptName(); Sound.restorePref(data.audio); closeModal();
+        if (S.over) { renderStats(); Scene.setWeekday(''); showEnding(); } else startWeek();
+    },
+});
 </script>
 </body>
 </html>

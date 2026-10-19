@@ -10,7 +10,7 @@
         body {
             font-family: 'Segoe UI', '맑은 고딕', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; display: flex;
+            min-height: 100vh; display: flex; flex-direction: column;
             justify-content: center; align-items: center; padding: 16px;
         }
         .card {
@@ -139,6 +139,7 @@
         <p class="footer">made by jeongik<br>문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
     </div>
 
+    <script src="game-transfer.js?v=game-transfer-v1"></script>
     <script>
         // =====================================================================
         // 오목 엔진 (Web Worker 안에서도 돌 수 있도록 외부 변수를 쓰지 않는다)
@@ -770,6 +771,11 @@
             worker = null;
         }
 
+        const aiTimers = new Set();
+        function aiTimeout(fn, delay) {
+            const id=setTimeout(()=>{aiTimers.delete(id);fn();},delay);
+            aiTimers.add(id); return id;
+        }
         function requestAi() {
             const id = ++reqId;
             const cells = board.flat();
@@ -777,13 +783,13 @@
             const started = Date.now();
             const deliver = (move) => {
                 // 너무 빨리 두면 어색하니 최소 0.35초는 기다린다
-                setTimeout(() => onAiMove(id, move), Math.max(0, 350 - (Date.now() - started)));
+                aiTimeout(() => onAiMove(id, move), Math.max(0, 350 - (Date.now() - started)));
             };
             if (worker) {
                 pendingDelivery = { id, deliver };
                 worker.postMessage({ id, cells, me, level, renju });
             } else {
-                setTimeout(() => {
+                aiTimeout(() => {
                     engine = engine || createEngine();
                     deliver(engine.think(cells, me, level, renju));
                 }, 30);
@@ -1072,6 +1078,9 @@
                 : `전적 — 흑 ${tally.a} : ${tally.b} 백`;
             onlineInfoEl.textContent = net && NET.roomId ? `방 코드: ${NET.roomId} · 공동참여자 ${NET.guestCount || 0}명 · 다른 폰도 같은 주소에서 방 입장` : '';
             undoBtn.disabled = net || thinking || !moves.length;
+            if (!NET.active && !net) {
+                try { localStorage.setItem(TRANSFER_KEY,JSON.stringify(captureTransfer())); } catch(e) { /* 저장 공간 부족 */ }
+            }
             draw();
         }
 
@@ -1104,8 +1113,60 @@
             el.addEventListener('change', () => { if (!isNet()) { clearInterval(NET.timer); NET.active = false; NET.roomId = NET.playerId = null; NET.playerIndex = null; NET.guestCount = 0; } resetTally(); resetGame(); });
         window.addEventListener('resize', resize);
 
+        // 파일에는 오프라인 대국 정보만 담는다. 온라인 판도 2인 대국으로 복원한다.
+        const TRANSFER_KEY = 'omok-save-v1';
+        function captureTransfer() {
+            return { size: SIZE, board: board.map(row => row.slice()), moves: moves.map(({x,y}) => ({x,y})),
+                turn, winner, mode: isNet() ? 'pvp' : modeEl.value, rule: ruleEl.value,
+                level: +levelEl.value, human: human(), tally: {a:tally.a,b:tally.b} };
+        }
+        function validateTransfer(s) {
+            if (!s || s.size !== SIZE || !Array.isArray(s.board) || s.board.length !== SIZE ||
+                s.board.some(row => !Array.isArray(row) || row.length !== SIZE || row.some(v => ![0,1,2].includes(v))) ||
+                !Array.isArray(s.moves) || s.moves.length > SIZE*SIZE || !['ai','pvp'].includes(s.mode) ||
+                !['free','renju'].includes(s.rule) || !Number.isInteger(s.level) || s.level < 1 || s.level > 5 ||
+                ![1,2].includes(s.human)) throw new Error('오목 저장 데이터의 판이나 설정이 올바르지 않습니다.');
+            const fail = () => { throw new Error('오목 수순과 판·차례·승패가 일치하지 않습니다.'); };
+            if (!s.tally || ![s.tally.a,s.tally.b].every(v=>Number.isSafeInteger(v)&&v>=0)) fail();
+            const replay=Array.from({length:SIZE},()=>Array(SIZE).fill(0));
+            let next=1, won=null;
+            for(const m of s.moves) {
+                if(won || !m || !Number.isInteger(m.x) || !Number.isInteger(m.y) || !inBounds(m.x,m.y) || replay[m.y][m.x]) fail();
+                replay[m.y][m.x]=next;
+                for(const [dx,dy] of DIRS) {
+                    let count=1;
+                    for(const sign of [-1,1]) { let x=m.x+dx*sign,y=m.y+dy*sign;
+                        while(inBounds(x,y)&&replay[y][x]===next) {count++;x+=dx*sign;y+=dy*sign;} }
+                    if(s.rule==='renju'&&next===1 ? count===5 : count>=5) won=next;
+                }
+                if(!won && s.moves.length===SIZE*SIZE && m===s.moves.at(-1)) won='draw';
+                if(!won) next=3-next;
+            }
+            if(JSON.stringify(replay)!==JSON.stringify(s.board) || next!==s.turn || won!==s.winner) fail();
+            return { size: SIZE, board: s.board.map(row=>row.slice()), moves: s.moves.map(m=>({x:m.x,y:m.y})),
+                turn:s.turn, winner:s.winner, mode:s.mode, rule:s.rule, level:s.level, human:s.human,
+                tally:{a:s.tally.a,b:s.tally.b} };
+        }
+        function restoreTransfer(s) {
+            if (NET.active) throw new Error('온라인 방을 먼저 나간 뒤 불러오세요.');
+            s=validateTransfer(s);
+            window.GameTransfer.persist({[TRANSFER_KEY]:JSON.stringify(s)});
+            for(const id of aiTimers) clearTimeout(id); aiTimers.clear();
+            reqId++; pendingDelivery = null; clearTimeout(noticeTimer); notice = ''; thinking = false;
+            clearInterval(NET.timer); NET.roomId = NET.playerId = null; NET.playerIndex = null; NET.guestCount = 0;
+            modeEl.value=s.mode; ruleEl.value=s.rule; levelEl.value=String(s.level); sideEl.value=String(s.human);
+            board=s.board.map(row=>row.slice()); moves=s.moves.map(m=>({...m})); turn=s.turn; winner=s.winner;
+            tally={...s.tally}; winLine=moves.length && winner && winner!=='draw' ? findWin(moves.at(-1).x,moves.at(-1).y) : null;
+            update(); resize();
+            maybeAiTurn(); // 새 요청 번호만 허용: 이전 워커 응답은 무시한다.
+        }
+        let savedTransfer = null;
+        try { savedTransfer=JSON.parse(localStorage.getItem(TRANSFER_KEY)); } catch(e) { /* 저장 없음 */ }
         resetGame();
         resize();
+        try { if(savedTransfer) restoreTransfer(validateTransfer(savedTransfer)); } catch(e) { /* 기존 판 유지 */ }
+        window.GameTransfer.mount({gameId:'omok',title:'오목',capture:captureTransfer,validate:validateTransfer,
+            restore:restoreTransfer,canImport:()=>NET.active ? '온라인 방을 먼저 나간 뒤 불러오세요. 온라인 판은 오프라인 2인 대국으로 저장됩니다.' : true});
     </script>
 </body>
 </html>

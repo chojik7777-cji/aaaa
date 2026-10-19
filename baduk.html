@@ -10,8 +10,8 @@
         body {
             font-family: 'Segoe UI', '맑은 고딕', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; display: flex;
-            justify-content: center; align-items: flex-start; padding: 16px;
+            min-height: 100vh; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 16px;
             color: #2d3748;
         }
         .card {
@@ -212,6 +212,7 @@
 
 <div class="modal-bg" id="modalBg" hidden><div class="modal" id="modal"></div></div>
 
+<script src="game-transfer.js?v=game-transfer-v1"></script>
 <script>
 'use strict';
 
@@ -481,7 +482,7 @@ const Snd = (() => {
     }
     function toggle() { on = !on; try { localStorage.setItem('baduk-sound', on ? 'on' : 'off'); } catch (e) { /* 무시 */ } init(); render(); }
     function render() { $('soundBtn').textContent = on ? '🔊 소리 켜짐' : '🔇 소리 꺼짐'; }
-    return { init, play, toggle, render };
+    return { init, play, toggle, render, setEnabled(value) { on = value; render(); } };
 })();
 
 // ===== 게임 상태 =====
@@ -493,6 +494,12 @@ let estimate = null;     // 형세 판단 결과
 let pendingTap = -1;     // 휴대폰 두 번 눌러 착수
 let hover = -1;
 let aiBusy = false;
+// 가져오기는 AI·계가·형세 판단의 이전 예약 작업을 모두 취소한다.
+const gameTimers = new Set();
+function gameTimeout(fn, delay) {
+    const id = setTimeout(() => { gameTimers.delete(id); fn(); }, delay);
+    gameTimers.add(id); return id;
+}
 
 function newGame(opts) {
     setupGeometry(opts.size);
@@ -557,7 +564,7 @@ function maybeAI() {
     $('thinking').textContent = cvc ? `🤖 ${colorName(G.toMove)}(${cvcLevel(G.toMove)}단계) 생각 중…` : '🤔 컴퓨터가 생각 중…';
     $('thinking').hidden = false;
     renderButtons();
-    setTimeout(() => {
+    gameTimeout(() => {
         if (game !== G || (cvc && G.paused)) { // 새 대국으로 바뀌었거나 일시정지됨
             aiBusy = false; $('thinking').hidden = true; renderButtons();
             if (game !== G) maybeAI(); // 새 대국이 컴퓨터 차례면 이어서
@@ -596,7 +603,7 @@ function undo() {
 function startScoring() {
     G.phase = 'score';
     $('thinking').hidden = false; $('thinking').textContent = '🧮 죽은 돌을 판단하는 중…';
-    setTimeout(() => {
+    gameTimeout(() => {
         const est = estimateOwnership(N === 19 ? 1200 : 700);
         G.dead = new Uint8Array(N * N);
         const seen = new Uint8Array(N * N);
@@ -615,7 +622,7 @@ function startScoring() {
         if (G.mode === 'cvc') {
             toastHint('관전 대국 종료! 죽은 돌(✕)과 집을 표시했어요. 잠시 후 계가 결과를 보여줘요.');
             const game = G;
-            setTimeout(() => { if (G === game && G.phase === 'score') finish(); }, 2200);
+            gameTimeout(() => { if (G === game && G.phase === 'score') finish(); }, 2200);
         } else {
             toastHint('대국 종료! 컴퓨터가 죽은 돌(✕)을 추측했어요. 틀렸다면 돌을 눌러 바꾼 뒤 <b>계가 확정</b>을 눌러요.');
         }
@@ -863,7 +870,7 @@ $('resignBtn').addEventListener('click', () => {
 $('estBtn').addEventListener('click', () => {
     if (estimate) { estimate = null; render(); toastHint(''); return; }
     $('thinking').hidden = false; $('thinking').textContent = '📊 형세를 판단하는 중…';
-    setTimeout(() => {
+    gameTimeout(() => {
         estimate = estimateOwnership(N === 19 ? 1000 : 600);
         $('thinking').hidden = true; $('thinking').textContent = '🤔 컴퓨터가 생각 중…';
         // 어느 한쪽이 가질 가능성이 높은 점(돌 + 빈 곳)만 세서 비교 (덤 반영)
@@ -1006,7 +1013,7 @@ function save() {
     try {
         localStorage.setItem(SAVE_KEY, JSON.stringify({
             size: G.size, mode: G.mode === 'net' ? 'pvp' : G.mode, level: G.level, levelB: G.levelB, levelW: G.levelW, human: G.human, komi: G.komi, moves: G.moves,
-            phase: G.phase, dead: G.dead ? Array.from(G.dead) : null, result: G.result,
+            phase: G.phase, dead: G.dead ? Array.from(G.dead) : null, result: G.result, passes: G.passes,
         }));
     } catch (e) { /* 무시 */ }
 }
@@ -1016,6 +1023,7 @@ function load() {
     if (!s || ![9, 13, 19].includes(s.size)) return false;
     newGameSilent(s);
     for (const p of s.moves) { if (!doMove(p, true)) break; }
+    if (Number.isInteger(s.passes) && s.passes >= 0 && s.passes <= s.moves.length) G.passes = s.passes;
     if (s.phase === 'score' || s.phase === 'end') {
         G.phase = s.phase; G.dead = s.dead ? Uint8Array.from(s.dead) : new Uint8Array(N * N); G.result = s.result;
         if (s.phase === 'score') { $('playActions').hidden = true; $('scoreActions').hidden = false; }
@@ -1034,11 +1042,74 @@ function newGameSilent(s) {
           caps: { 1: 0, 2: 0 }, moves: [], history: [], passes: 0, phase: 'play', last: -1, dead: null, result: null };
 }
 
+function captureTransfer() {
+    return {size:G.size,mode:G.mode==='net'?'pvp':G.mode,level:G.level||2,levelB:G.levelB||G.level||2,levelW:G.levelW||G.level||2,
+        human:G.human||1,komi:G.komi,board:Array.from(G.b),moves:G.moves.slice(),toMove:G.toMove,ko:G.ko,
+        caps:{1:G.caps[1],2:G.caps[2]},passes:G.passes,last:G.last,phase:G.phase,
+        dead:G.dead?Array.from(G.dead):(G.phase==='score'?Array(G.size*G.size).fill(0):null),result:G.result,paused:G.mode==='cvc'?true:false,
+        sound:localStorage.getItem('baduk-sound')!=='off',speed:Number($('speed').value)};
+}
+function validateTransfer(s) {
+    if (!s || ![9,13,19].includes(s.size) || !Array.isArray(s.board) || s.board.length!==s.size*s.size ||
+        s.board.some(v=>![0,1,2].includes(v)) || !Array.isArray(s.moves) || s.moves.length>10000 ||
+        !['ai','pvp','cvc'].includes(s.mode)) throw new Error('바둑 저장 데이터의 판이나 설정이 올바르지 않습니다.');
+    const fail=()=>{throw new Error('바둑 수순과 판·설정이 일치하지 않습니다.');};
+    if(![s.level,s.levelB,s.levelW].every(v=>Number.isInteger(v)&&v>=1&&v<=4) || ![1,2].includes(s.human) ||
+       ![0.5,6.5,7.5].includes(s.komi) || !['play','score','end'].includes(s.phase) || typeof s.sound!=='boolean' ||
+       ![120,600,1600].includes(s.speed) || !s.caps || ![s.caps[1],s.caps[2]].every(v=>Number.isSafeInteger(v)&&v>=0) ||
+       !(s.result===null || (typeof s.result==='string' && /^(흑|백) (불계승|\d+(?:\.\d+)?집 승)$/.test(s.result))) ||
+       (s.phase==='end' ? s.result===null : s.result!==null) ||
+       !(s.dead===null || (Array.isArray(s.dead)&&s.dead.length===s.size*s.size&&s.dead.every(v=>v===0||v===1)))) fail();
+    // 별도의 판에서 검증한다. 실패해도 현재 판의 크기·착수·저장 데이터는 바뀌지 않는다.
+    const n=s.size,b=Array(n*n).fill(0),caps={1:0,2:0}; let turn=1,ko=-1,passes=0,last=-1;
+    const neighbors=p=>{const a=[];if(p%n)a.push(p-1);if(p%n<n-1)a.push(p+1);if(p>=n)a.push(p-n);if(p<n*(n-1))a.push(p+n);return a;};
+    const chain=p=>{const stones=[p],seen=new Set(stones),libs=new Set();for(let i=0;i<stones.length;i++)for(const q of neighbors(stones[i])) {
+        if(!b[q])libs.add(q);else if(b[q]===b[p]&&!seen.has(q)){seen.add(q);stones.push(q);}}
+        return {stones,libs:libs.size};};
+    for(const p of s.moves) {
+        if(!Number.isInteger(p)||p< -1||p>=n*n) fail();
+        if(p===-1){passes++;ko=-1;last=-1;turn=3-turn;continue;}
+        if(b[p]||p===ko)fail(); b[p]=turn; const taken=[];
+        for(const q of neighbors(p))if(b[q]===3-turn){const g=chain(q);if(!g.libs)for(const r of g.stones){b[r]=0;taken.push(r);}}
+        const own=chain(p);if(!own.libs)fail();caps[turn]+=taken.length;
+        ko=taken.length===1&&own.stones.length===1&&own.libs===1?taken[0]:-1;
+        last=p;passes=0;turn=3-turn;
+    }
+    if(JSON.stringify(b)!==JSON.stringify(s.board)||s.toMove!==turn||s.ko!==ko||s.last!==last||
+       s.caps[1]!==caps[1]||s.caps[2]!==caps[2]||!Number.isInteger(s.passes)||s.passes<0||s.passes>10000||
+       !(s.passes===passes || (s.phase==='play'&&s.passes===0) || (s.mode==='cvc'&&s.passes===2&&s.moves.length>=n*n*3)))fail();
+    if(s.phase==='play'&&s.dead!==null)fail();
+    return {size:s.size,mode:s.mode,level:s.level,levelB:s.levelB,levelW:s.levelW,human:s.human,komi:s.komi,
+        board:s.board.slice(),moves:s.moves.slice(),toMove:s.toMove,ko:s.ko,caps:{1:s.caps[1],2:s.caps[2]},
+        passes:s.passes,last:s.last,phase:s.phase,dead:s.dead?s.dead.slice():null,result:s.result,
+        paused:s.mode==='cvc',sound:s.sound,speed:s.speed};
+}
+function restoreTransfer(s) {
+    if (NET.active) throw new Error('온라인 방을 먼저 나간 뒤 불러오세요.');
+    s=validateTransfer(s);
+    const stored={size:s.size,mode:s.mode,level:s.level,levelB:s.levelB,levelW:s.levelW,human:s.human,komi:s.komi,
+        moves:s.moves,phase:s.phase,dead:s.dead,result:s.result,passes:s.passes};
+    window.GameTransfer.persist({[SAVE_KEY]:JSON.stringify(stored),'baduk-speed':String(s.speed),'baduk-sound':s.sound?'on':'off'});
+    for(const id of gameTimers) clearTimeout(id); gameTimers.clear();
+    clearInterval(NET.timer); NET.roomId=NET.playerId=null; NET.playerIndex=null; NET.guestCount=0;
+    newGameSilent(s);
+    for(const p of s.moves) doMove(p,true);
+    G.passes=s.passes;
+    G.phase=s.phase; G.dead=s.dead?Uint8Array.from(s.dead):null; G.result=s.result; G.paused=s.mode==='cvc';
+    estimate=null; pendingTap=hover=-1; aiBusy=false; $('thinking').hidden=true; $('modalBg').hidden=true;
+    $('mode').value=s.mode; $('size').value=String(s.size); $('side').value=String(s.human); $('komi').value=String(s.komi);
+    $('level').value=String(s.mode==='cvc'?s.levelB:s.level); $('levelW').value=String(s.levelW); $('speed').value=String(s.speed);
+    Snd.setEnabled(s.sound); syncControls(); hideScoreUI();
+    if(G.phase==='score') { $('playActions').hidden=true; $('scoreActions').hidden=false; }
+    save(); render(); maybeAI(); // 관전은 일시정지, 사람 대 AI는 새 대국 객체에서만 재개한다.
+}
 Snd.render();
 syncControls();
 if (!load()) startNew();
 else maybeAI();
 window.addEventListener('resize', render);
+window.GameTransfer.mount({gameId:'baduk',title:'바둑',capture:captureTransfer,validate:validateTransfer,restore:restoreTransfer,
+    canImport:()=>NET.active?'온라인 방을 먼저 나간 뒤 불러오세요. 온라인 판은 오프라인 2인 대국으로 저장됩니다.':true});
 </script>
 </body>
 </html>
