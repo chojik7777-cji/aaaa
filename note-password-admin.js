@@ -64,6 +64,33 @@
     });
     return reset;
   }
+  function roomDeleteControl(id,room){
+    const box=document.createElement('div'),button=document.createElement('button'),status=document.createElement('p');
+    button.type='button';button.textContent='방 삭제';button.className='room-delete';status.className='room-delete-status';status.role='status';
+    if(room==='default'){button.disabled=true;button.title='기본방은 삭제할 수 없습니다.';}
+    button.addEventListener('click',()=>{
+      const auth=token,label=id==='note'?'노트 A':'노트 B';if(!auth||button.disabled||room==='default')return;
+      const confirmation=window.prompt(label+' / '+room+' 방을 삭제할까요? 방 목록에서 사라지고 기존 로그인이 해제됩니다. 본문·첨부·백업은 보존되며 같은 방 이름은 다시 사용할 수 없습니다.\n삭제하려면 방 이름 「'+room+'」을 정확히 입력해 주세요.','');
+      if(confirmation===null)return;
+      if(confirmation!==room){status.textContent='방 이름이 일치하지 않아 삭제하지 않았습니다.';return;}
+      busy(button,async()=>{
+        status.textContent='삭제할 방을 확인하고 있습니다…';
+        try{
+          const snapshot=await api('status',undefined,room,id);if(token!==auth)return;
+          const revision=snapshot.notes.find(n=>matchesSelection(n,id,room))?.revision;
+          if(!revision)throw new Error('방 상태를 확인하지 못했습니다. 다시 조회해 주세요.');
+          await api('delete-room',{id,room,confirmation,revision},room);if(token!==auth)return;
+          let updated;
+          if(form.elements.id.value===id&&selectedRoom()===room){roomInput.value='default';updated=await selectionChanged();}
+          else updated=await refresh();
+          if(!updated||token!==auth)return;
+          message.textContent=label+' / '+room+' 방을 삭제했습니다. 기존 로그인은 해제되며 본문·첨부·백업은 보존됩니다. 같은 방 이름은 다시 사용할 수 없습니다.';
+          message.scrollIntoView({behavior:'smooth',block:'center'});
+        }catch(e){status.textContent=e.message||'방을 삭제하지 못했습니다.';throw e;}
+      });
+    });
+    box.append(button,status);return box;
+  }
   function renderNoteRooms(){
     if(!noteRoomList)return;
     noteRoomList.replaceChildren(...noteRooms.map(room=>{
@@ -71,15 +98,15 @@
       card.className='room-card';name.textContent=room;link.textContent='방 열기 ↗';link.href='note.html?room='+encodeURIComponent(room);link.target='_blank';link.rel='noopener noreferrer';
       select.type='button';select.textContent='이 방 선택 / 비밀번호 변경';
       select.addEventListener('click',()=>selectRoomForPassword('note',room));
-      card.append(name,link,select,roomResetButton('note',room));return card;
+      card.append(name,link,select,roomResetButton('note',room),roomDeleteControl('note',room));return card;
     }));
   }
   function renderRoomOptions(){
     const options=(form.elements.id.value==='note'?noteRooms:rooms).map(value=>{const option=document.createElement('option');option.value=value;return option;});
     document.getElementById('note2-rooms').replaceChildren(...options);
   }
-  async function api(action,body,room='default'){
-    const r=await fetch('/api/note-admin?action='+action+'&room='+encodeURIComponent(room)+(action==='status'?'&id='+encodeURIComponent(form.elements.id.value):''),{method:body?'POST':'GET',cache:'no-store',headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});
+  async function api(action,body,room='default',noteId=form.elements.id.value){
+    const r=await fetch('/api/note-admin?action='+action+'&room='+encodeURIComponent(room)+(action==='status'?'&id='+encodeURIComponent(noteId):''),{method:body?'POST':'GET',cache:'no-store',headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});
     const d=await r.json();if(!r.ok){if(r.status===401)logout();throw new Error(d.error||'요청을 처리하지 못했습니다.');}return d;
   }
   function renderRooms(){
@@ -88,7 +115,7 @@
       card.className='room-card';name.textContent=room;link.textContent='방 열기 ↗';link.href='note2.html?room='+encodeURIComponent(room);link.target='_blank';link.rel='noopener noreferrer';
       select.type='button';select.textContent='이 방 선택 / 비밀번호 변경';
       select.addEventListener('click',()=>selectRoomForPassword('note2',room));
-      card.append(name,link,select,roomResetButton('note2',room));return card;
+      card.append(name,link,select,roomResetButton('note2',room),roomDeleteControl('note2',room));return card;
     });
     roomList.replaceChildren(...cards);
     if(!rooms.length)roomList.textContent='등록된 방이 없습니다. NEW ROOM에서 새 방을 생성하세요.';

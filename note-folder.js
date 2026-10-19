@@ -89,7 +89,7 @@ function createNoteFolderHandler(rootDir, opts = {}) {
   const ROOT = path.resolve(rootDir);
   const local = ['note','note2'].includes(opts.localId);
   const roomExists = opts.localId==='note'?existingNoteRoom:existingRoom;
-  const auth = createNoteAuth({...opts,roomAllowed:async(room,service)=>roomExists(ROOT,room)||await service.hasRoom(room,opts.localId)||room==='default'});
+  const auth = createNoteAuth({...opts,roomAllowed:async(room,service)=>!await service.isRoomDeleted(room,opts.localId)&&(roomExists(ROOT,room)||await service.hasRoom(room,opts.localId)||room==='default')});
   const dirOf = (room) => (room === 'default' && !opts.roomFolders) ? ROOT : path.join(ROOT, room);
   const label = opts.label || path.basename(ROOT);
   const labelOf = (room) => (room === 'default' && !opts.roomFolders) ? label : `${label}/${room}`;

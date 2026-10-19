@@ -59,6 +59,8 @@
         .note-admin input, .note-admin select, .note-admin button { width:100%; padding:11px; margin-top:6px; border:1px solid #cbd5e0; border-radius:8px; font:inherit; }
         .note-admin button { cursor:pointer; background:#667eea; color:white; }
         .note-admin button:disabled { opacity:.5; cursor:wait; }
+        .note-admin .room-delete { background:#fff1f2; color:#b42318; border-color:#fda4af; }
+        .note-admin .room-delete:disabled { cursor:not-allowed; }
         .note-admin [hidden] { display:none; }
         .note-admin h3 { margin:18px 0 8px; font-size:16px; color:#2d3748; }
         .room-card { border:1px solid #cbd5e0; border-radius:10px; padding:12px; margin:10px 0; overflow-wrap:anywhere; }
@@ -116,6 +118,7 @@
             </form>
             <div id="note-admin-panel" hidden>
                 <h3>노트 A 방 목록 (note.html)</h3>
+                <p>「방 삭제」는 방을 목록에서 제거하고 기존 로그인을 해제합니다. 본문·첨부·백업은 보존되며 같은 방 이름은 재사용할 수 없습니다. 기본방(default)은 삭제할 수 없습니다.</p>
                 <div id="note-a-room-list" aria-label="등록된 노트 A 방"></div>
                 <form id="note-a-create-form">
                     <h3>NEW ROOM · 노트 A 새 방 생성</h3>
@@ -164,7 +167,7 @@
             </div>
             <p id="note-admin-message" role="status" aria-live="polite"></p>
         </section>
-        <script src="note-password-admin.js?v=room-select-focus-20261019" defer></script>
+        <script src="note-password-admin.js?v=room-delete-20261019" defer></script>
         <p class="footer">made by jeongik<br>문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
     </div>
 
