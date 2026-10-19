@@ -9,7 +9,7 @@ test('parallel local scrypt guesses share a bounded client budget and retain loc
  await initialize(env);
  const saved=process.env.NOTE_AUTH_FILE;process.env.NOTE_AUTH_FILE=env.NOTE_AUTH_FILE;
  t.after(()=>{if(saved===undefined)delete process.env.NOTE_AUTH_FILE;else process.env.NOTE_AUTH_FILE=saved;fs.rmSync(dir,{recursive:true,force:true});});
- let now=Date.now();const auth=createNoteAuth({localId:'note',now:()=>now}),req={socket:{remoteAddress:'new-client'}};
+ let now=Date.now();const auth=createNoteAuth({localId:'note',now:()=>now,audit:{record(){}}}),req={socket:{remoteAddress:'192.0.2.1'}};
  const attempts=Array.from({length:12},()=>auth.login(req,{password:'incorrect-fixture'}));
  // Excess requests, including a correct guess, cannot enter the full queue.
  const correct=auth.login(req,{password:env.NOTE_PASSWORD});
@@ -19,13 +19,13 @@ test('parallel local scrypt guesses share a bounded client budget and retain loc
  assert.equal((await correct)[0],429);
  assert.equal((await auth.login(req,{password:env.NOTE_PASSWORD}))[0],429);
  // A correct guess accepted into the queue must recheck a lock set ahead of it.
- const queuedReq={socket:{remoteAddress:'queued-client'}};
+ const queuedReq={socket:{remoteAddress:'192.0.2.2'}};
  for(let i=0;i<4;i++)assert.equal((await auth.login(queuedReq,{password:'incorrect-fixture'}))[0],401);
  const fifth=auth.login(queuedReq,{password:'incorrect-fixture'});
  const queuedCorrect=auth.login(queuedReq,{password:env.NOTE_PASSWORD});
  assert.equal((await fifth)[0],429);assert.equal((await queuedCorrect)[0],429);
  // A separate client is not locked; expiry permits authentication again.
- assert.equal((await auth.login({socket:{remoteAddress:'other-client'}},{password:env.NOTE_PASSWORD}))[0],200);
+ assert.equal((await auth.login({socket:{remoteAddress:'192.0.2.3'}},{password:env.NOTE_PASSWORD}))[0],200);
  now+=require('../note-auth').LOCK_MS+1;
  assert.equal((await auth.login(req,{password:env.NOTE_PASSWORD}))[0],200);
  const legacy=createNoteAuth({password:env.NOTE_PASSWORD});

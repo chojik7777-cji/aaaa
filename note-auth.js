@@ -53,7 +53,7 @@ function createNoteAuth(opts = {}) {
   }
   if (opts.localId) {
     const { runtimeService, validPassword } = require('./server/note-local');
-    const {recordAuth}=require('./server/security-audit');
+    const {recordAuth,requestInfo}=require('./server/security-audit');
     const getService=opts.getService||runtimeService;
     return {
       async tokenOk(req, url, room='default') {
@@ -63,7 +63,9 @@ function createNoteAuth(opts = {}) {
       async login(req, body, room='default') {
 
         if (!validPassword(body?.password)) return [400, {ok:false,error:'비밀번호를 256바이트 이하로 입력해 주세요.'}];
-        const ip = String(req.socket?.remoteAddress || 'remote');
+        // Use exactly the audit's validated visitor identity: trust CF only
+        // through our loopback tunnel + configured Host, never arbitrary XFF.
+        const ip = requestInfo(req).ip;
         const audit=outcome=>recordAuth(req,{page:opts.localId+'.html',room,outcome},opts.audit);
         const limited = () => {audit('rate_limit');return [429, {ok:false,error:'시도 횟수가 많습니다. 1시간 뒤 다시 시도해 주세요.'}];};
         let f = fails.get(ip);

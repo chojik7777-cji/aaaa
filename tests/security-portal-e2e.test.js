@@ -22,7 +22,7 @@ test('real isolated portal: fifth dashboard/note failure, admin-only history, re
  t.after(async()=>{if(child&&child.exitCode===null)await stop();});
  let base=await start();
  const headers={Host:tunnel,'CF-Connecting-IP':'203.0.113.71','Content-Type':'application/json','User-Agent':'security-e2e-browser'};
- async function post(url,body){return new Promise((resolve,reject)=>{const request=require('node:http').request(base+url,{method:'POST',headers},response=>{const chunks=[];response.on('data',c=>chunks.push(c));response.on('end',()=>resolve({status:response.statusCode,json:async()=>JSON.parse(Buffer.concat(chunks).toString())}));});request.on('error',reject);request.end(JSON.stringify(body));});}
+ async function post(url,body,visitor='203.0.113.71'){return new Promise((resolve,reject)=>{const request=require('node:http').request(base+url,{method:'POST',headers:{...headers,'CF-Connecting-IP':visitor}},response=>{const chunks=[];response.on('data',c=>chunks.push(c));response.on('end',()=>resolve({status:response.statusCode,json:async()=>JSON.parse(Buffer.concat(chunks).toString())}));});request.on('error',reject);request.end(JSON.stringify(body));});}
  const login=await post('/api/note-admin?action=login',{password});assert.equal(login.status,200);
  const token=(await login.json()).token;
  const events=async()=>{const r=await fetch(base+'/api/security-audit',{headers:{...headers,Authorization:'Bearer '+token}});assert.equal(r.status,200);return (await r.json()).records;};
@@ -33,8 +33,13 @@ test('real isolated portal: fifth dashboard/note failure, admin-only history, re
   const list=await events();assert.equal(list.filter(e=>e.outcome==='failure').length,i<5?0:1);
  }
  let list=await events();assert.equal(list[0].page,'omok-dashboard.html');assert.equal(list[0].ip,'203.0.113.71');assert.equal(list[0].count,5);assert.equal(list[0].alertEligible,true);
- for(let i=1;i<=5;i++){
-  const r=await post('/api/note/login?room=default',{password:'e2e-wrong-never-log-this'});assert.equal(r.status,i<5?401:429);
+ for(const id of ['note','note2']){
+  for(let i=1;i<=5;i++){
+   const r=await post('/api/'+id+'/login?room=default',{password:'e2e-wrong-never-log-this'});assert.equal(r.status,i<5?401:429);
+  }
+  assert.equal((await post('/api/'+id+'/login?room=default',{password:notePassword})).status,429,'locked visitor A stays locked');
+  assert.equal((await post('/api/'+id+'/login?room=default',{password:notePassword},'203.0.113.72')).status,200,'visitor B through same proxy can login');
+  assert.ok((await events()).some(e=>e.page===id+'.html'&&e.ip==='203.0.113.71'&&e.count===5&&e.alertEligible));
  }
  list=await events();assert.ok(list.some(e=>e.page==='note.html'&&e.count===5&&e.alertEligible));
  await post('/api/note/login?room=default',{password:'e2e-wrong-never-log-this'});
