@@ -6,6 +6,7 @@
   const create=document.getElementById('note2-create-form'),roomList=document.getElementById('note2-room-list');
   const noteCreate=document.getElementById('note-a-create-form'),noteRoomList=document.getElementById('note-a-room-list');
   const auditList=document.getElementById('security-audit-list'),auditStatus=document.getElementById('security-audit-status'),auditRefresh=document.getElementById('security-audit-refresh');
+  const selectionHeading=document.getElementById('note-password-selection'),selectionStatus=document.getElementById('note-password-selection-status');
   let auditSequence=0;
   let token='',notes=[],rooms=[],noteRooms=[],sequence=0;
   function renderAudit(events){
@@ -48,7 +49,7 @@
     if(password.length<8||new TextEncoder().encode(password).length>256)throw new Error('비밀번호는 8자 이상, 256바이트 이하로 입력해 주세요.');
     return {password,confirmation};
   }
-  function logout(){auditSequence++;auditList?.replaceChildren();if(auditStatus)auditStatus.textContent='';if(auditRefresh)auditRefresh.disabled=false;sequence++;token='';notes=[];rooms=[];noteRooms=[];panel.hidden=true;login.hidden=false;form.reset();create.reset();noteCreate?.reset();roomField.hidden=true;roomInput.disabled=true;roomList.replaceChildren();noteRoomList?.replaceChildren();document.getElementById('note2-rooms').replaceChildren();document.getElementById('note-password-status').textContent='';}
+  function logout(){if(selectionHeading)selectionHeading.textContent='선택한 방 비밀번호 변경';if(selectionStatus)selectionStatus.textContent='';auditSequence++;auditList?.replaceChildren();if(auditStatus)auditStatus.textContent='';if(auditRefresh)auditRefresh.disabled=false;sequence++;token='';notes=[];rooms=[];noteRooms=[];panel.hidden=true;login.hidden=false;form.reset();create.reset();noteCreate?.reset();roomField.hidden=true;roomInput.disabled=true;roomList.replaceChildren();noteRoomList?.replaceChildren();document.getElementById('note2-rooms').replaceChildren();document.getElementById('note-password-status').textContent='';}
   function roomResetButton(id,room){
     const reset=document.createElement('button');reset.type='button';reset.textContent='내용·파일 초기화';
     reset.addEventListener('click',()=>{
@@ -69,7 +70,7 @@
       const card=document.createElement('div'),name=document.createElement('strong'),link=document.createElement('a'),select=document.createElement('button');
       card.className='room-card';name.textContent=room;link.textContent='방 열기 ↗';link.href='note.html?room='+encodeURIComponent(room);link.target='_blank';link.rel='noopener noreferrer';
       select.type='button';select.textContent='이 방 선택 / 비밀번호 변경';
-      select.addEventListener('click',()=>{form.elements.id.value='note';roomInput.value=room;form.elements.password.value='';form.elements.confirmation.value='';selectionChanged();});
+      select.addEventListener('click',()=>selectRoomForPassword('note',room));
       card.append(name,link,select,roomResetButton('note',room));return card;
     }));
   }
@@ -86,7 +87,7 @@
       const card=document.createElement('div'),name=document.createElement('strong'),link=document.createElement('a'),select=document.createElement('button');
       card.className='room-card';name.textContent=room;link.textContent='방 열기 ↗';link.href='note2.html?room='+encodeURIComponent(room);link.target='_blank';link.rel='noopener noreferrer';
       select.type='button';select.textContent='이 방 선택 / 비밀번호 변경';
-      select.addEventListener('click',()=>{form.elements.id.value='note2';roomInput.value=room;form.elements.password.value='';form.elements.confirmation.value='';selectionChanged();});
+      select.addEventListener('click',()=>selectRoomForPassword('note2',room));
       card.append(name,link,select,roomResetButton('note2',room));return card;
     });
     roomList.replaceChildren(...cards);
@@ -101,7 +102,7 @@
     document.getElementById('note-password-status').textContent=notes.filter(n=>n.id==='note'?noteRooms.includes(n.room||'default'):rooms.includes(n.room)).map(n=>(n.id==='note'?'노트 A / '+(n.room||'default'):'노트 B / '+n.room)+': '+new Date(n.updatedAt).toLocaleString('ko-KR')).join(' / ');
     panel.hidden=false;login.hidden=true;return true;
   }
-  async function busy(button,work){button.disabled=true;message.textContent='처리 중입니다…';try{await work();}catch(e){message.textContent=e.message||'서버에 연결할 수 없습니다.';}finally{button.disabled=false;}}
+  async function busy(button,work){button.disabled=true;message.textContent='처리 중입니다…';try{return await work();}catch(e){message.textContent=e.message||'서버에 연결할 수 없습니다.';return false;}finally{button.disabled=false;}}
   login.addEventListener('submit',e=>{
     e.preventDefault();const password=login.elements.password.value;login.reset();
     busy(login.querySelector('button'),async()=>{token=(await api('login',{password})).token;await refresh();if(token)void refreshAudit();message.textContent='관리자 인증이 완료되었습니다. 인증은 15분간 유효합니다.';});
@@ -149,19 +150,23 @@
     });
   });
   roomInput.addEventListener('input',()=>{sequence++;notes=[];});
-  function selectionChanged(){roomField.hidden=!noteRoomList&&form.elements.id.value!=='note2';roomInput.disabled=roomField.hidden;if(roomField.firstChild?.nodeType===3)roomField.firstChild.textContent=(form.elements.id.value==='note'?'노트 A':'노트 B')+' 방 선택 / 직접 입력';form.elements.password.value='';form.elements.confirmation.value='';renderRoomOptions();notes=[];sequence++;if(token)busy(document.getElementById('note-admin-refresh'),refresh);}
+  function selectionChanged(){roomField.hidden=!noteRoomList&&form.elements.id.value!=='note2';roomInput.disabled=roomField.hidden;if(roomField.firstChild?.nodeType===3)roomField.firstChild.textContent=(form.elements.id.value==='note'?'노트 A':'노트 B')+' 방 선택 / 직접 입력';form.elements.password.value='';form.elements.confirmation.value='';renderRoomOptions();notes=[];sequence++;if(selectionHeading)selectionHeading.textContent=(form.elements.id.value==='note'?'노트 A':'노트 B')+' / '+(roomInput.value||'default')+' 비밀번호 변경';if(token)return busy(document.getElementById('note-admin-refresh'),refresh);return false;}
+  async function selectRoomForPassword(id,room){
+    if(!token)return;
+    form.elements.id.value=id;roomInput.value=room;
+    const selected=selectionChanged();
+    if(selectionStatus)selectionStatus.textContent='선택한 방을 확인하고 있습니다…';
+    form.scrollIntoView({behavior:'smooth',block:'start'});
+    form.elements.password.focus({preventScroll:true});
+    const ok=await selected;
+    if(!token||form.elements.id.value!==id||selectedRoom()!==room)return;
+    if(!ok){if(selectionStatus)selectionStatus.textContent=message.textContent;return;}
+    const feedback=(id==='note'?'노트 A':'노트 B')+' / '+room+' 방을 선택했습니다. 새 비밀번호를 입력하고 「새 비밀번호 저장」을 눌러 주세요.';
+    message.textContent=feedback;if(selectionStatus)selectionStatus.textContent=feedback;
+  }
   roomInput.addEventListener('change',selectionChanged);form.elements.id.addEventListener('change',selectionChanged);
   document.getElementById('note-admin-refresh').addEventListener('click',e=>busy(e.target,async()=>{await refresh();message.textContent='변경 상태를 다시 조회했습니다.';}));
   document.getElementById('note-admin-logout').addEventListener('click',()=>{logout();message.textContent='관리자 로그아웃되었습니다.';});
-  document.getElementById('note-a-select-password')?.addEventListener('click',()=>{
-    if(!token)return;
-    form.elements.id.value='note';
-    roomInput.value='default';
-    form.elements.password.value='';
-    form.elements.confirmation.value='';
-    selectionChanged();
-    form.scrollIntoView({behavior:'smooth',block:'center'});
-    form.elements.password.focus({preventScroll:true});
-  });
+  document.getElementById('note-a-select-password')?.addEventListener('click',()=>selectRoomForPassword('note','default'));
   window.addEventListener('pagehide',logout);
 })();
