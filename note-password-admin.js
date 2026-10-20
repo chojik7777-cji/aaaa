@@ -12,7 +12,7 @@
   function renderAudit(events){
     auditList.replaceChildren(...events.map(event=>{
       const card=document.createElement('article'),fields=document.createElement('dl');card.className='security-event';
-      for(const [label,value] of [['시각 (한국 시간)',event.timeKst||(event.time?new Date(event.time).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'—')],['IP',event.ip],['페이지',event.page],['방',event.room],['연속 실패 횟수',event.count],['IP 출처',event.ipSource]]){
+      for(const [label,value] of [['시각 (한국 시간)',event.timeKst||(event.time?new Date(event.time).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'—')],['IP',event.ip],['브라우저',event.browser||'미수집'],['OS',event.os||'미수집'],['기기 ID',event.deviceId||'미수집'],['페이지',event.page],['방',event.room],['연속 실패 횟수',event.count],['IP 출처',event.ipSource]]){
         const term=document.createElement('dt'),description=document.createElement('dd');term.textContent=label;description.textContent=String(value??'—');fields.append(term,description);
       }
       card.append(fields);

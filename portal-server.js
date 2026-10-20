@@ -90,6 +90,7 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  require('./server/audit-device').auditDevice(req, res);
   const pathname = new URL(req.url, 'http://localhost').pathname;
   if (pathname === '/api/security-audit') return securityAuditHandler(req, res);
   if (req.method === 'OPTIONS') {

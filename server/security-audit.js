@@ -1,5 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{isIP}=require('node:net');
+const {userAgentMetadata,requestDeviceId}=require('./audit-device');
 const WINDOW=15*60*1000,RETENTION=30*86400000;
 const TRUSTED_TUNNEL='inn-analytical-split-juice.trycloudflare.com';
 const PAGES=new Set(['detail-admin-jik-2026.html','omok-dashboard.html','baduk-dashboard.html','yut-dashboard.html','note.html','note2.html','math-control.html','math-level.html']);
@@ -11,7 +12,7 @@ function requestInfo(req){
  const loopback=peer==='::1'||peer==='127.0.0.1'||peer==='::ffff:127.0.0.1',cf=req.headers?.['cf-connecting-ip'];
  const trusted=loopback&&host===TRUSTED_TUNNEL&&typeof cf==='string'&&!!isIP(cf);
  let endpoint='/';try{endpoint=new URL(req.url||'/','http://localhost').pathname;}catch{}
- return {ip:trusted?cf:peer,peer,ipSource:trusted?'cf-connecting-ip (trusted-local-proxy assumption)':'socket',endpoint:clean(endpoint),userAgent:clean(req.headers?.['user-agent'])};
+ return {ip:trusted?cf:peer,peer,ipSource:trusted?'cf-connecting-ip (trusted-local-proxy assumption)':'socket',endpoint:clean(endpoint),userAgent:clean(req.headers?.['user-agent']),...userAgentMetadata(req.headers?.['user-agent']),deviceId:requestDeviceId(req)};
 }
 function dashboardPage(req,body={}){
  const posted=typeof body.page==='string'?body.page.replace(/^\//,''):'';

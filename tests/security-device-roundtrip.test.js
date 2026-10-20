@@ -1,0 +1,24 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawn,spawnSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..');
+const {chromium}=require(process.env.PLAYWRIGHT_PATH||'/tmp/note-modal-browser/node_modules/playwright');
+test('real browser cookie -> fifth-failure audit -> private UI -> safe notifier; clearing ID does not refund IP lock',async t=>{
+ const home=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'device-audit-e2e-')));let child,browser;
+ t.after(async()=>{if(browser)await browser.close();if(child&&child.exitCode===null&&child.signalCode===null)await new Promise(r=>{child.once('exit',r);child.kill()});fs.rmSync(home,{recursive:true,force:true});});
+ const admin='device-e2e-admin-fixture',note='device-e2e-note-fixture';fs.writeFileSync(path.join(home,'admin-password'),admin,{mode:0o600});
+ const env={...process.env,HOME:home,HOST:'127.0.0.1',PORT:'0',NOTE_DIR:path.join(home,'note'),NOTE2_DIR:path.join(home,'note2'),NOTE_AUTH_FILE:path.join(home,'private','auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(home,'admin-password'),NOTE_PASSWORD:note,NOTE2_PASSWORD:note};delete env.VERCEL;
+ child=spawn(process.execPath,['portal-server.js'],{cwd:root,env,stdio:['ignore','pipe','pipe']});
+ const base=await new Promise((resolve,reject)=>{let out='';const timer=setTimeout(()=>reject(new Error('fixture startup timeout')),12000);child.stdout.on('data',chunk=>{out+=chunk;const m=out.match(/Game portal server: (http:\/\/127\.0\.0\.1:\d+)/);if(m){clearTimeout(timer);resolve(m[1])}});child.once('exit',()=>{clearTimeout(timer);reject(new Error('fixture exited'))});});
+ browser=await chromium.launch({headless:true});
+ const context=await browser.newContext({viewport:{width:390,height:844},userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'});
+ const page=await context.newPage();await page.goto(base+'/math-level.html');
+ let cookie=(await context.cookies()).find(c=>c.name==='aaaa-audit-device-v1');assert(cookie,'first GET must issue an advisory device ID');assert.equal(cookie.httpOnly,true);assert.equal(cookie.sameSite,'Lax');assert.match(cookie.value,/^[0-9a-f-]{36}$/);assert.equal(await page.evaluate(()=>document.cookie.includes('aaaa-audit-device-v1')),false);
+ const first=cookie.value;for(let i=1;i<=5;i++){const r=await context.request.post(base+'/api/note/login',{data:{password:'wrong-fixture-only'}});assert.equal(r.status(),i<5?401:429);}
+ const auditPath=path.join(home,'.config/aaaa/security/audit.json');const data=JSON.parse(fs.readFileSync(auditPath));const event=data.events.find(e=>e.alertEligible===true&&e.page==='note.html');assert(event);assert.equal(event.deviceId,first);assert.match(event.browser,/Safari/);assert.match(event.os,/iOS/);assert.equal(event.count,5);assert.equal(event.ip,'127.0.0.1');assert(!fs.readFileSync(auditPath,'utf8').includes('wrong-fixture-only'));
+ const snapshot=spawnSync(process.execPath,['scripts/security-audit-snapshot.js',path.dirname(auditPath)],{cwd:root,env,encoding:'utf8'});assert.equal(snapshot.status,0);const snap=JSON.parse(snapshot.stdout).find(e=>e.id===event.id);assert.equal(snap.deviceId,first);assert.equal(snap.browser,event.browser);assert.equal(snap.os,event.os);assert.equal(snap.userAgent,undefined);
+ const script='import importlib.util,json,sys; s=importlib.util.spec_from_file_location("device_notifier",sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.format_alert(json.load(sys.stdin)))';
+ const formatted=spawnSync('python3',['-B','-c',script,'/Users/chojiks/.hermes/scripts/aaaa_security_notify.py'],{env,input:JSON.stringify(snap),encoding:'utf8'});assert.equal(formatted.status,0);assert(formatted.stdout.includes(first));assert(formatted.stdout.includes(event.browser));assert(formatted.stdout.includes(event.os));
+ await context.clearCookies();await page.reload();cookie=(await context.cookies()).find(c=>c.name==='aaaa-audit-device-v1');assert(cookie);assert.notEqual(cookie.value,first);assert.equal((await context.request.post(base+'/api/note/login',{data:{password:note}})).status(),429,'changing advisory ID cannot bypass IP lock');
+ await page.goto(base+'/detail-admin-jik-2026.html');await page.locator('#note-admin-login input').fill(admin);await page.locator('#note-admin-login button').click();await page.locator('#note-admin-panel').waitFor({state:'visible'});await page.waitForFunction(()=>document.getElementById('security-audit-list').textContent.includes('Safari'));
+ const text=await page.locator('#security-audit-list').innerText();assert(text.includes(first));assert(text.includes(event.os));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+});

@@ -22,7 +22,7 @@ try{
    const outbox=data.outbox===undefined?data.events:data.outbox;
    if(!Array.isArray(outbox)||outbox.length>2000)throw new Error('Invalid outbox');
    events=outbox.filter(e=>e.alertEligible===true&&Date.parse(e.time)>Date.now()-30*86400000).map(e=>{
-    const out={};for(const key of ['id','time','ip','page','room','count','ipSource'])out[key]=e[key];return out;
+    const out={};for(const key of ['id','time','ip','page','room','count','ipSource','browser','os','deviceId'])out[key]=e[key];return out;
    });
   }
   process.stdout.write(JSON.stringify(events));
