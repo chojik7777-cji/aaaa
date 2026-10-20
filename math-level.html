@@ -44,7 +44,14 @@
         .play-tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
         .feedback { margin-top: 10px; min-height: 28px; text-align: center; font-weight: 800; line-height: 1.5; }
         .feedback.good { color: #2f855a; } .feedback.bad { color: #c53030; }
-        #gamePanel { overflow-anchor: none; }
+        #gamePanel { overflow-anchor: none; min-width: 0; }
+        #questionText, #questionHint, .choice-grid button { overflow-wrap: anywhere; }
+        #solutionBtn { display: block; width: 100%; margin-top: 12px; }
+        #solutionPanel { background: #fff; font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; scroll-margin-top: 16px; }
+        #solutionPanel h2 { font-size: 17px; margin-bottom: 8px; }
+        #solutionPanel ol { padding-left: 24px; }
+        #solutionPanel li { padding-left: 4px; margin-bottom: 8px; white-space: pre-wrap; }
+        #solutionAnswer { font-weight: 800; margin-top: 12px; }
         .choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; min-height: 156px; }
         .choice-grid button { font-size: 20px; padding: 14px 10px; min-height: 68px; touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
         .choice-grid button.selected-ok { background: #38a169; color: white; border-color: #38a169; }
@@ -134,7 +141,14 @@
             <button id="skipBtn" type="button">모르겠어요</button>
             <button id="pauseBtn" type="button">⏸️ 멈춤</button>
             <button id="menuBtn" type="button">🏠 메뉴로 가기</button>
+            <button id="nextProblemBtn" class="primary" type="button" hidden disabled>다음 문제</button>
         </div>
+        <button id="solutionBtn" type="button" aria-expanded="false" aria-controls="solutionPanel">풀이과정</button>
+        <section class="panel" id="solutionPanel" aria-labelledby="solutionHeading" hidden>
+            <h2 id="solutionHeading">자세한 풀이과정</h2>
+            <ol id="solutionSteps"></ol>
+            <p id="solutionAnswer"></p>
+        </section>
         <div class="feedback" id="feedback"></div>
     </section>
 
@@ -174,7 +188,7 @@
     </div>
 </div>
 
-<script src="math-problems.js?v=variety-1"></script>
+<script src="math-problems.js?v=solutions-1"></script>
 <script src="game-transfer.js?v=game-transfer-v1"></script>
 <script>
 'use strict';
@@ -217,6 +231,7 @@ let state = loadState();
 let current = null;
 let startedAt = 0;
 let paused = false;
+let solutionOpen = false;
 let pauseStarted = 0;
 let pausedTotal = 0;
 let nextTimer = null;
@@ -225,6 +240,45 @@ let lastControlVersion = null;
 let questionLimit = 5;
 let limitLocked = false;
 
+function toggleSolution() {
+    if (!current || centralLocked || limitLocked || $('gamePanel').hidden) return;
+    const wasStopped = paused || solutionOpen;
+    solutionOpen = !solutionOpen;
+    syncPauseClock(wasStopped);
+    if (solutionOpen) {
+        const steps = Array.isArray(current.solutionSteps) ? current.solutionSteps : [];
+        $('solutionSteps').replaceChildren(...steps.map(step => {
+            const li = document.createElement('li');
+            li.textContent = String(step);
+            return li;
+        }));
+        $('solutionAnswer').textContent = `정답: ${fmt(current.answer)}`;
+    }
+    $('solutionPanel').hidden = !solutionOpen;
+    $('solutionBtn').setAttribute('aria-expanded', String(solutionOpen));
+    updatePauseUi();
+    render();
+    if (solutionOpen) $('solutionPanel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function syncPauseClock(wasStopped) {
+    const stopped = paused || solutionOpen;
+    if (!wasStopped && stopped) pauseStarted = Date.now();
+    if (wasStopped && !stopped) {
+        pausedTotal += Date.now() - pauseStarted;
+        pauseStarted = 0;
+    }
+}
+function clearSolution() {
+    const wasStopped = paused || solutionOpen;
+    solutionOpen = false;
+    syncPauseClock(wasStopped);
+    $('solutionPanel').hidden = true;
+    $('solutionBtn').setAttribute('aria-expanded', 'false');
+    $('solutionSteps').replaceChildren();
+    $('solutionAnswer').textContent = '';
+    $('nextProblemBtn').hidden = true;
+    $('nextProblemBtn').disabled = true;
+}
 function curriculumLabel(level) {
     const lv = clamp(Math.round(level), MIN_LEVEL, MAX_LEVEL);
     const meta = CURRICULUM[lv - 1];
@@ -324,6 +378,7 @@ function confidencePercent() {
     return Math.round(base + stable);
 }
 function startGame(level = Number($('startLevel').value)) {
+    if (centralLocked || limitLocked) return;
     state = newState(clamp(Number(level) || 6, MIN_LEVEL, MAX_LEVEL), $('practiceMode').value);
     saveState();
     $('setupPanel').hidden = true;
@@ -336,15 +391,20 @@ function resumeGame() {
     nextProblem(true);
 }
 function nextProblem(preserveLevel = false) {
+    if (centralLocked || limitLocked) return;
     if (nextTimer) { clearTimeout(nextTimer); nextTimer = null; }
     if (shouldShowQuestionLimitLock()) {
         showQuestionLimitLock();
         return;
     }
+    clearSolution();
     paused = false;
     pausedTotal = 0;
     pauseStarted = 0;
     current = generateProblem(preserveLevel && state.practiceMode !== 'grade' ? state.nextLevel : chooseNextLevel());
+    current.answered = false;
+    current.controlVersion = Number(lastControlVersion);
+    current.questionLimit = questionLimit;
     startedAt = Date.now();
     $('problemNo').textContent = `${state.asked + 1}번째 문제`;
     const topicPart = current.type === current.meta.topic ? '' : ` · ${current.type}`;
@@ -370,11 +430,11 @@ function setQuestionLimitFromControl(data) {
 }
 function showQuestionLimitLock() {
     limitLocked = true;
-    paused = false;
+    if (current || solutionOpen) clearSolution();
     $('questionLimitMessage').textContent = '비번입력';
     $('questionLimitError').textContent = '';
     $('questionLimitOverlay').classList.add('show');
-    document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn').forEach(b => { b.disabled = true; });
+    updatePauseUi();
     $('questionLimitPassword').focus();
 }
 function hideQuestionLimitLock() {
@@ -403,8 +463,10 @@ async function unlockQuestionLimit() {
     }
 }
 function submitAnswer(skip = false, selectedValue = null) {
-    if (!current || paused || centralLocked || limitLocked) return;
+    if (!current || current.answered || paused || solutionOpen || centralLocked || limitLocked || $('gamePanel').hidden) return;
     const seconds = Math.max(1, Math.round((Date.now() - startedAt - pausedTotal) / 1000));
+    current.elapsed = elapsedSeconds();
+    current.answered = true;
     const correct = !skip && nearlyEqual(selectedValue, current.answer);
     const before = state.theta;
     const info = updateAbility(correct, current.difficulty, seconds);
@@ -413,28 +475,37 @@ function submitAnswer(skip = false, selectedValue = null) {
     saveState();
     const delta = state.theta - before;
     $('feedback').className = 'feedback ' + (correct ? 'good' : 'bad');
-    $('feedback').innerHTML = correct
+    $('feedback').textContent = correct
         ? `정답입니다! (${seconds}초) 추정 레벨 ${delta >= 0 ? '+' : ''}${delta.toFixed(2)}`
-        : `정답은 <b>${fmt(current.answer)}</b>입니다. 추정 레벨 ${delta.toFixed(2)}`;
+        : `정답은 ${fmt(current.answer)}입니다. 추정 레벨 ${delta.toFixed(2)}`;
     document.querySelectorAll('#choiceGrid button').forEach(b => {
         b.disabled = true;
         if (nearlyEqual(b.dataset.choice, current.answer)) b.classList.add('selected-ok');
         else if (!skip && nearlyEqual(b.dataset.choice, selectedValue)) b.classList.add('selected-bad');
     });
     render();
-    nextTimer = setTimeout(nextProblem, correct ? 850 : 1500);
+    updatePauseUi();
 }
 function submitChoice(value) { submitAnswer(false, value); }
 function elapsedSeconds() {
     if (!current) return 0;
-    const extraPause = paused ? Date.now() - pauseStarted : 0;
+    if (current.answered) return current.elapsed;
+    const extraPause = paused || solutionOpen ? Date.now() - pauseStarted : 0;
     return Math.max(0, Math.round((Date.now() - startedAt - pausedTotal - extraPause) / 1000));
 }
 function updatePauseUi() {
     $('pauseBtn').textContent = paused ? '▶️ 계속하기' : '⏸️ 멈춤';
-    $('skipBtn').disabled = paused;
-    document.querySelectorAll('#choiceGrid button').forEach(b => { b.disabled = paused; });
-    if (paused) {
+    const locked = centralLocked || limitLocked;
+    const answered = !!current?.answered;
+    const blocked = !current || locked || answered || paused || solutionOpen;
+    $('skipBtn').disabled = blocked;
+    document.querySelectorAll('#choiceGrid button').forEach(b => { b.disabled = blocked; });
+    $('pauseBtn').disabled = !current || locked || answered;
+    $('menuBtn').disabled = locked;
+    $('solutionBtn').disabled = !current || locked;
+    $('nextProblemBtn').hidden = !answered;
+    $('nextProblemBtn').disabled = !answered || locked || paused;
+    if (paused && !answered) {
         $('feedback').className = 'feedback';
         $('feedback').textContent = '멈춤 상태입니다. 계속하기를 누르면 이어서 풀 수 있어요.';
     }
@@ -448,9 +519,16 @@ function applyMathControl(data) {
     centralLocked = !!data.locked && (serverIpLock ? Number(data.version ?? 0) !== bypassVersion : Number(data.version ?? 0) > bypassVersion);
     $('mathLockMessage').textContent = data.message || '비번을 입력하세요';
     $('mathLockOverlay').classList.toggle('show', centralLocked);
-    document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn, #menuBtn').forEach(b => { b.disabled = centralLocked || (b.id !== 'menuBtn' && b.id !== 'pauseBtn' && paused); });
+    // Manual pause leaves the resume control enabled: b.id !== 'pauseBtn' && paused.
+    if (centralLocked && solutionOpen) clearSolution();
+    updatePauseUi();
     if (centralLocked) $('mathUnlockPassword').focus();
-    if (!centralLocked && current && shouldShowQuestionLimitLock()) showQuestionLimitLock();
+    // Finishing the last permitted question keeps its explanation readable.
+    // A changed server policy still locks immediately; nextProblem always checks the quota.
+    const reviewingLastAnswer = current?.answered && state.asked === questionLimit
+        && current.questionLimit === questionLimit && current.controlVersion === Number(lastControlVersion);
+    if (!centralLocked && current && !reviewingLastAnswer && shouldShowQuestionLimitLock()) showQuestionLimitLock();
+    if (!centralLocked && !limitLocked && !current && $('gamePanel').hidden === false) nextProblem(true);
 }
 async function pollMathControl() {
     try {
@@ -474,18 +552,17 @@ async function unlockMathControl() {
         $('mathLockOverlay').classList.remove('show');
         $('mathUnlockPassword').value = '';
         updatePauseUi();
+        if (!current && $('gamePanel').hidden === false) nextProblem(true);
     } catch (e) {
         $('mathUnlockError').textContent = e.message || '해제할 수 없습니다.';
     }
 }
 function togglePause() {
-    if (!current || $('gamePanel').hidden || centralLocked || limitLocked) return;
+    if (!current || current.answered || $('gamePanel').hidden || centralLocked || limitLocked) return;
+    const wasStopped = paused || solutionOpen;
     paused = !paused;
-    if (paused) {
-        pauseStarted = Date.now();
-    } else {
-        pausedTotal += Date.now() - pauseStarted;
-        pauseStarted = 0;
+    syncPauseClock(wasStopped);
+    if (!paused) {
         $('feedback').textContent = '';
         $('feedback').className = 'feedback';
     }
@@ -494,6 +571,7 @@ function togglePause() {
 }
 function goMenu() {
     if (nextTimer) { clearTimeout(nextTimer); nextTimer = null; }
+    clearSolution();
     current = null;
     paused = false;
     pauseStarted = 0;
@@ -555,6 +633,11 @@ function buildControls() {
 }
 $('startBtn').addEventListener('click', () => startGame());
 $('skipBtn').addEventListener('click', () => submitAnswer(true));
+$('solutionBtn').addEventListener('click', toggleSolution);
+$('nextProblemBtn').addEventListener('click', () => {
+    if (!current?.answered || centralLocked || limitLocked || paused) return;
+    nextProblem();
+});
 $('pauseBtn').addEventListener('click', togglePause);
 $('menuBtn').addEventListener('click', goMenu);
 $('mathUnlockBtn').addEventListener('click', unlockMathControl);
@@ -564,6 +647,10 @@ $('questionLimitPassword').addEventListener('keydown', e => { if (e.key === 'Ent
 $('startLevel').addEventListener('change', render);
 $('resetBtn').addEventListener('click', () => {
     if (!confirm('풀이 기록과 추정 레벨을 초기화할까요?')) return;
+    clearSolution();
+    paused = false;
+    pauseStarted = 0;
+    pausedTotal = 0;
     state = newState(Number($('startLevel').value) || 6, $('practiceMode').value);
     current = null;
     localStorage.removeItem(SAVE_KEY);

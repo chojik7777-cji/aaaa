@@ -12,7 +12,7 @@ test('CommonJS exposes isolated generator factory and default generation', () =>
     assert.equal(typeof api.createGenerator, 'function');
     assert.equal(typeof api.generate, 'function');
     const p = api.generate(1);
-    assert.deepEqual(Object.keys(p).sort(), ['answer', 'difficulty', 'hint', 'level', 'templateId', 'text', 'type']);
+    assert.deepEqual(Object.keys(p).sort(), ['answer', 'difficulty', 'hint', 'level', 'solutionSteps', 'templateId', 'text', 'type']);
     assert.equal(p.level, 1);
     assert.equal(p.difficulty, 1);
     assert.ok(Number.isFinite(p.answer));
