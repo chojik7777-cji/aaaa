@@ -88,6 +88,12 @@
     </div>
 
     <section class="panel" id="setupPanel">
+        <label style="margin-bottom:12px">출제 방식
+            <select id="practiceMode" aria-label="출제 방식">
+                <option value="adaptive">자동 레벨 진단 · 학년 이동 가능</option>
+                <option value="grade">선택 학년 고정 · 해당 학년 단원 골고루</option>
+            </select>
+        </label>
         <div class="setup grid">
             <label>시작 레벨
                 <select id="startLevel" aria-label="시작 레벨">
@@ -114,12 +120,12 @@
             <button class="primary" id="startBtn">진단 시작</button>
         </div>
         <div class="level-row" id="levelButtons"></div>
-        <p class="explain" style="margin-top:12px"><b>방식:</b> 맞히면 조금 어려워지고, 틀리면 쉬워집니다. 단순히 한 문제마다 크게 흔들리지 않도록 최근 풀이가 쌓일수록 안정적으로 수렴하게 만들었습니다.</p>
+        <p class="explain" style="margin-top:12px"><b>방식:</b> 자동 진단은 풀이 결과에 따라 학년을 오갈 수 있습니다. 학년 고정은 시작 레벨의 학년 안에서 단원을 골고루 출제합니다. 같은 단원도 서로 다른 유형을 번갈아 풉니다.</p>
     </section>
 
     <section class="panel" id="gamePanel" hidden>
         <div class="question-box">
-            <div class="question-meta"><span class="pill" id="problemNo">0번째 문제</span><span class="pill" id="problemType">유형</span><span class="pill" id="timeText">0초</span></div>
+            <div class="question-meta"><span class="pill" id="practiceLabel">자동 레벨 진단</span><span class="pill" id="problemNo">0번째 문제</span><span class="pill" id="problemType">유형</span><span class="pill" id="timeText">0초</span></div>
             <div id="questionText">문제</div>
             <div id="questionHint"></div>
         </div>
@@ -168,6 +174,7 @@
     </div>
 </div>
 
+<script src="math-problems.js?v=variety-1"></script>
 <script src="game-transfer.js?v=game-transfer-v1"></script>
 <script>
 'use strict';
@@ -223,13 +230,13 @@ function curriculumLabel(level) {
     const meta = CURRICULUM[lv - 1];
     return `Lv.${lv} ${meta.grade} · ${meta.topic}`;
 }
-function newState(level = 6) {
-    return { theta: level, nextLevel: level, asked: 0, correct: 0, streak: 0, uncertainty: 3.2, history: [] };
+function newState(level = 6, practiceMode = 'adaptive') {
+    return { practiceMode, gradeLevel: level, theta: level, nextLevel: level, asked: 0, correct: 0, streak: 0, uncertainty: 3.2, history: [] };
 }
 function loadState() {
     try {
         const raw = JSON.parse(localStorage.getItem(SAVE_KEY));
-        if (raw && typeof raw.theta === 'number') return Object.assign(newState(raw.nextLevel || raw.theta), raw, { history: Array.isArray(raw.history) ? raw.history : [] });
+        if (raw && typeof raw.theta === 'number') return Object.assign(newState(raw.nextLevel || raw.theta), raw, { history: Array.isArray(raw.history) ? raw.history : [], practiceMode: raw.practiceMode === 'grade' ? 'grade' : 'adaptive', gradeLevel: Number.isInteger(raw.gradeLevel) && raw.gradeLevel >= 1 && raw.gradeLevel <= 18 ? raw.gradeLevel : clamp(Math.round(raw.nextLevel || raw.theta), 1, 18) });
     } catch (e) { /* 기본값 */ }
     return newState(6);
 }
@@ -272,69 +279,10 @@ function buildChoices(answer, level) {
 
 function generateProblem(level) {
     level = clamp(Math.round(level), MIN_LEVEL, MAX_LEVEL);
-    let a, b, c, d, x, y, ans, text, hint, type;
-    const meta = CURRICULUM[level - 1];
-    if (level === 1) {
-        a = rnd(-12, 15); b = rnd(-12, 15); ans = a + b;
-        text = `(${a}) + (${b})`; type = '정수와 유리수'; hint = '부호를 먼저 정리하세요.';
-    } else if (level === 2) {
-        a = rnd(2, 8); x = rnd(-5, 9); b = rnd(-10, 10); ans = a * x + b;
-        text = `x=${x}일 때 ${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}`; type = '문자와 식'; hint = '문자에 값을 대입한 뒤 계산합니다.';
-    } else if (level === 3) {
-        x = rnd(-8, 12); a = rnd(2, 9); b = rnd(-12, 12); ans = x;
-        text = `${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)} = ${a * x + b}, x = ?`; type = '일차방정식'; hint = '상수를 옮기고 계수로 나눕니다.';
-    } else if (level === 4) {
-        b = pick([3, 6, 7, 9, 11]); a = rnd(1, b - 1); c = rnd(1, 4); ans = c + a / b;
-        text = `${c} + ${a}/${b}`; type = '유리수와 순환소수'; hint = '분수 또는 소수로 입력해도 됩니다.';
-    } else if (level === 5) {
-        x = rnd(-5, 8); y = rnd(-5, 8); a = rnd(1, 5); b = rnd(1, 5); c = rnd(1, 5); d = rnd(1, 5);
-        while (a * d === b * c) { c = rnd(1, 5); d = rnd(1, 5); }
-        ans = x + y;
-        text = `${a}x+${b}y=${a*x+b*y}, ${c}x+${d}y=${c*x+d*y}. x+y=?`; type = '연립방정식'; hint = '두 식을 풀고 x+y만 답하세요.';
-    } else if (level === 6) {
-        a = rnd(-5, 6) || 2; b = rnd(-10, 10); x = rnd(-4, 7); ans = a * x + b;
-        text = `y=${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}, x=${x}일 때 y`; type = '일차함수'; hint = '직선의 식에 x를 대입합니다.';
-    } else if (level === 7) {
-        a = rnd(2, 9); b = rnd(2, 6); ans = a * b;
-        text = `√${a*a*b*b}`; type = '제곱근/실수'; hint = '제곱수는 근호 밖으로 나옵니다.';
-    } else if (level === 8) {
-        a = rnd(-8, 8) || 2; b = rnd(-8, 8) || -3; ans = a + b;
-        text = `x² ${-(a+b) >= 0 ? '+ ' + (-(a+b)) : '- ' + Math.abs(-(a+b))}x ${a*b >= 0 ? '+ ' + a*b : '- ' + Math.abs(a*b)} = 0의 두 근의 합`; type = '인수분해/이차방정식'; hint = '두 근이 a,b이면 합은 a+b입니다.';
-    } else if (level === 9) {
-        a = pick([1, 2, -1, -2]); b = rnd(-4, 4); x = rnd(-3, 3); ans = a * x * x + b;
-        text = `y=${a}x² ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}, x=${x}일 때 y`; type = '이차함수'; hint = 'x²을 먼저 계산하세요.';
-    } else if (level === 10) {
-        a = rnd(2, 6); b = rnd(-5, 5); c = rnd(-5, 5); ans = a * c + b;
-        text = `f(x)=${a}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}일 때 f(${c})`; type = '다항식/나머지정리'; hint = '나머지정리는 f(c)를 구하는 문제로 볼 수 있습니다.';
-    } else if (level === 11) {
-        b = rnd(-8, 8) || 2; c = rnd(-8, 8) || -3; ans = Math.abs(b - c);
-        text = `방정식 x² ${-(b+c) >= 0 ? '+ ' + (-(b+c)) : '- ' + Math.abs(-(b+c))}x ${b*c >= 0 ? '+ ' + b*c : '- ' + Math.abs(b*c)}=0의 두 근 차이의 절댓값`; type = '방정식/부등식'; hint = '두 근을 인수분해로 찾고 차이를 구합니다.';
-    } else if (level === 12) {
-        a = rnd(4, 8); b = rnd(2, a - 1); ans = 1;
-        for (let i = 0; i < b; i++) ans *= (a - i);
-        text = `서로 다른 ${a}명 중 ${b}명을 줄 세우는 경우의 수`; type = '함수/경우의 수'; hint = '순열 nP r 계산입니다.';
-    } else if (level === 13) {
-        a = rnd(2, 5); b = rnd(2, 4); ans = Math.pow(a, b + 1);
-        text = `${a}^${b} × ${a}`; type = '지수·로그'; hint = '밑이 같으면 지수를 더합니다.';
-    } else if (level === 14) {
-        const choices = [{t:'sin 30°',v:0.5},{t:'cos 60°',v:0.5},{t:'tan 45°',v:1},{t:'sin 90°',v:1},{t:'cos 0°',v:1}];
-        const q = pick(choices); ans = q.v; text = q.t; type = '삼각함수'; hint = '특수각 값을 떠올리세요. 1/2은 0.5로 입력하세요.';
-    } else if (level === 15) {
-        a = rnd(1, 8); d = rnd(2, 8); x = rnd(5, 12); ans = x * (2 * a + (x - 1) * d) / 2;
-        text = `첫항 ${a}, 공차 ${d}인 등차수열의 첫 ${x}항의 합`; type = '수열'; hint = 'Sn = n(2a+(n-1)d)/2';
-    } else if (level === 16) {
-        a = rnd(1, 5); b = rnd(-4, 4); c = rnd(-3, 5); x = rnd(-2, 4); ans = 3*a*x*x + 2*b*x + c;
-        text = `f(x)=${a}x³ ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}x² ${c >= 0 ? '+ ' + c : '- ' + Math.abs(c)}x, f'(${x})`; type = '미분'; hint = '도함수를 구한 뒤 x값을 대입합니다.';
-    } else if (level === 17) {
-        const mode = pick(['integral','prob','geo']);
-        if (mode === 'integral') { a = rnd(1, 5); b = rnd(1, 4); ans = a * b * b / 2; text = `∫₀^${b} ${a}x dx`; type = '적분'; hint = 'x의 적분은 x²/2입니다.'; }
-        else if (mode === 'prob') { a = rnd(2, 5); b = rnd(6, 10); ans = a / b; text = `전체 ${b}개 중 성공 ${a}개의 확률`; type = '확률과 통계'; hint = '성공/전체를 소수로 입력해도 됩니다.'; }
-        else { a = rnd(-3, 5); b = rnd(-3, 5); c = rnd(-3, 5); d = rnd(-3, 5); ans = a*c + b*d; text = `벡터 (${a}, ${b}) · (${c}, ${d})`; type = '기하'; hint = '내적은 x끼리 곱한 값 + y끼리 곱한 값입니다.'; }
-    } else {
-        a = rnd(1, 4); b = rnd(1, 4); c = rnd(1, 4); x = rnd(1, 3); ans = (2*a*x + b) + c;
-        text = `f(x)=${a}x²+${b}x, g(x)=f'(x)+${c}. g(${x})`; type = '수능 종합'; hint = '미분 후 함수값을 구하는 복합 문제입니다.';
-    }
-    return { level, difficulty: level, text, answer: ans, choices: buildChoices(ans, level), type, hint, meta };
+    const problem = window.MathProblems.generate(level);
+    const roundingHint = Math.abs(problem.answer - Math.round(problem.answer * 100) / 100) > 1e-9
+        ? ' 보기는 소수 셋째 자리에서 반올림한 값입니다.' : '';
+    return { ...problem, hint: problem.hint + roundingHint, choices: buildChoices(problem.answer, level), meta: CURRICULUM[level - 1] };
 }
 
 function nearlyEqual(input, answer) {
@@ -355,6 +303,11 @@ function updateAbility(correct, difficulty, seconds) {
     return { expected, k };
 }
 function chooseNextLevel() {
+    if (state.practiceMode === 'grade') {
+        const first = Math.floor((state.gradeLevel - 1) / 3) * 3 + 1;
+        state.nextLevel = first + ((state.gradeLevel - first + state.asked) % 3);
+        return state.nextLevel;
+    }
     if (state.asked === 0) {
         state.nextLevel = clamp(Math.round(state.theta), MIN_LEVEL, MAX_LEVEL);
         return state.nextLevel;
@@ -371,7 +324,7 @@ function confidencePercent() {
     return Math.round(base + stable);
 }
 function startGame(level = Number($('startLevel').value)) {
-    state = newState(clamp(Number(level) || 6, MIN_LEVEL, MAX_LEVEL));
+    state = newState(clamp(Number(level) || 6, MIN_LEVEL, MAX_LEVEL), $('practiceMode').value);
     saveState();
     $('setupPanel').hidden = true;
     $('gamePanel').hidden = false;
@@ -391,7 +344,7 @@ function nextProblem(preserveLevel = false) {
     paused = false;
     pausedTotal = 0;
     pauseStarted = 0;
-    current = generateProblem(preserveLevel ? state.nextLevel : chooseNextLevel());
+    current = generateProblem(preserveLevel && state.practiceMode !== 'grade' ? state.nextLevel : chooseNextLevel());
     startedAt = Date.now();
     $('problemNo').textContent = `${state.asked + 1}번째 문제`;
     const topicPart = current.type === current.meta.topic ? '' : ` · ${current.type}`;
@@ -553,6 +506,7 @@ function goMenu() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function render() {
+    $('practiceLabel').textContent = state.practiceMode === 'grade' ? `${['중1','중2','중3','고1','고2','고3'][Math.floor((state.gradeLevel-1)/3)]} 학년 고정` : '자동 레벨 진단';
     const acc = state.asked ? Math.round(state.correct / state.asked * 100) : 0;
     const conf = confidencePercent();
     $('estimateLevel').textContent = state.asked ? `Lv.${state.theta.toFixed(1)}` : '-';
@@ -577,7 +531,10 @@ function renderHistory() {
     const last = state.history[state.history.length - 1];
     const conf = confidencePercent();
     const band = curriculumLabel(state.theta);
-    $('analysisText').innerHTML = `현재 추정치는 <b>Lv.${state.theta.toFixed(1)}</b> (${band})입니다. 수렴도는 <b>${conf}%</b>이고, 다음 문제는 <b>${curriculumLabel(state.nextLevel)}</b> 근처로 출제됩니다.`;
+    const nextDescription = state.practiceMode === 'grade'
+        ? `${['중1','중2','중3','고1','고2','고3'][Math.floor((state.gradeLevel-1)/3)]} 학년 고정으로 해당 학년의 단원을 번갈아 풉니다.`
+        : `다음 문제는 <b>${curriculumLabel(state.nextLevel)}</b> 근처로 출제됩니다.`;
+    $('analysisText').innerHTML = `현재 추정치는 <b>Lv.${state.theta.toFixed(1)}</b> (${band})입니다. 수렴도는 <b>${conf}%</b>입니다. ${nextDescription}`;
     $('log').innerHTML = state.history.slice(-8).reverse().map(h => `<div>${h.correct ? '✅' : '❌'} ${curriculumLabel(h.level)} · ${escapeTransferText(h.q)} = ${fmt(h.answer)} · ${h.seconds}초 · 추정 Lv.${h.theta}</div>`).join('');
 }
 function buildControls() {
@@ -607,7 +564,7 @@ $('questionLimitPassword').addEventListener('keydown', e => { if (e.key === 'Ent
 $('startLevel').addEventListener('change', render);
 $('resetBtn').addEventListener('click', () => {
     if (!confirm('풀이 기록과 추정 레벨을 초기화할까요?')) return;
-    state = newState(Number($('startLevel').value) || 6);
+    state = newState(Number($('startLevel').value) || 6, $('practiceMode').value);
     current = null;
     localStorage.removeItem(SAVE_KEY);
     $('setupPanel').hidden = false;
@@ -621,9 +578,16 @@ setInterval(pollMathControl, 5000);
 buildControls();
 if (state.asked > 0) $('startLevel').value = String(clamp(Math.round(state.theta), MIN_LEVEL, MAX_LEVEL));
 try { const level = Number(localStorage.getItem('math-level-start-v1')); if (Number.isInteger(level) && level >= 1 && level <= 18) $('startLevel').value = String(level); } catch (e) { /* 기본 설정 */ }
-if (state.asked > 0) { resumeGame(); }
-else render();
-pollMathControl();
+$('practiceMode').value = state.practiceMode;
+if (state.practiceMode === 'grade') $('startLevel').value = String(state.gradeLevel);
+// Resolve the server's real limit before deciding whether a saved game is locked.
+render();
+pollMathControl().then(() => {
+    if (state.asked > 0 && !current) {
+        resumeGame();
+        if (centralLocked || limitLocked) document.querySelectorAll('#choiceGrid button, #skipBtn, #pauseBtn').forEach(b => { b.disabled = true; });
+    }
+});
 
 // Only educational data crosses the transfer boundary. Server grants stay in memory.
 function validateMathTransfer(raw) {
@@ -642,7 +606,10 @@ function validateMathTransfer(raw) {
         return {q:h.q, answer:num(h.answer,-1e12,1e12), level:num(h.level,1,18,true), correct:h.correct,
             seconds:num(h.seconds,1,100000000,true), theta:num(h.theta,1,18), expected:num(h.expected,0,100)};
     });
-    return {progress:{theta:num(p.theta,1,18), nextLevel:num(p.nextLevel,1,18,true), asked,
+    const practiceMode = p.practiceMode == null ? 'adaptive' : p.practiceMode;
+    if (!['adaptive','grade'].includes(practiceMode)) fail();
+    const gradeLevel = p.gradeLevel == null ? num(raw.startLevel,1,18,true) : num(p.gradeLevel,1,18,true);
+    return {progress:{practiceMode,gradeLevel,theta:num(p.theta,1,18), nextLevel:num(p.nextLevel,1,18,true), asked,
         correct:num(p.correct,0,asked,true), streak:num(p.streak,-asked,asked,true),
         uncertainty:num(p.uncertainty,0.45,3.2),history}, startLevel:num(raw.startLevel,1,18,true)};
 }
@@ -657,6 +624,7 @@ window.GameTransfer.mount({
         data.progress.asked = Math.max(state.asked, data.progress.asked);
         window.GameTransfer.persist({[SAVE_KEY]:JSON.stringify(data.progress),'math-level-start-v1':String(data.startLevel)});
         state = data.progress;
+        $('practiceMode').value = state.practiceMode;
         $('startLevel').value = String(data.startLevel);
         goMenu();
         if (state.asked > 0) resumeGame();

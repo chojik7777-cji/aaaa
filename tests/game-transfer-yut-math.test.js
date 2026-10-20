@@ -21,6 +21,7 @@ async function openGame(t, name, storage = {}, control = {}, realHelper = false)
         const url = new URL(route.request().url());
         if (url.pathname === '/'+name+'.html') return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,name+'.html'),'utf8')});
         if (url.pathname === '/game-transfer.js') return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'game-transfer.js'),'utf8')+(realHelper?'':';GameTransfer.mount=options=>{window.transfer=options;};')});
+        if (url.pathname === '/math-problems.js') return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'math-problems.js'),'utf8')});
         if (url.pathname.startsWith('/api/')) {
             calls.push({url:url.pathname+url.search,method:route.request().method()});
             return route.fulfill({json:{ok:true,version:9,locked:false,questionLimit:5,...control}});
