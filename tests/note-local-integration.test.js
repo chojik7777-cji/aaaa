@@ -4,7 +4,7 @@ const {spawn}=require('node:child_process');
 const root=path.join(__dirname,'..');
 test('portal startup-only bootstrap, HTTP auth/revisions persist through restart; Vercel stays independent',async t=>{
  const dir=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'note-http-')));let child,base;
- const env={...process.env,VERCEL:'',HOST:'127.0.0.1',PORT:'0',NOTE_AUTH_FILE:path.join(dir,'private','note-auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_DIR:path.join(dir,'note'),NOTE2_DIR:path.join(dir,'note2'),NOTE_PASSWORD:'existing-A-test',NOTE2_PASSWORD:'existing-B-test'};
+ const env={...process.env,HOME:dir,VERCEL:'',HOST:'127.0.0.1',PORT:'0',NOTE_AUTH_FILE:path.join(dir,'private','note-auth.json'),NOTE_ADMIN_PASSWORD_FILE:path.join(dir,'admin'),NOTE_DIR:path.join(dir,'note'),NOTE2_DIR:path.join(dir,'note2'),NOTE_PASSWORD:'existing-A-test',NOTE2_PASSWORD:'existing-B-test'};
  fs.writeFileSync(env.NOTE_ADMIN_PASSWORD_FILE,'admin-test-password\n',{mode:0o600});
  fs.mkdirSync(path.join(env.NOTE2_DIR,'default'),{recursive:true});
  async function stop(){if(child){const c=child;child=null;const done=new Promise(r=>c.once('exit',r));c.kill();await done;}}
