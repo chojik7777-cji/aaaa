@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>수학 모험섬</title>
+<style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+        margin: 0; min-height: 100vh; padding: 14px;
+        font-family: 'Jua', 'Apple SD Gothic Neo', '맑은 고딕', sans-serif;
+        background: linear-gradient(180deg, #8fd3fe 0%, #c6f1ff 55%, #fff3c4 100%);
+        color: #2d3748; user-select: none;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    button { font: inherit; cursor: pointer; border: 0; }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    h1 { margin: 4px 0; font-size: 28px; color: #1a4d7a; text-shadow: 0 2px 0 #fff; }
+    .stat { display: flex; gap: 6px; align-items: center; }
+    .pill { background: rgba(255,255,255,.85); border-radius: 999px; padding: 6px 12px; font-weight: 800; font-size: 15px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    .icon-btn { background: rgba(255,255,255,.85); border-radius: 999px; padding: 6px 10px; font-size: 18px; }
+    .card { background: rgba(255,255,255,.93); border-radius: 24px; padding: 18px; margin-top: 12px; box-shadow: 0 10px 30px rgba(26,77,122,.15); }
+    .hello { display: flex; gap: 12px; align-items: center; }
+    .mascot { font-size: 54px; animation: bob 2.4s ease-in-out infinite; }
+    @keyframes bob { 50% { transform: translateY(-6px) rotate(-4deg); } }
+    .bubble { background: #fffbe6; border: 2px solid #ffe08a; border-radius: 18px; padding: 10px 14px; font-size: 17px; line-height: 1.5; }
+    h2 { margin: 6px 0 10px; font-size: 20px; color: #1a4d7a; }
+    .ages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .age { background: #edf6ff; border: 3px solid transparent; border-radius: 16px; padding: 10px 6px; font-size: 16px; font-weight: 800; color: #1a4d7a; }
+    .age small { display: block; font-weight: 600; font-size: 12px; color: #5a6b7d; margin-top: 2px; }
+    .age.on { background: #fff; border-color: #ffb703; box-shadow: 0 4px 0 #ffb703; }
+    .games { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .game { position: relative; border-radius: 20px; padding: 14px 10px 12px; color: white; text-align: center; box-shadow: 0 6px 0 rgba(0,0,0,.15); transition: transform .1s; }
+    .game:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+    .game .em { font-size: 42px; display: block; }
+    .game b { display: block; font-size: 19px; margin-top: 2px; }
+    .game span { font-size: 13px; opacity: .95; }
+    .game .stars { position: absolute; top: 6px; right: 8px; font-size: 13px; letter-spacing: -2px; }
+    .stickers { display: flex; flex-wrap: wrap; gap: 6px; font-size: 30px; min-height: 40px; }
+    .stickers .lock { filter: grayscale(1); opacity: .25; }
+    .hint { font-size: 13px; color: #5a6b7d; line-height: 1.6; }
+
+    /* 게임 화면 */
+    .play-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .back { background: #fff; border-radius: 999px; padding: 8px 14px; font-weight: 800; color: #1a4d7a; box-shadow: 0 3px 0 #c9d9ea; }
+    .progress { flex: 1; height: 14px; background: rgba(255,255,255,.7); border-radius: 999px; overflow: hidden; }
+    .progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb703, #fb8500); border-radius: 999px; transition: width .4s; }
+    .prompt { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 28px; font-weight: 800; color: #1a4d7a; text-align: center; min-height: 64px; line-height: 1.3; flex-wrap: wrap; }
+    .prompt .say { font-size: 22px; background: #edf6ff; border-radius: 999px; padding: 4px 10px; }
+    .stage { position: relative; height: 340px; border-radius: 22px; overflow: hidden; margin-top: 10px; }
+    .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); gap: 10px; margin-top: 12px; }
+    .choice { background: #fff; border-radius: 18px; padding: 14px 6px; font-size: 30px; font-weight: 800; color: #1a4d7a; box-shadow: 0 5px 0 #c9d9ea; }
+    .choice:active { transform: translateY(3px); box-shadow: 0 2px 0 #c9d9ea; }
+    .wrong { animation: shake .35s; background: #ffe3e3 !important; }
+    .right { background: #d3f9d8 !important; }
+    @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+    .feedback { text-align: center; font-size: 20px; font-weight: 800; min-height: 30px; margin-top: 8px; }
+    .feedback.good { color: #2b8a3e; } .feedback.bad { color: #c92a2a; }
+
+    /* 물고기 */
+    .sea { background: linear-gradient(180deg, #4dabf7, #1971c2); }
+    .fish { position: absolute; font-size: 22px; font-weight: 800; color: #1a4d7a; background: #ffe066; border-radius: 50% 40% 40% 50%; padding: 10px 18px 10px 14px; box-shadow: 0 4px 0 rgba(0,0,0,.15); white-space: nowrap; transition: left linear; }
+    .fish::after { content: ''; position: absolute; right: -16px; top: 50%; transform: translateY(-50%); border: 12px solid transparent; border-left: 16px solid #ffd43b; }
+    .fish.flip { transform: scaleX(-1); } .fish.flip > span { display: inline-block; transform: scaleX(-1); }
+    .bubbles { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 20% 80%, rgba(255,255,255,.25) 0 6px, transparent 7px), radial-gradient(circle at 70% 60%, rgba(255,255,255,.2) 0 4px, transparent 5px), radial-gradient(circle at 45% 30%, rgba(255,255,255,.2) 0 5px, transparent 6px); }
+    /* 풍선 */
+    .sky { background: linear-gradient(180deg, #a5d8ff, #e7f5ff); }
+    .balloon { position: absolute; bottom: -110px; width: 82px; height: 98px; border-radius: 50% 50% 48% 48%; font-size: 26px; font-weight: 800; color: white; display: flex; align-items: center; justify-content: center; text-shadow: 0 2px 0 rgba(0,0,0,.25); box-shadow: inset -8px -10px 0 rgba(0,0,0,.12); }
+    .balloon::after { content: ''; position: absolute; bottom: -26px; left: 50%; width: 2px; height: 26px; background: #868e96; }
+    .pop { animation: pop .25s forwards; }
+    @keyframes pop { to { transform: scale(1.6); opacity: 0; } }
+    /* 개구리 */
+    .pond { background: linear-gradient(180deg, #74c0fc, #339af0); }
+    .pads { position: absolute; left: 0; right: 0; bottom: 70px; display: flex; justify-content: space-around; padding: 0 6px; }
+    .pad { position: relative; width: 52px; height: 52px; border-radius: 50%; background: #51cf66; box-shadow: 0 4px 0 #2f9e44; color: white; font-weight: 800; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+    .pad.small { width: 40px; height: 40px; font-size: 16px; }
+    .pad.target { outline: 4px dashed #fff3bf; }
+    .frog { position: absolute; bottom: 118px; font-size: 40px; transition: left .5s cubic-bezier(.3,1.6,.6,1); transform: translateX(-50%); }
+    /* 짝꿍 카드 */
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+    .tile { aspect-ratio: 1; border-radius: 18px; background: #fff; font-size: 30px; font-weight: 800; color: #1a4d7a; box-shadow: 0 5px 0 #c9d9ea; }
+    .tile.sel { background: #fff3bf; box-shadow: 0 5px 0 #ffd43b; }
+    .tile.done { visibility: hidden; }
+    /* 가게 */
+    .shop { display: flex; gap: 14px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .item { font-size: 70px; }
+    .price { font-size: 30px; font-weight: 800; color: #e8590c; }
+    .tray { min-height: 70px; background: #fff9db; border: 3px dashed #ffd43b; border-radius: 18px; margin-top: 12px; padding: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; }
+    .paid { font-size: 22px; font-weight: 800; color: #1a4d7a; text-align: center; margin-top: 6px; }
+    .coins { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 12px; }
+    .coin { width: 72px; height: 72px; border-radius: 50%; font-weight: 800; font-size: 17px; color: #5c3d00; background: radial-gradient(circle at 35% 30%, #fff3bf, #fcc419 60%, #e67700); box-shadow: 0 4px 0 #a35b00; }
+    .coin.silver { color: #343a40; background: radial-gradient(circle at 35% 30%, #fff, #ced4da 60%, #868e96); box-shadow: 0 4px 0 #495057; }
+    .coin.bill { width: 100px; height: 56px; border-radius: 8px; color: #fff; background: linear-gradient(135deg, #69db7c, #2f9e44); box-shadow: 0 4px 0 #2b8a3e; }
+    .coin.mini { width: 44px; height: 44px; font-size: 12px; box-shadow: none; }
+    .coin.bill.mini { width: 60px; height: 34px; }
+    .row-btns { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+    .btn { background: #339af0; color: white; border-radius: 16px; padding: 12px 22px; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 #1c7ed6; }
+    .btn.gray { background: #e9ecef; color: #495057; box-shadow: 0 5px 0 #ced4da; }
+    /* 레이스 */
+    .track { background: linear-gradient(180deg, #8ce99a 0 30%, #868e96 30% 70%, #8ce99a 70%); height: 120px; }
+    .track .line { position: absolute; left: 0; right: 0; top: 50%; border-top: 4px dashed #fff; }
+    .track .finish { position: absolute; right: 10px; top: 30%; bottom: 30%; width: 16px; background: repeating-linear-gradient(0deg, #000 0 8px, #fff 8px 16px); }
+    .car { position: absolute; top: 50%; transform: translate(-50%, -55%) scaleX(-1); font-size: 44px; transition: left .4s; }
+    .timer { font-size: 22px; font-weight: 800; color: #e8590c; text-align: center; }
+
+    /* 결과 */
+    .result { text-align: center; }
+    .result .big { font-size: 64px; letter-spacing: 6px; }
+    .confetti { position: fixed; top: -20px; font-size: 24px; pointer-events: none; animation: fall 2.2s linear forwards; z-index: 50; }
+    @keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
+
+    .footer { text-align: center; margin: 18px 0 6px; color: #1a4d7a; font-size: 14px; }
+    .footer a { color: #1864ab; font-weight: 700; }
+    [hidden] { display: none !important; }
+    @media (max-width: 520px) {
+        h1 { font-size: 23px; }
+        .prompt { font-size: 24px; }
+        .stage { height: 300px; }
+        .choice { font-size: 26px; }
+        .pad { width: 40px; height: 40px; font-size: 16px; }
+        .pad.small { width: 30px; height: 30px; font-size: 12px; }
+        .games { grid-template-columns: repeat(2, 1fr); }
+        .game .em { font-size: 34px; }
+        .game b { font-size: 17px; }
+        .balloon { width: 66px; height: 80px; font-size: 22px; }
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="top">
+        <h1>🏝️ 수학 모험섬</h1>
+        <div class="stat">
+            <span class="pill" id="starTotal">⭐ 0</span>
+            <button class="icon-btn" id="voiceBtn" title="문제 읽어 주기" aria-label="문제 읽어 주기">🗣️</button>
+            <button class="icon-btn" id="soundBtn" title="소리" aria-label="소리">🔊</button>
+        </div>
+    </div>
+
+    <!-- 메인 -->
+    <section id="home">
+        <div class="card">
+            <div class="hello">
+                <div class="mascot">🐢</div>
+                <div class="bubble" id="greet">안녕! 나는 거북이 <b>또또</b>야. 모험섬에서 수학 놀이 하자!</div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>몇 살 친구예요?</h2>
+            <div class="ages" id="ages">
+                <button class="age" data-age="0">🐣 유아<small>5~7살</small></button>
+                <button class="age" data-age="1">🐥 초등 1~2</button>
+                <button class="age" data-age="2">🦅 초등 3~4</button>
+            </div>
+        </div>
+        <div class="card">
+            <h2>어떤 놀이를 할까요?</h2>
+            <div class="games" id="games"></div>
+        </div>
+        <div class="card">
+            <h2>🎁 스티커 모으기 <span class="hint" id="stickerHint"></span></h2>
+            <div class="stickers" id="stickers"></div>
+        </div>
+    </section>
+
+    <!-- 놀이 -->
+    <section id="play" hidden>
+        <div class="card">
+            <div class="play-top">
+                <button class="back" id="backBtn">← 섬으로</button>
+                <div class="progress"><i id="bar"></i></div>
+                <span class="pill" id="score">0 / 10</span>
+            </div>
+            <div class="prompt"><span id="prompt"></span><button class="say" id="sayBtn" aria-label="다시 듣기">🔊</button></div>
+            <div id="board"></div>
+            <div class="feedback" id="feedback"></div>
+        </div>
+    </section>
+
+    <!-- 결과 -->
+    <section id="result" hidden>
+        <div class="card result">
+            <div class="mascot">🐢</div>
+            <h2 id="resTitle">잘했어요!</h2>
+            <div class="big" id="resStars">⭐⭐⭐</div>
+            <p class="bubble" id="resMsg"></p>
+            <div class="row-btns">
+                <button class="btn" id="againBtn">🔁 한 번 더</button>
+                <button class="btn gray" id="homeBtn">🏝️ 섬으로</button>
+            </div>
+        </div>
+    </section>
+
+    <p class="footer">made by jeongik<br>문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
+</div>
+
+<script>
+'use strict';
+// ===== 문제 만들기 (화면과 무관한 순수 함수, 테스트에서도 사용) =====
+const MathIsland = (() => {
+    const int = (rnd, a, b) => a + Math.floor(rnd() * (b - a + 1));
+    const pick = (rnd, arr) => arr[Math.floor(rnd() * arr.length)];
+    const shuffle = (rnd, arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    // 정답 주변의 그럴듯한 오답 (음수 없음, 중복 없음)
+    function distractors(rnd, answer, count, spread, min = 0) {
+        const set = new Set([answer]);
+        let guard = 0;
+        while (set.size < count + 1 && guard++ < 200) {
+            const d = int(rnd, 1, spread) * (rnd() < 0.5 ? -1 : 1);
+            const v = answer + d;
+            if (v >= min) set.add(v);
+        }
+        for (let v = answer + 1; set.size < count + 1; v++) set.add(v);
+        return shuffle(rnd, [...set]);
+    }
+    const EMOJI = ['🍎', '🍓', '🐟', '⭐', '🌸', '🐥', '🍪', '🎈', '🚗', '🦋'];
+
+    // 나이별 기본 문제: 0 유아(세기·10까지 더하기), 1 초등 1~2(20까지 덧뺄셈), 2 초등 3~4(구구단·나눗셈·두 자리)
+    function basic(rnd, age) {
+        if (age === 0) {
+            if (rnd() < 0.5) {
+                const n = int(rnd, 1, 10), e = pick(rnd, EMOJI);
+                return { text: `${e.repeat(n)}`, speak: `${e === '⭐' ? '별' : '그림'}이 몇 개일까요?`, ask: '몇 개일까요?', answer: n, spread: 2, min: 1 };
+            }
+            const a = int(rnd, 1, 5), b = int(rnd, 1, 5);
+            return { text: `${a} + ${b}`, speak: `${a} 더하기 ${b}는?`, answer: a + b, spread: 2, min: 1 };
+        }
+        if (age === 1) {
+            if (rnd() < 0.5) { const a = int(rnd, 3, 15), b = int(rnd, 2, 20 - a); return { text: `${a} + ${b}`, speak: `${a} 더하기 ${b}는?`, answer: a + b, spread: 3 }; }
+            const a = int(rnd, 6, 20), b = int(rnd, 1, a - 1); return { text: `${a} − ${b}`, speak: `${a} 빼기 ${b}는?`, answer: a - b, spread: 3 };
+        }
+        const r = rnd();
+        if (r < 0.5) { const a = int(rnd, 2, 9), b = int(rnd, 2, 9); return { text: `${a} × ${b}`, speak: `${a} 곱하기 ${b}는?`, answer: a * b, spread: 6, min: 1 }; }
+        if (r < 0.75) { const b = int(rnd, 2, 9), q = int(rnd, 2, 9); return { text: `${b * q} ÷ ${b}`, speak: `${b * q} 나누기 ${b}는?`, answer: q, spread: 3, min: 1 }; }
+        const a = int(rnd, 12, 68), b = int(rnd, 11, 99 - a); return { text: `${a} + ${b}`, speak: `${a} 더하기 ${b}는?`, answer: a + b, spread: 10 };
+    }
+    function withChoices(rnd, q, n = 4) { return { ...q, choices: distractors(rnd, q.answer, n - 1, q.spread || 3, q.min ?? 0) }; }
+
+    const GAMES = {
+        // 🐟 물고기 잡기: 정답 숫자가 적힌 물고기를 잡아요
+        fish(rnd, age) {
+            if (age === 0) { const n = int(rnd, 1, 10); return { text: `${n}`, speak: `숫자 ${n} 물고기를 잡아요!`, ask: '물고기를 잡아요', answer: n, choices: distractors(rnd, n, 4, 4, 1) }; }
+            return withChoices(rnd, basic(rnd, age), 5);
+        },
+        // 🎈 풍선 터뜨리기: 정답 풍선을 날아가기 전에 터뜨려요
+        balloon(rnd, age) { return withChoices(rnd, basic(rnd, age), 4); },
+        // 🐸 개구리 징검다리: 수직선 위에서 뛰어 세기 (보기는 화면의 연잎 가운데 정답 가까운 것)
+        frog(rnd, age) {
+            const q = frogQ(rnd, age);
+            const pads = frogPads(q), i = pads.indexOf(q.answer);
+            const near = pads.filter((v) => v !== q.answer && v !== q.start).sort((x, y) => Math.abs(pads.indexOf(x) - i) - Math.abs(pads.indexOf(y) - i) || rnd() - 0.5);
+            q.choices = shuffle(rnd, [q.answer, ...near.slice(0, 3)]);
+            return q;
+        },
+    };
+    function frogQ(rnd, age) {
+        if (age === 0) { const max = 10, start = int(rnd, 0, 6), step = int(rnd, 1, Math.min(3, max - start)); return { max, start, step, answer: start + step, text: `${start}에서 ${step}칸 앞으로!`, speak: `${start}에서 ${step}칸 앞으로 뛰면 어디일까요?` }; }
+        if (age === 1) {
+            const max = 20, start = int(rnd, 2, 18), fwd = rnd() < 0.5;
+            const step = fwd ? int(rnd, 2, Math.min(6, max - start)) : int(rnd, 2, Math.min(6, start));
+            const answer = fwd ? start + step : start - step;
+            return { max, start, step: fwd ? step : -step, answer, text: `${start}에서 ${step}칸 ${fwd ? '앞으로' : '뒤로'}!`, speak: `${start}에서 ${step}칸 ${fwd ? '앞으로' : '뒤로'} 뛰면 어디일까요?` };
+        }
+        const by = pick(rnd, [2, 5, 10, 3, 4]), max = by * 10, start = by * int(rnd, 1, 6), jumps = int(rnd, 2, 4);
+        return { max, by, start, step: by * jumps, answer: start + by * jumps, text: `${start}에서 ${by}씩 ${jumps}번 뛰면?`, speak: `${start}에서 ${by}씩 ${jumps}번 뛰면 어디일까요?` };
+    }
+    Object.assign(GAMES, {
+        // 🧩 짝꿍 찾기: 두 수를 더해 목표 수 만들기
+        pair(rnd, age) {
+            const target = age === 0 ? 5 : age === 1 ? 10 : 100;
+            const used = new Set(), pairs = [];
+            let guard = 0;
+            while (pairs.length < 4 && guard++ < 300) {
+                const a = age === 2 ? int(rnd, 1, 9) * 10 + (rnd() < 0.5 ? 0 : 5) : int(rnd, 1, target - 1);
+                const b = target - a;
+                // 유아(5 만들기)는 짝이 2가지뿐이라 같은 짝이 다시 나와도 괜찮아요
+                if (age !== 0 && (used.has(a) || used.has(b))) continue;
+                used.add(a); used.add(b); pairs.push([a, b]);
+            }
+            const ga = target === 5 ? '가' : '이';
+            return { target, tiles: shuffle(rnd, pairs.flat()), text: `더해서 ${target}${ga} 되는 짝꿍을 찾아요`, speak: `더해서 ${target}${ga} 되는 두 수를 찾아요!` };
+        },
+        // 🛒 시장 놀이: 동전으로 딱 맞게 내기
+        shop(rnd, age) {
+            const items = ['🍭', '🍦', '🧃', '🍙', '🥐', '✏️', '🧸', '🎨', '📒', '🍩'];
+            const coins = age === 0 ? [10] : age === 1 ? [10, 50, 100] : [10, 50, 100, 500, 1000];
+            const price = age === 0 ? 10 * int(rnd, 1, 9) : age === 1 ? 10 * int(rnd, 3, 50) : 10 * int(rnd, 30, 300);
+            return { item: pick(rnd, items), price, coins, text: `${price}원을 딱 맞게 내요`, speak: `${price}원을 동전으로 딱 맞게 내 볼까요?` };
+        },
+        // 🏁 자동차 경주: 60초 동안 빨리 풀기
+        race(rnd, age) {
+            if (age === 0) {
+                const a = int(rnd, 1, 10); let b = int(rnd, 1, 10); if (a === b) b = a === 10 ? 9 : a + 1;
+                return { text: `${a}  ?  ${b}`, speak: '더 큰 수는?', ask: '더 큰 수는?', answer: Math.max(a, b), choices: [a, b] };
+            }
+            return withChoices(rnd, basic(rnd, age), 3);
+        },
+    });
+    // 동전으로 낸 금액
+    const sum = (arr) => arr.reduce((s, v) => s + v, 0);
+    function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+    // 개구리 화면에 보여 줄 연잎 11개 (출발점과 정답이 모두 들어가게)
+    function frogPads(q) {
+        if (q.by) return Array.from({ length: 11 }, (_, i) => i * q.by);
+        const lo = Math.max(0, Math.min(Math.min(q.start, q.answer) - 2, q.max - 10));
+        return Array.from({ length: 11 }, (_, i) => lo + i);
+    }
+    return { GAMES, basic, distractors, frogPads, sum, mulberry32 };
+})();
+if (typeof module !== 'undefined') module.exports = MathIsland;
+
+// ===== 화면 =====
+if (typeof document !== 'undefined') {
+const $ = (id) => document.getElementById(id);
+const { GAMES, sum } = MathIsland;
+const ROUND = 10, RACE_SEC = 60, RACE_GOAL = 15;
+const GAME_INFO = [
+    { key: 'fish', em: '🐟', name: '물고기 잡기', desc: '정답 물고기를 콕!', color: '#228be6' },
+    { key: 'balloon', em: '🎈', name: '풍선 팡팡', desc: '날아가기 전에 터뜨려요', color: '#e64980' },
+    { key: 'frog', em: '🐸', name: '개구리 징검다리', desc: '수직선 뛰어 세기', color: '#2f9e44' },
+    { key: 'pair', em: '🧩', name: '짝꿍 찾기', desc: '더해서 목표 수 만들기', color: '#7048e8' },
+    { key: 'shop', em: '🛒', name: '시장 놀이', desc: '동전으로 딱 맞게', color: '#f08c00' },
+    { key: 'race', em: '🏁', name: '자동차 경주', desc: '60초 스피드 퀴즈', color: '#e8590c' },
+];
+const STICKERS = ['🐶', '🐱', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🦄', '🐳', '🦖', '🚀', '🌈', '🏆', '👑'];
+const STARS_PER_STICKER = 5;
+const SAVE_KEY = 'math-island-v1';
+const AGE_NAMES = ['유아', '초등 1~2', '초등 3~4'];
+
+let save = { age: 0, stars: 0, best: {}, sound: true, voice: true };
+try { save = Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch (e) { /* 새로 시작 */ }
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* 저장 안 돼도 놀이는 가능 */ } }
+
+// ---- 소리 ----
+let actx = null;
+function tone(f, t, d, vol = 0.08, type = 'triangle') {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d + 0.02);
+}
+function sfx(kind) {
+    if (!save.sound) return;
+    try {
+        actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') actx.resume();
+        const t = actx.currentTime + 0.01;
+        if (kind === 'good') { tone(660, t, 0.12); tone(880, t + 0.1, 0.2); }
+        else if (kind === 'bad') { tone(220, t, 0.18, 0.06, 'sawtooth'); }
+        else if (kind === 'pop') { tone(900, t, 0.06, 0.07, 'square'); tone(500, t + 0.04, 0.08, 0.05, 'square'); }
+        else if (kind === 'coin') { tone(1320, t, 0.07, 0.05, 'square'); tone(1760, t + 0.06, 0.1, 0.05, 'square'); }
+        else if (kind === 'jump') { [400, 600, 800].forEach((f, i) => tone(f, t + i * 0.05, 0.08, 0.05)); }
+        else if (kind === 'win') { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, t + i * 0.11, 0.25)); }
+        else if (kind === 'tap') { tone(700, t, 0.05, 0.04); }
+    } catch (e) { /* 소리 없이 진행 */ }
+}
+// ---- 읽어 주기 (한국어 음성) ----
+function speak(text) {
+    if (!save.voice || !('speechSynthesis' in window) || !text) return;
+    try {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text.replace(/−/g, '빼기').replace(/×/g, '곱하기').replace(/÷/g, '나누기'));
+        u.lang = 'ko-KR'; u.rate = 0.95; u.pitch = 1.15;
+        speechSynthesis.speak(u);
+    } catch (e) { /* 음성 없이 진행 */ }
+}
+
+// ---- 메인 화면 ----
+function renderHome() {
+    $('starTotal').textContent = `⭐ ${save.stars}`;
+    $('soundBtn').textContent = save.sound ? '🔊' : '🔇';
+    $('voiceBtn').style.opacity = save.voice ? 1 : 0.4;
+    document.querySelectorAll('.age').forEach((b) => b.classList.toggle('on', Number(b.dataset.age) === save.age));
+    $('games').innerHTML = GAME_INFO.map((g) => {
+        const best = save.best[`${g.key}-${save.age}`] || 0;
+        return `<button class="game" data-game="${g.key}" style="background:${g.color}">
+            <span class="stars">${'⭐'.repeat(best)}${'☆'.repeat(3 - best)}</span>
+            <span class="em">${g.em}</span><b>${g.name}</b><span>${g.desc}</span></button>`;
+    }).join('');
+    const got = Math.min(STICKERS.length, Math.floor(save.stars / STARS_PER_STICKER));
+    $('stickers').innerHTML = STICKERS.map((s, i) => `<span class="${i < got ? '' : 'lock'}" title="${i < got ? '받은 스티커' : '아직 잠겨 있어요'}">${s}</span>`).join('');
+    const left = STARS_PER_STICKER - (save.stars % STARS_PER_STICKER);
+    $('stickerHint').textContent = got >= STICKERS.length ? '모두 모았어요! 🎉' : `별 ${left}개 더 모으면 새 스티커!`;
+}
+function show(id) { for (const s of ['home', 'play', 'result']) $(s).hidden = s !== id; window.scrollTo({ top: 0 }); }
+
+// ---- 놀이 진행 ----
+let G = null; // 지금 놀이 { key, age, n, correct, tries, q, timers[] }
+function clearTimers() { if (!G) return; G.timers.forEach((t) => { clearTimeout(t); clearInterval(t); cancelAnimationFrame(t); }); G.timers = []; }
+function startGame(key) {
+    clearTimers();
+    G = { key, age: save.age, n: 0, correct: 0, wrongInQ: 0, timers: [], q: null, raceLeft: RACE_SEC };
+    show('play');
+    $('feedback').textContent = '';
+    if (key === 'race') startRace(); else next();
+}
+function setProgress() {
+    const total = G.key === 'race' ? RACE_GOAL : ROUND;
+    const done = G.key === 'race' ? G.correct : G.n;
+    $('bar').style.width = `${Math.min(100, (done / total) * 100)}%`;
+    $('score').textContent = G.key === 'race' ? `🏁 ${G.correct} / ${RACE_GOAL}` : `${Math.min(G.n + 1, ROUND)} / ${ROUND}`;
+}
+function setPrompt(q) {
+    const el = $('prompt');
+    if (q.ask) {
+        el.innerHTML = '<span></span><br><small style="font-size:20px"></small>';
+        el.firstChild.textContent = q.text; el.lastChild.textContent = q.ask;
+        el.firstChild.style.cssText = `font-size:${[...q.text].length > 6 ? 26 : 34}px;letter-spacing:2px`;
+    } else el.textContent = /[가-힣]/.test(q.text) ? q.text : `${q.text} = ?`;
+    speak(q.speak || q.text);
+}
+function feedback(ok, msg) {
+    const el = $('feedback');
+    el.className = `feedback ${ok ? 'good' : 'bad'}`;
+    el.textContent = msg;
+}
+const PRAISE = ['딩동댕! 🎉', '최고예요! 👍', '와, 정답! 🌟', '멋져요! 💯', '잘했어요! 😄'];
+const RETRY = ['다시 해 볼까? 🤔', '천천히 다시! 🐢', '거의 다 왔어요! 💪'];
+function answerResult(ok, btn) {
+    if (ok) {
+        sfx('good');
+        if (G.wrongInQ === 0) G.correct++;
+        feedback(true, PRAISE[Math.floor(Math.random() * PRAISE.length)]);
+        btn && btn.classList.add('right');
+    } else {
+        sfx('bad');
+        G.wrongInQ++;
+        feedback(false, RETRY[Math.floor(Math.random() * RETRY.length)]);
+        if (btn) { btn.classList.remove('wrong'); void btn.offsetWidth; btn.classList.add('wrong'); }
+    }
+    return ok;
+}
+function next() {
+    clearTimers();
+    if (G.n >= ROUND) return finish();
+    G.wrongInQ = 0;
+    G.q = GAMES[G.key](Math.random, G.age);
+    setProgress();
+    ({ fish: renderFish, balloon: renderBalloon, frog: renderFrog, pair: renderPair, shop: renderShop })[G.key](G.q);
+    setPrompt(G.q);
+}
+function goNext(delay = 900) { G.timers.push(setTimeout(() => { G.n++; $('feedback').textContent = ''; next(); }, delay)); }
+
+// 🐟 물고기
+function renderFish(q) {
+    const board = $('board');
+    board.innerHTML = '<div class="stage sea" id="sea"><div class="bubbles"></div></div>';
+    const sea = $('sea'), H = sea.clientHeight, W = sea.clientWidth;
+    const lanes = q.choices.length, laneH = (H - 20) / lanes;
+    q.choices.forEach((v, i) => {
+        const f = document.createElement('button');
+        const fromLeft = i % 2 === 0;
+        f.className = 'fish' + (fromLeft ? '' : ' flip');
+        f.innerHTML = `<span>${v}</span>`;
+        f.style.top = `${10 + i * laneH + (laneH - 50) / 2}px`;
+        const speed = 7000 + Math.random() * 4000;
+        f.style.left = fromLeft ? '-120px' : `${W + 20}px`;
+        sea.appendChild(f);
+        const swim = () => {
+            const toRight = !f.classList.contains('flip');
+            f.style.transitionDuration = '0ms';
+            f.style.left = toRight ? '-120px' : `${W + 20}px`;
+            void f.offsetWidth;
+            f.style.transitionDuration = `${speed}ms`;
+            f.style.left = toRight ? `${W + 20}px` : '-120px';
+        };
+        G.timers.push(setTimeout(swim, 50 + i * 500));
+        G.timers.push(setInterval(swim, speed + 600));
+        f.addEventListener('click', () => {
+            if (f.dataset.done) return;
+            if (answerResult(v === q.answer, null)) {
+                sfx('pop'); f.dataset.done = 1;
+                const r = f.getBoundingClientRect(), s = sea.getBoundingClientRect();
+                f.style.transitionDuration = '0ms'; f.style.left = `${r.left - s.left}px`;
+                f.textContent = '🎣'; f.style.background = '#d3f9d8';
+                goNext();
+            } else { f.style.background = '#ffc9c9'; setTimeout(() => { f.style.background = ''; }, 500); }
+        });
+    });
+}
+// 🎈 풍선
+const BALLOON_COLORS = ['#ff6b6b', '#f783ac', '#845ef7', '#339af0', '#20c997', '#fcc419', '#ff922b'];
+function renderBalloon(q) {
+    $('board').innerHTML = '<div class="stage sky" id="sky"></div>';
+    const sky = $('sky'), W = sky.clientWidth, H = sky.clientHeight;
+    const n = q.choices.length, gap = W / n;
+    const rise = G.age === 0 ? 9000 : G.age === 1 ? 7500 : 6500;
+    q.choices.forEach((v, i) => {
+        const b = document.createElement('button');
+        b.className = 'balloon';
+        b.style.background = BALLOON_COLORS[(i + G.n) % BALLOON_COLORS.length];
+        b.textContent = v;
+        sky.appendChild(b);
+        b.style.left = `${gap * i + (gap - b.offsetWidth) / 2}px`;
+        const start = performance.now() + i * 350;
+        const step = (now) => {
+            if (b.dataset.done) return;
+            const p = Math.max(0, (now - start) / rise);
+            b.style.bottom = `${-110 + p * (H + 220)}px`;
+            b.style.marginLeft = `${Math.sin(now / 400 + i) * 8}px`;
+            if (p < 1) { const id = requestAnimationFrame(step); G.timers.push(id); }
+            else if (v === q.answer && !G.answered) { // 정답 풍선이 날아가면 다시
+                feedback(false, '앗, 날아갔어요! 다시 해 봐요 🎈');
+                G.wrongInQ++;
+                G.timers.push(setTimeout(() => renderBalloon(q), 900));
+            }
+        };
+        G.timers.push(requestAnimationFrame(step));
+        b.addEventListener('click', () => {
+            if (b.dataset.done) return;
+            if (answerResult(v === q.answer, null)) {
+                b.dataset.done = 1; G.answered = true; sfx('pop'); b.classList.add('pop');
+                G.timers.push(setTimeout(() => { G.answered = false; goNext(500); }, 10));
+            } else { b.dataset.done = 1; b.classList.add('pop'); }
+        });
+    });
+}
+// 🐸 개구리
+function renderFrog(q) {
+    const values = MathIsland.frogPads(q);
+    const small = values[values.length - 1] >= 100;
+    $('board').innerHTML = `<div class="stage pond" id="pond" style="height:230px"><div class="frog" id="frog">🐸</div><div class="pads" id="pads">${values.map((v) => `<span class="pad${small ? ' small' : ''}" data-v="${v}">${v}</span>`).join('')}</div></div>
+        <div class="choices" id="choices"></div>`;
+    const placeFrog = (v) => {
+        const pad = document.querySelector(`.pad[data-v="${v}"]`); if (!pad) return;
+        const pr = pad.getBoundingClientRect(), sr = $('pond').getBoundingClientRect();
+        $('frog').style.left = `${pr.left - sr.left + pr.width / 2}px`;
+    };
+    G.timers.push(setTimeout(() => placeFrog(q.start), 30));
+    const choices = q.choices.slice(0, 4);
+    $('choices').innerHTML = choices.sort((a, b) => a - b).map((v) => `<button class="choice" data-v="${v}">${v}</button>`).join('');
+    $('choices').onclick = (e) => {
+        const b = e.target.closest('.choice'); if (!b || G.locked) return;
+        const v = Number(b.dataset.v);
+        if (answerResult(v === q.answer, b)) {
+            G.locked = true; sfx('jump');
+            // 한 칸씩 뛰는 모습
+            const dir = q.answer > q.start ? 1 : -1, unit = q.by || 1;
+            let cur = q.start;
+            const hop = () => {
+                cur += dir * unit; placeFrog(cur); sfx('tap');
+                if (cur !== q.answer) G.timers.push(setTimeout(hop, 260)); else { G.locked = false; goNext(800); }
+            };
+            G.timers.push(setTimeout(hop, 150));
+        }
+    };
+}
+// 🧩 짝꿍
+function renderPair(q) {
+    $('board').innerHTML = `<div class="grid" id="grid">${q.tiles.map((v, i) => `<button class="tile" data-i="${i}">${v}</button>`).join('')}</div>`;
+    let sel = null, left = q.tiles.length / 2;
+    $('grid').onclick = (e) => {
+        const t = e.target.closest('.tile'); if (!t || t.classList.contains('done')) return;
+        sfx('tap');
+        if (!sel) { sel = t; t.classList.add('sel'); return; }
+        if (sel === t) { t.classList.remove('sel'); sel = null; return; }
+        const a = Number(sel.textContent), b = Number(t.textContent);
+        if (a + b === q.target) {
+            sfx('good'); feedback(true, `${a} + ${b} = ${q.target} 🎉`);
+            const s = sel; s.classList.add('sel'); t.classList.add('sel');
+            setTimeout(() => { s.classList.add('done'); t.classList.add('done'); }, 350);
+            left--;
+            if (left === 0) { if (G.wrongInQ === 0) G.correct++; goNext(1000); }
+        } else {
+            sfx('bad'); G.wrongInQ++; feedback(false, `${a} + ${b} = ${a + b}, ${q.target}이 아니에요`);
+            t.classList.add('wrong'); setTimeout(() => t.classList.remove('wrong'), 400);
+            sel.classList.remove('sel');
+        }
+        sel = null;
+    };
+}
+// 🛒 시장
+const coinLabel = (c) => (c >= 1000 ? `${c}원` : `${c}`);
+const coinClass = (c) => (c >= 1000 ? 'coin bill' : c === 10 || c === 50 ? 'coin' : 'coin silver');
+function renderShop(q) {
+    const paid = [];
+    $('board').innerHTML = `<div class="shop"><span class="item">${q.item}</span><span class="price">${q.price}원</span></div>
+        <div class="tray" id="tray"><span class="hint">아래 동전을 눌러 여기에 놓아요</span></div>
+        <div class="paid" id="paid">낸 돈: 0원</div>
+        <div class="coins" id="coins">${q.coins.map((c) => `<button class="${coinClass(c)}" data-c="${c}">${coinLabel(c)}</button>`).join('')}</div>
+        <div class="row-btns"><button class="btn gray" id="undoBtn">↩️ 하나 빼기</button><button class="btn" id="payBtn">💳 계산하기</button></div>`;
+    const draw = () => {
+        $('tray').innerHTML = paid.length ? paid.map((c) => `<span class="${coinClass(c)} mini">${coinLabel(c)}</span>`).join('') : '<span class="hint">아래 동전을 눌러 여기에 놓아요</span>';
+        $('paid').textContent = `낸 돈: ${sum(paid)}원`;
+    };
+    $('coins').onclick = (e) => { const b = e.target.closest('[data-c]'); if (!b) return; if (paid.length >= 30) return; paid.push(Number(b.dataset.c)); sfx('coin'); draw(); };
+    $('undoBtn').onclick = () => { paid.pop(); sfx('tap'); draw(); };
+    $('payBtn').onclick = () => {
+        const s = sum(paid);
+        if (s === q.price) { answerResult(true, $('payBtn')); feedback(true, `${q.price}원 딱 맞아요! 🛍️`); goNext(1100); }
+        else { answerResult(false, $('payBtn')); feedback(false, s < q.price ? `${q.price - s}원이 모자라요` : `${s - q.price}원이 많아요`); }
+    };
+}
+// 🏁 경주
+function startRace() {
+    G.raceLeft = RACE_SEC;
+    $('board').innerHTML = `<div class="stage track" id="track"><div class="line"></div><div class="finish"></div><div class="car" id="car" style="left:8%">🏎️</div></div>
+        <div class="timer" id="timer">⏱️ ${RACE_SEC}초</div><div class="choices" id="choices"></div>`;
+    G.timers.push(setInterval(() => {
+        G.raceLeft--;
+        $('timer').textContent = `⏱️ ${G.raceLeft}초`;
+        if (G.raceLeft <= 0) finish();
+    }, 1000));
+    raceQuestion();
+}
+function raceQuestion() {
+    G.q = GAMES.race(Math.random, G.age);
+    setProgress();
+    setPrompt(G.q);
+    $('choices').innerHTML = G.q.choices.map((v) => `<button class="choice" data-v="${v}">${v}</button>`).join('');
+    $('choices').onclick = (e) => {
+        const b = e.target.closest('.choice'); if (!b) return;
+        const ok = Number(b.dataset.v) === G.q.answer;
+        if (ok) { sfx('good'); G.correct++; $('car').style.left = `${8 + (G.correct / RACE_GOAL) * 80}%`; feedback(true, '부릉부릉! 🚀'); if (G.correct >= RACE_GOAL) return finish(); }
+        else { sfx('bad'); feedback(false, `정답은 ${G.q.answer}! 다음 문제 💨`); }
+        raceQuestion();
+    };
+}
+
+// ---- 끝 ----
+function starsFor() {
+    if (G.key === 'race') return G.correct >= RACE_GOAL ? 3 : G.correct >= 10 ? 2 : G.correct >= 5 ? 1 : 0;
+    return G.correct >= 9 ? 3 : G.correct >= 6 ? 2 : G.correct >= 3 ? 1 : 0;
+}
+function finish() {
+    clearTimers();
+    if (window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) { /* 무시 */ }
+    const stars = starsFor(), info = GAME_INFO.find((g) => g.key === G.key);
+    const before = Math.floor(save.stars / STARS_PER_STICKER);
+    save.stars += stars;
+    const k = `${G.key}-${G.age}`;
+    save.best[k] = Math.max(save.best[k] || 0, stars);
+    persist();
+    $('starTotal').textContent = `⭐ ${save.stars}`;
+    const gotSticker = Math.floor(save.stars / STARS_PER_STICKER) > before && before < STICKERS.length;
+    $('resTitle').textContent = stars === 3 ? '최고예요! 🏆' : stars === 2 ? '정말 잘했어요!' : stars === 1 ? '잘했어요!' : '다음엔 더 잘할 수 있어요!';
+    $('resStars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+    const detail = G.key === 'race' ? `60초 동안 ${G.correct}문제를 맞혔어요.` : `${ROUND}문제 중 ${G.correct}문제를 한 번에 맞혔어요.`;
+    $('resMsg').innerHTML = `${info.em} ${info.name} (${AGE_NAMES[G.age]})<br>${detail}${gotSticker ? `<br>🎁 새 스티커 <b style="font-size:28px">${STICKERS[before]}</b> 를 받았어요!` : ''}`;
+    show('result');
+    if (stars > 0) { sfx('win'); confetti(); }
+    speak($('resTitle').textContent);
+}
+function confetti() {
+    const em = ['🎉', '⭐', '🎈', '✨', '🌟'];
+    for (let i = 0; i < 24; i++) {
+        const c = document.createElement('span');
+        c.className = 'confetti'; c.textContent = em[i % em.length];
+        c.style.left = `${Math.random() * 100}vw`; c.style.animationDelay = `${Math.random() * 0.8}s`;
+        document.body.appendChild(c); setTimeout(() => c.remove(), 3200);
+    }
+}
+
+// ---- 이벤트 ----
+$('ages').addEventListener('click', (e) => { const b = e.target.closest('[data-age]'); if (!b) return; save.age = Number(b.dataset.age); persist(); sfx('tap'); renderHome(); });
+$('games').addEventListener('click', (e) => { const b = e.target.closest('[data-game]'); if (b) { sfx('tap'); startGame(b.dataset.game); } });
+$('backBtn').addEventListener('click', () => { clearTimers(); G = null; renderHome(); show('home'); });
+$('homeBtn').addEventListener('click', () => { renderHome(); show('home'); });
+$('againBtn').addEventListener('click', () => startGame(G.key));
+$('sayBtn').addEventListener('click', () => { if (G && G.q) { const was = save.voice; save.voice = true; speak(G.q.speak || G.q.text); save.voice = was; } });
+$('soundBtn').addEventListener('click', () => { save.sound = !save.sound; persist(); renderHome(); });
+$('voiceBtn').addEventListener('click', () => { save.voice = !save.voice; persist(); renderHome(); if (save.voice) speak('문제를 읽어 줄게요'); else if (window.speechSynthesis) speechSynthesis.cancel(); });
+renderHome();
+}
+</script>
+</body>
+</html>
