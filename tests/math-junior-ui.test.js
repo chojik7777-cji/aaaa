@@ -1,0 +1,98 @@
+'use strict';
+const test=require('node:test'), assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {chromium,webkit}=require(process.env.PLAYWRIGHT_PATH||'/tmp/note-modal-browser/node_modules/playwright');
+const root=path.resolve(__dirname,'..');
+async function open(t,engine=chromium,policy={ok:true,locked:false,version:1,questionLimit:0},seed={}) {
+ const browser=await engine.launch({headless:true});t.after(()=>browser.close());
+ const ctx=await browser.newContext({viewport:{width:390,height:844}});
+ const calls=[],errors=[];let status=policy;
+ await ctx.addInitScript(data=>{for(const [k,v]of Object.entries(data))localStorage.setItem(k,JSON.stringify(v));},seed);
+ await ctx.route('**/*',route=>{
+  const u=new URL(route.request().url());
+  if(u.pathname==='/api/math-control'){
+   calls.push({action:u.searchParams.get('action'),method:route.request().method()});
+   if(u.searchParams.get('action')==='status')return route.fulfill({json:status});
+   const password=route.request().postDataJSON().password;
+   return route.fulfill({status:password==='verified-fixture'?200:403,json:password==='verified-fixture'?{...status,unlocked:true,limitUnlocked:true}:{error:'거부'}});
+  }
+  if(['/math-junior.html','/math-junior-problems.js'].includes(u.pathname))return route.fulfill({body:fs.readFileSync(path.join(root,u.pathname)),contentType:u.pathname.endsWith('.js')?'application/javascript':'text/html'});
+  return route.abort();
+ });
+ const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('https://fixture.vercel.app/math-junior.html');
+ await page.waitForFunction(()=>typeof controlReady!=='undefined'&&controlReady);
+ t.after(()=>assert.deepEqual(errors,[]));
+ return {page,ctx,calls,setStatus:s=>{status=s;}};
+}
+for(const [name,engine]of [['Chromium',chromium],['WebKit',webkit]])test(name+': quota is conserved across grade/menu/reload, legacy history preserved, unlock verified by server',async t=>{
+ const old={theta:6,nextLevel:6,asked:1,correct:1,history:[{q:'기존 기록',correct:true}],custom:'keep'};
+ const {page,calls}=await open(t,engine,{ok:true,locked:false,version:2,questionLimit:2},{'math-level-game-v1':old});
+ await page.click('#startBtn');
+ const legacy=await page.evaluate(()=>JSON.parse(localStorage.getItem('math-level-game-v1')));
+ assert.deepEqual(legacy,old,'quota must never mutate middle/high learning statistics');
+ await page.click('#skipBtn'); await page.click('#solutionBtn');
+ assert.equal(await page.locator('#solutionPanel').isVisible(),true,'last permitted answer remains readable');
+ await page.click('#nextBtn');assert.equal(await page.locator('#gate').isVisible(),true);
+ await page.fill('#gatePassword','wrong');await page.click('#unlockBtn');
+ assert.equal(await page.locator('#gate').isVisible(),true);
+ await page.fill('#gatePassword','verified-fixture');await page.click('#unlockBtn');
+ await page.waitForFunction(()=>document.querySelector('#gate').hidden);
+ assert(calls.some(c=>c.action==='limit-unlock'&&c.method==='POST'));
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('math-level-game-v1')).asked),1);
+ await page.click('#menuBtn');await page.selectOption('#trackSelect','e6');await page.click('#startBtn');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('math-junior-issued-v1'))),3);
+ assert.equal(await page.evaluate(()=>progress.tracks['k-count'].answered),1);
+ await page.reload();await page.waitForFunction(()=>controlReady);await page.click('#startBtn');
+ assert.equal(await page.locator('#gate').isVisible(),true,'reload discards memory-only grant but never refunds budget');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('math-junior-issued-v1'))),3);
+});
+for(const [name,engine]of [['Chromium',chromium],['WebKit',webkit]])test(name+': central lock, failed status, policy change and forged storage cannot bypass authority',async t=>{
+ const {page,calls,setStatus}=await open(t,engine,{ok:true,locked:true,version:7,questionLimit:0},{'math-level-control-bypass-v1':99999,'math-level-limit-unlock-v1':99999});
+ assert.equal(await page.locator('#gate').isVisible(),true);
+ assert.equal(await page.locator('#startBtn').isDisabled(),true);
+ assert.equal(await page.evaluate(()=>typeof unlockGate),'function','server-verified unlock action must exist');
+ await page.fill('#gatePassword','wrong');await page.click('#unlockBtn');assert.equal(await page.locator('#gate').isVisible(),true);
+ await page.fill('#gatePassword','verified-fixture');await page.click('#unlockBtn');
+ await page.waitForFunction(()=>document.querySelector('#gate').hidden);
+ await page.click('#startBtn');assert.equal(await page.locator('#choiceGrid button:enabled').count(),4);
+ assert(calls.some(c=>c.action==='unlock'&&c.method==='POST'));
+ setStatus({ok:true,locked:true,version:8,questionLimit:0});await page.evaluate(()=>pollMathControl());
+ assert.equal(await page.locator('#choiceGrid button:enabled').count(),0);
+ const before=await page.evaluate(()=>JSON.stringify(progress));
+ await page.evaluate(()=>{answer(current.answer);nextProblem();toggleSolution();});
+ assert.equal(await page.evaluate(()=>JSON.stringify(progress)),before);
+ setStatus({ok:false});await page.evaluate(()=>pollMathControl());
+ assert.equal(await page.locator('#startBtn').isDisabled(),true);
+ setStatus({ok:true,locked:false,version:7,questionLimit:0});await page.evaluate(()=>pollMathControl());
+ assert.equal(await page.locator('#startBtn').isDisabled(),true,'stale policy cannot reopen the game after connection failure');
+});
+for(const [name,engine]of [['Chromium',chromium],['WebKit',webkit]])test(name+': selected grade, four choices, pause/solution union, manual progression, saved independent stats',async t=>{
+ assert(fs.existsSync(path.join(root,'math-junior.html')),'junior playable page must exist');
+ const {page}=await open(t,engine);
+ await page.selectOption('#trackSelect','e4'); await page.click('#startBtn');
+ assert.equal(await page.locator('#choiceGrid button').count(),4);
+ assert.match(await page.locator('#trackLabel').textContent(),/4학년/);
+ const before=await page.evaluate(()=>localStorage.getItem('math-junior-progress-v1'));
+ await page.click('#pauseBtn'); await page.click('#solutionBtn');
+ const seconds=await page.evaluate(()=>elapsedSeconds());
+ await page.waitForTimeout(1100);
+ assert.equal(await page.evaluate(()=>elapsedSeconds()),seconds);
+ assert.equal(await page.evaluate(()=>localStorage.getItem('math-junior-progress-v1')),before);
+ await page.click('#solutionBtn');
+ assert.equal(await page.locator('#choiceGrid button:enabled').count(),0);
+ await page.click('#pauseBtn');
+ await page.locator('#choiceGrid button').first().click();
+ const q=await page.locator('#questionText').textContent();
+ await page.waitForTimeout(200);
+ assert.equal(await page.locator('#questionText').textContent(),q);
+ assert.equal(await page.locator('#choiceGrid button:enabled').count(),0);
+ await page.click('#solutionBtn');assert(await page.locator('#solutionSteps li').count()>=2);
+ await page.click('#nextBtn');assert.equal(await page.locator('#solutionPanel').isVisible(),false);
+ await page.click('#skipBtn');await page.click('#menuBtn');
+ assert.equal(await page.locator('#setupPanel').isVisible(),true);
+ const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('math-junior-progress-v1')));
+ assert.equal(saved.tracks.e4.answered,2); assert.equal(saved.selected,'e4');
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ assert.equal(await page.locator('a[href="math-level.html"]').count(),1);
+ assert.equal(await page.locator('a[href="intro.html"]').count(),0);
+});

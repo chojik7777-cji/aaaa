@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>유아·초등 수학 놀이터</title>
+<style>
+*{box-sizing:border-box} [hidden]{display:none!important} body{margin:0;padding:24px 14px 40px;background:linear-gradient(145deg,#e6faf2,#eaf0ff);font-family:system-ui,'맑은 고딕',sans-serif;color:#163d3d;line-height:1.6}main{max-width:840px;margin:auto}header{padding:8px 4px 20px}h1{font-size:clamp(26px,6vw,38px);margin:4px 0}h2{font-size:20px;margin-top:0}.eyebrow{font-size:13px;letter-spacing:.12em;font-weight:800;color:#197c69}.sub{color:#52716e;margin:8px 0}a{color:#156154;font-weight:750;text-underline-offset:4px}.card{background:#fff;border:1px solid #cfe5dd;border-radius:24px;padding:24px;margin-bottom:16px;box-shadow:0 8px 28px #194e4610}label{font-weight:800;display:block}select,input,button{font:inherit;border:2px solid #c6ded5;border-radius:14px;padding:12px;color:inherit}select{width:100%;background:white;margin:8px 0}button{cursor:pointer;background:#f5faf8;font-weight:800;touch-action:manipulation}button:hover:not(:disabled){border-color:#14816c;background:#e4f5ee}button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #e19a22;outline-offset:3px}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:#147c65;color:white;border-color:#147c65}.primary:hover:not(:disabled){background:#0d624f}.topics{padding:12px 16px;background:#f2f8f5;border-radius:12px;min-height:48px}.start{width:100%;font-size:21px;margin-top:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}.stat{background:white;border:1px solid #cfe5dd;padding:12px 8px;border-radius:16px;text-align:center;font-size:13px}.stat strong{display:block;font-size:22px}.question{background:#f0f8f3;border-radius:20px;padding:22px 14px;text-align:center}#questionText{font-size:clamp(23px,5vw,34px);line-height:1.5;margin:14px 0;overflow-wrap:anywhere}.meta{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:14px;color:#4c6b60}#visual{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;padding:14px 4px;font-size:42px;line-height:1.7;overflow-wrap:anywhere}#visual.comparison{flex-direction:column;font-size:32px}#choiceGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}#choiceGrid button{min-height:88px;font-size:clamp(24px,5vw,34px);background:#fff;border-width:3px;overflow-wrap:anywhere}#choiceGrid button.correct{background:#e0f6e5;border-color:#218548;opacity:1}#choiceGrid button.wrong{background:#fff0e8;border-color:#c85d30;opacity:1}.tools{display:flex;flex-wrap:wrap;gap:8px}.tools button{flex:1;min-width:130px}.solution-button{width:100%;margin-top:14px}#solutionPanel{padding:20px;border-radius:16px;background:#fff8e4;margin-top:12px;overflow-wrap:anywhere}#solutionSteps{padding-left:24px}#solutionSteps li{margin:10px 0}#feedback{font-weight:800;min-height:32px;margin:12px 0}#history{padding-left:20px;color:#52716e;font-size:14px}#history li{padding:6px 0;border-bottom:1px solid #edf3ef}.note{font-size:13px;color:#57716a}.gate{position:fixed;inset:0;z-index:50;background:#173933b8;display:grid;place-items:center;padding:20px;backdrop-filter:blur(5px)}.gate .card{width:100%;max-width:420px}.gate input,.gate button{width:100%;margin-top:10px}#gateError{color:#ae3328;min-height:26px}footer{text-align:center;font-size:12px;color:#52716e;margin-top:20px}@media(max-width:480px){body{padding:14px 10px 30px}.card{padding:18px 14px;border-radius:20px}#choiceGrid{gap:10px}#choiceGrid button{min-height:92px}.stat strong{font-size:20px}}
+/* Spatial words must match the picture, including narrow phone screens. */
+#visual.comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;font-size:clamp(18px,5vw,28px)}
+#visual.comparison span{min-width:0;width:auto;white-space:pre-line;overflow-wrap:anywhere;text-align:center}
+</style>
+</head>
+<body><main>
+<header><span class="eyebrow">LITTLE MATH GARDEN</span><h1>🌱 유아·초등 수학 놀이터</h1><p class="sub">그림으로 시작하고, 한 문제씩 자신감을 키워요.<br>유아 3단계 · 초등 1~6학년의 <b>대표 학습 영역</b> 연습입니다.</p><a href="math-level.html">중1~고3 수학으로 →</a></header>
+<div class="stats" aria-label="선택 과정의 학습 기록"><div class="stat">풀어 본 문제<strong id="answeredStat">0</strong></div><div class="stat">맞힌 문제<strong id="correctStat">0</strong></div><div class="stat">정답률<strong id="accuracyStat">—</strong></div></div>
+<section class="card" id="setupPanel"><h2>오늘은 무엇을 배울까요?</h2><label for="trackSelect">학습 과정 선택 · 선택 과정 고정</label><select id="trackSelect"></select><p class="topics" id="topics"></p><p class="note">학년은 자동으로 바뀌지 않아요. 단원을 번갈아 연습해요.<br>전체 교육과정 평가가 아닌 대표 유형 연습입니다.</p><button id="startBtn" class="primary start" disabled>함께 시작해요 →</button><p class="note" id="controlStatus" role="status">학습 설정을 확인하고 있어요…</p></section>
+<section class="card" id="gamePanel" hidden><div class="question"><div class="meta"><span id="trackLabel"></span><span id="topicLabel"></span><span id="timeText">0초</span></div><h2 id="questionText"></h2><div id="visual" role="img" hidden></div></div><div id="choiceGrid" aria-label="네 가지 답 중 하나를 골라요"></div><p id="feedback" role="status" aria-live="polite"></p><div class="tools"><button id="skipBtn">모르겠어요</button><button id="pauseBtn">⏸ 멈춤</button><button id="menuBtn">메뉴로 가기</button><button id="nextBtn" class="primary" hidden>다음 문제 →</button></div><button id="solutionBtn" class="solution-button" aria-expanded="false" aria-controls="solutionPanel">💡 풀이과정 보기</button><section id="solutionPanel" aria-labelledby="solutionHeading" hidden><h2 id="solutionHeading">차근차근 풀어 봐요</h2><ol id="solutionSteps"></ol><strong id="solutionAnswer"></strong></section><p class="note">풀이를 읽거나 멈춘 시간은 제외해요. 정답을 고른 뒤 직접 다음 문제를 눌러요.</p></section>
+<section class="card"><h2>🌼 이 과정의 최근 기록</h2><ol id="history"></ol><p class="note">기록은 이 브라우저에 저장돼요. 유아·초등 기록은 중·고등 기록과 따로 관리합니다. 문제 수 제한은 함께 적용하며, 새 문제를 받을 때 사용 횟수가 차감됩니다.</p></section><footer>made by jeongik · 즐겁게, 천천히, 꾸준히</footer>
+</main>
+<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle" hidden><div class="card"><h2 id="gateTitle">🔐 수학게임 잠금</h2><p id="gateMessage">비번입력</p><label for="gatePassword">비번입력</label><input id="gatePassword" type="password" autocomplete="off" placeholder="비번입력"><button id="unlockBtn" class="primary">계속하기</button><p id="gateError" role="alert"></p></div></div>
+<script src="math-junior-problems.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), SAVE_KEY='math-junior-progress-v1';
+let progress={selected:'k-count',tracks:{}};
+try{const p=JSON.parse(localStorage.getItem(SAVE_KEY));if(p&&p.tracks&&typeof p.tracks==='object')progress={selected:MathJunior.tracks.some(t=>t.id===p.selected)?p.selected:'k-count',tracks:p.tracks};}catch(_){}
+let current=null, paused=false, solutionOpen=false, startedAt=0, pauseStarted=0, pausedTotal=0, frozenSeconds=0;
+let controlReady=false, centralLocked=true, limitLocked=false, policy={locked:true,version:0,questionLimit:5};
+// Grants are intentionally memory-only: browser storage never authenticates a student.
+let controlGrant=-1, limitGrant=-1, gateMode=null, unlockBusy=false, budgetFloor=0;
+const LEGACY_KEY='math-level-game-v1', BUDGET_KEY='math-junior-issued-v1';
+function count(v){return Number.isSafeInteger(v)&&v>=0?v:0;}
+function readBudget(){const legacy=JSON.parse(localStorage.getItem(LEGACY_KEY)||'null');const issued=JSON.parse(localStorage.getItem(BUDGET_KEY)||'0');return count(issued)+count(legacy?.asked);}
+function quotaReached(){return policy.questionLimit>0&&limitGrant!==policy.version&&readBudget()>=policy.questionLimit;}
+function reserveQuestion(){
+ const used=readBudget();
+ if(policy.questionLimit>0&&limitGrant!==policy.version&&used>=policy.questionLimit){showGate('limit');return false;}
+ // Quota is separate from learning statistics: never rewrite the old game's save.
+ const issued=count(JSON.parse(localStorage.getItem(BUDGET_KEY)||'0'));
+ localStorage.setItem(BUDGET_KEY,JSON.stringify(issued+1));
+ budgetFloor=used+1;
+ return true;
+}
+function showGate(mode){gateMode=mode;limitLocked=mode==='limit';$('gateTitle').textContent=mode==='limit'?'🔑 계속 풀기':'🔐 수학게임 잠금';$('gateMessage').textContent=mode==='limit'?'비번입력':(policy.message||'비번입력');$('gate').hidden=false;if(solutionOpen){stoppedChange(()=>{solutionOpen=false;});clearSolution();}updateControls();}
+function validPolicy(p){return p&&p.ok===true&&typeof p.locked==='boolean'&&Number.isSafeInteger(p.version)&&p.version>=0&&Number.isSafeInteger(p.questionLimit)&&p.questionLimit>=0;}
+function applyPolicy(p){
+ if(!validPolicy(p))throw Error('설정 응답이 올바르지 않습니다.');
+ if(p.version<policy.version)throw Error('설정이 바뀌었습니다. 다시 확인해 주세요.');
+ policy=p;controlReady=true;centralLocked=p.locked&&controlGrant!==p.version;
+ if(centralLocked)showGate('control');
+ else {
+  const changedQuestion=current&&(current.controlVersion!==p.version||current.questionLimit!==p.questionLimit||readBudget()>current.budgetAtIssue);
+  if((limitLocked||changedQuestion)&&quotaReached())showGate('limit');
+  else{limitLocked=false;gateMode=null;$('gate').hidden=true;}
+ }
+ $('controlStatus').textContent=p.questionLimit>0?`중·고등과 함께 ${p.questionLimit}문제 제한 · 새 문제를 받으면 1회 사용해요.`:'선택한 과정 안에서 차근차근 연습해요.';
+ updateControls();
+}
+async function unlockGate(){
+ if(unlockBusy||!gateMode)return;
+ unlockBusy=true;$('unlockBtn').disabled=true;$('gateError').textContent='';
+ const mode=gateMode, action=mode==='control'?'unlock':'limit-unlock';
+ try{
+  const res=await fetch('/api/math-control?action='+action,{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({password:$('gatePassword').value})});
+  const data=await res.json();
+  if(!res.ok||!validPolicy(data)||!(mode==='control'?data.unlocked===true:data.limitUnlocked===true))throw Error(data.error||'해제할 수 없습니다.');
+  if(data.version<policy.version)throw Error('설정이 바뀌었습니다. 다시 입력해 주세요.');
+  if(mode==='control')controlGrant=data.version;else limitGrant=data.version;
+  $('gatePassword').value='';applyPolicy(data);
+  if(!centralLocked&&!limitLocked&&!$('gamePanel').hidden&&(!current||current.answered))nextProblem();
+ }catch(e){$('gateError').textContent=e.message||'연결을 확인해 주세요.';}
+ finally{unlockBusy=false;$('unlockBtn').disabled=false;}
+}
+function stats(){const s=progress.tracks[progress.selected];return s&&Number.isInteger(s.answered)&&s.answered>=0&&Number.isInteger(s.correct)&&s.correct>=0&&s.correct<=s.answered&&Array.isArray(s.history)?s:{answered:0,correct:0,issued:0,history:[]};}
+function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(progress));}catch(_){$('controlStatus').textContent='기록 저장을 사용할 수 없어요.';}}
+function elapsedSeconds(){if(!current)return 0;if(current.answered)return frozenSeconds;return Math.max(0,Math.floor(((paused||solutionOpen?pauseStarted:Date.now())-startedAt-pausedTotal)/1000));}
+function stoppedChange(action){const was=paused||solutionOpen;action();const now=paused||solutionOpen;if(!was&&now)pauseStarted=Date.now();if(was&&!now){pausedTotal+=Date.now()-pauseStarted;pauseStarted=0;}}
+function refresh(){const s=stats();$('answeredStat').textContent=s.answered;$('correctStat').textContent=s.correct;$('accuracyStat').textContent=s.answered?Math.round(s.correct/s.answered*100)+'%':'—';$('topics').textContent='대표 학습 영역 · '+MathJunior.tracks.find(t=>t.id===progress.selected).topics.join(' · ');$('history').replaceChildren(...s.history.slice(-8).reverse().map(h=>{const li=document.createElement('li');li.textContent=`${h.correct?'✓':'다시 연습'} ${h.topic} · ${h.text} → ${h.answer} · ${h.seconds}초`;return li;}));if(!s.history.length){const li=document.createElement('li');li.textContent='첫 문제를 풀면 여기에 기록돼요.';$('history').append(li);}updateControls();}
+function updateControls(){const locked=!controlReady||centralLocked||limitLocked;const inactive=locked||paused||solutionOpen||!current||current.answered;document.querySelectorAll('#choiceGrid button').forEach(b=>b.disabled=inactive);$('startBtn').disabled=locked;$('skipBtn').disabled=inactive;$('pauseBtn').disabled=locked||!current||current.answered;$('pauseBtn').textContent=paused?'▶ 계속하기':'⏸ 멈춤';$('solutionBtn').disabled=locked||!current;$('nextBtn').hidden=!current?.answered;$('nextBtn').disabled=locked||paused||!current?.answered;$('timeText').textContent=elapsedSeconds()+'초'+(paused?' · 멈춤':'');}
+function clearSolution(){$('solutionPanel').hidden=true;$('solutionBtn').setAttribute('aria-expanded','false');$('solutionSteps').replaceChildren();$('solutionAnswer').textContent='';solutionOpen=false;}
+function nextProblem(){if(!controlReady||centralLocked||limitLocked)return;try{if(!reserveQuestion())return;}catch(_){controlReady=false;$('controlStatus').textContent='문제 수를 안전하게 저장할 수 없어 시작하지 않았어요. 브라우저 저장 공간을 확인해 주세요.';updateControls();return;}clearSolution();paused=false;pausedTotal=0;pauseStarted=0;const s=stats();current=MathJunior.generate(progress.selected,s.issued||0);current.controlVersion=policy.version;current.questionLimit=policy.questionLimit;current.budgetAtIssue=budgetFloor;s.issued=(s.issued||0)+1;progress.tracks[progress.selected]=s;save();current.answered=false;startedAt=Date.now();$('trackLabel').textContent=MathJunior.tracks.find(t=>t.id===progress.selected).label+' · 고정';$('topicLabel').textContent=current.topic;$('questionText').textContent=current.text;$('visual').hidden=!current.visual;$('visual').replaceChildren();if(current.visual){$('visual').setAttribute('aria-label',current.visual.label);$('visual').className=current.template==='compare'?'comparison':'';current.visual.symbols.forEach(v=>{const span=document.createElement('span');span.textContent=current.template==='compare'?v.replace(' ','\n'):v;$('visual').append(span);});}$('choiceGrid').replaceChildren(...current.choices.map((c,i)=>{const b=document.createElement('button');b.type='button';b.textContent=c;b.dataset.choice=c;b.setAttribute('aria-label',`${i+1}번 보기 ${c}`);b.onclick=()=>answer(c);return b;}));$('feedback').textContent='';refresh();}
+function answer(value,skip=false){if(!current||current.answered||!controlReady||centralLocked||limitLocked||paused||solutionOpen||$('gamePanel').hidden)return;frozenSeconds=elapsedSeconds();current.answered=true;const correct=!skip&&String(value)===String(current.answer);const s=stats();s.answered++;if(correct)s.correct++;s.history.push({text:current.text,topic:current.topic,answer:current.answer,correct,seconds:frozenSeconds});s.history=s.history.slice(-80);progress.tracks[progress.selected]=s;save();document.querySelectorAll('#choiceGrid button').forEach(b=>{if(b.dataset.choice===String(current.answer))b.classList.add('correct');else if(b.dataset.choice===String(value))b.classList.add('wrong');});$('feedback').textContent=correct?'🌟 잘했어요! 정답이에요.':`괜찮아요! 정답은 ${current.answer}예요. 풀이를 함께 볼까요?`;refresh();}
+function toggleSolution(){if(!current||!controlReady||centralLocked||limitLocked)return;stoppedChange(()=>{solutionOpen=!solutionOpen;});$('solutionPanel').hidden=!solutionOpen;$('solutionBtn').setAttribute('aria-expanded',String(solutionOpen));if(solutionOpen){$('solutionSteps').replaceChildren(...current.solutionSteps.map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));$('solutionAnswer').textContent='정답: '+current.answer;}updateControls();}
+async function pollMathControl(){try{const res=await fetch('/api/math-control?action=status',{cache:'no-store'});if(!res.ok)throw Error();applyPolicy(await res.json());}catch(_){controlReady=false;$('controlStatus').textContent='학습 설정에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.';updateControls();}}
+$('unlockBtn').onclick=unlockGate;$('gatePassword').onkeydown=e=>{if(e.key==='Enter')unlockGate();};
+window.addEventListener('storage',e=>{if(e.key===BUDGET_KEY||e.key===LEGACY_KEY)pollMathControl();});
+MathJunior.tracks.forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.label;$('trackSelect').append(o);});$('trackSelect').value=progress.selected;
+$('trackSelect').onchange=()=>{progress.selected=$('trackSelect').value;save();refresh();};
+$('startBtn').onclick=()=>{if(!controlReady||centralLocked||limitLocked)return;$('setupPanel').hidden=true;$('gamePanel').hidden=false;nextProblem();};
+$('nextBtn').onclick=()=>{if(current?.answered&&!paused)nextProblem();};$('skipBtn').onclick=()=>answer(null,true);$('solutionBtn').onclick=toggleSolution;
+$('pauseBtn').onclick=()=>{if(!current||current.answered||!controlReady||centralLocked||limitLocked)return;stoppedChange(()=>{paused=!paused;});updateControls();};
+$('menuBtn').onclick=()=>{current=null;paused=false;clearSolution();$('gamePanel').hidden=true;$('setupPanel').hidden=false;refresh();};
+setInterval(updateControls,500);setInterval(pollMathControl,5000);refresh();pollMathControl();
+</script></body></html>
