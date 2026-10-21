@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '..');
 const game = fs.readFileSync(path.join(root, 'math-level.html'), 'utf8');
 const intro = fs.readFileSync(path.join(root, 'intro.html'), 'utf8');
 
-assert.match(game, /<title>수학 레벨 진단 게임<\/title>/, '수학 레벨 진단 게임 페이지 제목이 있어야 합니다');
+assert.match(game, /<title>수학게임<\/title>/, '중·고등 전용 수학게임 페이지 제목이 있어야 합니다');
 assert.match(game, /id="startLevel"/, '시작 레벨 선택 UI가 있어야 합니다');
 assert.match(game, /id="questionText"/, '문제 표시 영역이 있어야 합니다');
 assert.doesNotMatch(game, /id="answerInput"/, '직접 입력칸 대신 객관식 보기만 사용해야 합니다');
@@ -54,7 +54,7 @@ assert.match(game, /state\.theta \+=/, '풀이 결과에 따라 추정 레벨이
 assert.match(game, /localStorage\.setItem\(SAVE_KEY/, '진행 기록이 저장되어야 합니다');
 assert.match(game, /최근 풀이 흐름/, '풀이 흐름 시각화가 있어야 합니다');
 assert.match(game, /function curriculumLabel\(/, '추정 레벨을 교과 라벨로 바꾸는 함수가 있어야 합니다');
-assert.match(intro, /href="math-level\.html">수학 문제풀이 레벨 게임<\/a>/, '소개 페이지에 수학 문제풀이 레벨 게임 링크가 있어야 합니다');
+assert.match(intro, /href="math-level\.html">수학게임 · 중등·고등<\/a>/, '소개 페이지에 중·고등 전용 수학게임 링크가 있어야 합니다');
 assert.match(intro, /href="math-control\.html"[^>]*class="dashboard-link"[^>]*>수학관리<\/a>/, '소개 페이지에 수학관리 링크가 있어야 합니다');
 assert.doesNotMatch(game, /← 소개 페이지/, '수학게임 페이지 하단에는 소개 페이지 링크가 없어야 합니다');
 assert.doesNotMatch(game, /href="intro\.html"/, '수학게임 페이지에는 소개 페이지로 돌아가는 링크가 없어야 합니다');

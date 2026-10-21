@@ -93,6 +93,6 @@ for(const [name,engine]of [['Chromium',chromium],['WebKit',webkit]])test(name+':
  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('math-junior-progress-v1')));
  assert.equal(saved.tracks.e4.answered,2); assert.equal(saved.selected,'e4');
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
- assert.equal(await page.locator('a[href="math-level.html"]').count(),1);
+ assert.equal(await page.locator('a[href="math-level.html"]').count(),0);
  assert.equal(await page.locator('a[href="intro.html"]').count(),0);
 });
