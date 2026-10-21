@@ -134,11 +134,11 @@ function restoreJuniorTransfer(raw){
 }
 if(window.GameTransfer){
  const transfer=window.GameTransfer.mount({gameId:'math-junior',title:'수학놀이터',
-  description:'선택한 과정과 과정별 학습 기록을 JSON 파일로 저장하고 불러옵니다. 불러온 뒤 메뉴에서 새 문제를 시작합니다. 비밀번호·잠금 해제 정보는 저장하지 않으며, 사용한 문제 수는 줄어들지 않습니다.',
+  description:'저장하기를 누르면 공부한 기록을 간직해요. 불러오기를 누르면 저장한 기록을 다시 꺼내요.',
   capture:()=>validateJuniorTransfer({progress,issued:JSON.parse(localStorage.getItem(BUDGET_KEY)||'0')}),
   validate:validateJuniorTransfer,canImport:()=>unlockBusy?'비밀번호 확인이 끝난 뒤 불러와 주세요.':true,restore:restoreJuniorTransfer});
  transfer.panel.style.maxWidth='840px';transfer.panel.style.width='100%';
- transfer.panel.querySelector('h2').textContent='학습 기록 저장·불러오기';
+ transfer.panel.querySelector('h2').textContent='내 공부 기록';
  transfer.exportBtn.textContent='저장하기';transfer.importBtn.textContent='불러오기';
 }
 </script></body></html>
