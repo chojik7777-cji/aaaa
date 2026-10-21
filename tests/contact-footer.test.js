@@ -23,6 +23,7 @@ const pages = [
   'note2.html',
   'detail-admin-jik-2026.html',
   'ladder.html',
+  'math-island.html',
 ];
 
 for (const page of pages) {
