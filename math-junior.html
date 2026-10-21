@@ -19,6 +19,7 @@
 </main>
 <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle" hidden><div class="card"><h2 id="gateTitle">🔐 수학게임 잠금</h2><p id="gateMessage">비번입력</p><label for="gatePassword">비번입력</label><input id="gatePassword" type="password" autocomplete="off" placeholder="비번입력"><button id="unlockBtn" class="primary">계속하기</button><p id="gateError" role="alert"></p></div></div>
 <script src="math-junior-problems.js"></script>
+<script src="game-transfer.js?v=game-transfer-v1"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id), SAVE_KEY='math-junior-progress-v1';
@@ -91,4 +92,53 @@ $('nextBtn').onclick=()=>{if(current?.answered&&!paused)nextProblem();};$('skipB
 $('pauseBtn').onclick=()=>{if(!current||current.answered||!controlReady||centralLocked||limitLocked)return;stoppedChange(()=>{paused=!paused;});updateControls();};
 $('menuBtn').onclick=()=>{current=null;paused=false;clearSolution();$('gamePanel').hidden=true;$('setupPanel').hidden=false;refresh();};
 setInterval(updateControls,500);setInterval(pollMathControl,5000);refresh();pollMathControl();
+// Portable learning records only; passwords, grants and server policy never cross this boundary.
+function validateJuniorTransfer(raw){
+ const fail=()=>{throw Error('수학놀이터 기록 형식이나 범위가 올바르지 않습니다.');};
+ const obj=v=>{if(!v||typeof v!=='object'||Array.isArray(v))fail();return v;};
+ const integer=(v,min,max)=>{if(!Number.isSafeInteger(v)||v<min||v>max)fail();return v;};
+ const text=(v,max)=>{if(typeof v!=='string'||v.length>max)fail();return v;};
+ obj(raw);const p=obj(raw.progress);obj(p.tracks);
+ const ids=MathJunior.tracks.map(t=>t.id);if(!ids.includes(p.selected))fail();
+ const tracks={};
+ for(const id of Object.keys(p.tracks)){
+  if(!ids.includes(id))fail();const s=obj(p.tracks[id]);
+  const answered=integer(s.answered,0,1000000),correct=integer(s.correct,0,answered),issued=integer(s.issued,answered,1000000);
+  if(!Array.isArray(s.history)||s.history.length>Math.min(80,answered))fail();
+  const history=s.history.map(h=>{
+   obj(h);if(typeof h.correct!=='boolean')fail();
+   const answer=typeof h.answer==='string'?text(h.answer,80):h.answer;
+   if(typeof answer!=='string'&&(typeof answer!=='number'||!Number.isFinite(answer)||Math.abs(answer)>1e12))fail();
+   return {text:text(h.text,1000),topic:text(h.topic,120),answer,correct:h.correct,seconds:integer(h.seconds,0,100000000)};
+  });
+  const recentCorrect=history.filter(h=>h.correct).length;
+  if(recentCorrect>correct||history.length-recentCorrect>answered-correct)fail();
+  tracks[id]={answered,correct,issued,history};
+ }
+ const sum=Object.values(tracks).reduce((n,s)=>n+s.issued,0);
+ return {progress:{selected:p.selected,tracks},issued:Math.max(integer(raw.issued,0,100000000),sum)};
+}
+function restoreJuniorTransfer(raw){
+ if(unlockBusy)throw Error('비밀번호 확인이 끝난 뒤 불러와 주세요.');
+ const data=validateJuniorTransfer(raw);
+ const used=JSON.parse(localStorage.getItem(BUDGET_KEY)||'0');
+ if(!Number.isSafeInteger(used)||used<0)throw Error('현재 문제 수 기록을 확인할 수 없습니다.');
+ const issued=Math.max(used,data.issued);
+ // Persist transactionally before replacing visible state. Never refund destination usage.
+ window.GameTransfer.persist({[SAVE_KEY]:JSON.stringify(data.progress),[BUDGET_KEY]:JSON.stringify(issued)});
+ progress=data.progress;current=null;paused=false;pauseStarted=0;pausedTotal=0;startedAt=0;frozenSeconds=0;
+ clearSolution();$('choiceGrid').replaceChildren();$('feedback').textContent='';$('questionText').textContent='';$('visual').replaceChildren();$('visual').hidden=true;
+ $('setupPanel').hidden=false;$('gamePanel').hidden=true;$('trackSelect').value=progress.selected;
+ if(controlReady&&!centralLocked&&quotaReached())showGate('limit');
+ refresh();
+}
+if(window.GameTransfer){
+ const transfer=window.GameTransfer.mount({gameId:'math-junior',title:'수학놀이터',
+  description:'선택한 과정과 과정별 학습 기록을 JSON 파일로 저장하고 불러옵니다. 불러온 뒤 메뉴에서 새 문제를 시작합니다. 비밀번호·잠금 해제 정보는 저장하지 않으며, 사용한 문제 수는 줄어들지 않습니다.',
+  capture:()=>validateJuniorTransfer({progress,issued:JSON.parse(localStorage.getItem(BUDGET_KEY)||'0')}),
+  validate:validateJuniorTransfer,canImport:()=>unlockBusy?'비밀번호 확인이 끝난 뒤 불러와 주세요.':true,restore:restoreJuniorTransfer});
+ transfer.panel.style.maxWidth='840px';transfer.panel.style.width='100%';
+ transfer.panel.querySelector('h2').textContent='학습 기록 저장·불러오기';
+ transfer.exportBtn.textContent='저장하기';transfer.importBtn.textContent='불러오기';
+}
 </script></body></html>
