@@ -206,6 +206,7 @@
     <p class="footer">made by jeongik<br>문의 : <a href="mailto:chojeongik@naver.com">chojeongik@naver.com</a></p>
 </div>
 
+<script src="game-transfer.js?v=game-transfer-v1"></script>
 <script>
 'use strict';
 // ===== 문제 만들기 (화면과 무관한 순수 함수, 테스트에서도 사용) =====
@@ -765,6 +766,42 @@ $('sayBtn').addEventListener('click', () => { if (G && G.q) { const was = save.v
 $('soundBtn').addEventListener('click', () => { save.sound = !save.sound; persist(); renderHome(); });
 $('voiceBtn').addEventListener('click', () => { save.voice = !save.voice; persist(); renderHome(); if (save.voice) speak('문제를 읽어 줄게요'); else if (window.speechSynthesis) speechSynthesis.cancel(); });
 renderHome();
+
+// Only this island's completed records travel with the file, never browser-wide storage.
+function validateIslandTransfer(raw) {
+    const fail = () => { throw new Error('수학 모험섬에서 저장한 기록을 골라 주세요.'); };
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail();
+    const integer = (v, min, max) => { if (!Number.isSafeInteger(v) || v < min || v > max) fail(); return v; };
+    const age = integer(raw.age, 0, 6), stars = integer(raw.stars, 0, 1000000000);
+    if (typeof raw.sound !== 'boolean' || typeof raw.voice !== 'boolean' || !raw.best || typeof raw.best !== 'object' || Array.isArray(raw.best)) fail();
+    const best = {};
+    for (const key of Object.keys(raw.best)) {
+        if (!GAME_INFO.some(g => key.startsWith(g.key + '-') && /^[0-6]$/.test(key.slice(g.key.length + 1)))) fail();
+        best[key] = integer(raw.best[key], 0, 3);
+    }
+    return { age, stars, best, sound: raw.sound, voice: raw.voice };
+}
+function restoreIslandTransfer(raw) {
+    const nextSave = validateIslandTransfer(raw);
+    // Persist before stopping a live round so failure leaves the current game untouched.
+    window.GameTransfer.persist({ [SAVE_KEY]: JSON.stringify(nextSave) });
+    clearTimers(); G = null;
+    if (window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) { /* 음성 없이 메뉴로 돌아가기 */ }
+    if (actx) { try { actx.close().catch(() => {}); } catch (e) { /* already closed */ } actx = null; }
+    document.querySelectorAll('.confetti').forEach(el => el.remove());
+    $('board').replaceChildren(); $('feedback').textContent = ''; $('prompt').textContent = '';
+    save = nextSave; renderHome(); show('home');
+}
+if (window.GameTransfer) {
+    const transfer = window.GameTransfer.mount({
+        gameId: 'math-island', title: '수학 모험섬',
+        description: '저장하기를 누르면 모은 별과 스티커를 간직해요. 불러오기를 누르면 저장한 기록을 다시 꺼내요.',
+        capture: () => validateIslandTransfer(save), validate: validateIslandTransfer, restore: restoreIslandTransfer
+    });
+    transfer.panel.style.maxWidth = '760px'; transfer.panel.style.width = '100%';
+    transfer.panel.querySelector('h2').textContent = '내 모험 기록';
+    transfer.exportBtn.textContent = '저장하기'; transfer.importBtn.textContent = '불러오기';
+}
 }
 </script>
 </body>

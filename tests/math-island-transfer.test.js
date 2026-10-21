@@ -1,0 +1,32 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {chromium,webkit}=require('/tmp/note-modal-browser/node_modules/playwright');const root=path.resolve(__dirname,'..');
+const seed={age:3,stars:12,best:{'frog-3':2,'race-3':3,'shop-0':1},sound:false,voice:false};
+async function open(t,engine=chromium){const b=await engine.launch({headless:true});t.after(()=>b.close());const p=await b.newPage({viewport:{width:390,height:844}});const errors=[];p.on('pageerror',e=>errors.push(e.message));t.after(()=>assert.deepEqual(errors,[]));p.on('dialog',d=>d.accept());await p.route('**/*',r=>{const u=new URL(r.request().url());if(['/math-island.html','/game-transfer.js'].includes(u.pathname))return r.fulfill({body:fs.readFileSync(path.join(root,u.pathname)),contentType:u.pathname.endsWith('.js')?'application/javascript':'text/html'});return r.abort();});await p.addInitScript(seed=>{if(!localStorage.getItem('math-island-v1'))localStorage.setItem('math-island-v1',JSON.stringify(seed));localStorage.setItem('unrelated-auth-test','keep');},seed);await p.goto('http://fixture.local/math-island.html');return p;}
+async function upload(p,payload){await p.locator('#game-import-file').setInputFiles({name:'island.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(payload))});await p.waitForFunction(()=>!document.getElementById('game-import-file').disabled);}
+async function download(p){const [d]=await Promise.all([p.waitForEvent('download'),p.click('#game-export-btn')]);return JSON.parse(fs.readFileSync(await d.path(),'utf8'));}
+for(const [name,engine]of [['Chromium',chromium],['WebKit',webkit]])test(name+': real bottom buttons roundtrip stars, best scores, grade and settings with reload',async t=>{
+ const p=await open(t,engine);assert.equal(await p.locator('#game-export-btn').count(),1,'맨 아래에 저장하기가 필요합니다');assert.equal(await p.locator('#game-export-btn').textContent(),'저장하기');assert.equal(await p.locator('#game-import-btn').textContent(),'불러오기');assert.doesNotMatch(await p.locator('#game-transfer-panel').textContent(),/JSON|Export|Import/);
+ const payload=await download(p);assert.equal(payload.game,'math-island');assert.deepEqual(payload.data,seed);
+ await p.locator('[data-age="6"]').click();await p.click('#soundBtn');await p.click('#voiceBtn');await upload(p,payload);
+ assert.match(await p.locator('#game-transfer-status').textContent(),/불러왔습니다/);assert.equal(await p.locator('#starTotal').textContent(),'⭐ 12');assert.equal(await p.locator('#stickers .lock').count(),18);assert.equal(await p.locator('[data-game="frog"] .stars').textContent(),'⭐⭐☆');assert(await p.locator('[data-age="3"]').evaluate(e=>e.classList.contains('on')));
+ await p.reload();assert.deepEqual(await p.evaluate(()=>JSON.parse(localStorage.getItem('math-island-v1'))),seed);assert.equal(await p.evaluate(()=>localStorage.getItem('unrelated-auth-test')),'keep');
+ for(const width of [320,390,1280]){await p.setViewportSize({width,height:844});assert(await p.evaluate(()=>{const m=document.querySelector('.wrap').getBoundingClientRect(),panel=document.getElementById('game-transfer-panel').getBoundingClientRect();return panel.top>=m.bottom&&Math.abs(panel.width-m.width)<2&&m.width===Math.min(760,innerWidth-28)&&document.documentElement.scrollWidth<=innerWidth;}));}
+});
+test('invalid and other-game files are rejected, cancellation and failed storage preserve the running game',async t=>{
+ const p=await open(t);const payload=await download(p);await p.locator('[data-game="race"]').click();
+ const before=await p.evaluate(()=>localStorage.getItem('math-island-v1'));
+ const invalid=[];
+ for(const mutate of [d=>d.age=7,d=>d.stars=-1,d=>d.stars='12',d=>d.sound='false',d=>d.voice=null,d=>d.best={'fish-7':2},d=>d.best={'frog-3':4},d=>d.best={'<img src=x onerror=alert(1)>':1}]){const d=structuredClone(payload);mutate(d.data);invalid.push(d);}
+ invalid.push({...payload,game:'math-junior'});
+ for(const d of invalid){await upload(p,d);assert.equal(await p.evaluate(()=>localStorage.getItem('math-island-v1')),before);assert(await p.locator('#play').isVisible());assert.equal(await p.locator('#board img').count(),0);assert.doesNotMatch(await p.locator('#game-transfer-status').textContent(),/불러왔습니다/);}
+ p.removeAllListeners('dialog');p.on('dialog',d=>d.dismiss());await upload(p,payload);assert(await p.locator('#play').isVisible());assert.equal(await p.evaluate(()=>localStorage.getItem('math-island-v1')),before);
+ p.removeAllListeners('dialog');p.on('dialog',d=>d.accept());await p.evaluate(()=>{const proto=Object.getPrototypeOf(localStorage),original=proto.setItem;proto.setItem=function(k,v){if(k==='math-island-v1')throw Error('fixture full');return original.call(this,k,v);};});await upload(p,payload);assert(await p.locator('#play').isVisible());assert.equal(await p.evaluate(()=>localStorage.getItem('math-island-v1')),before);assert.match(await p.locator('#game-transfer-status').textContent(),/저장|권한/);
+});
+for(const [name,engine]of [['Chromium',chromium],['WebKit',webkit]])test(name+': importing during race or pending frog animations cancels old work and strips unknown fields',async t=>{
+ const p=await open(t,engine);const payload=await download(p);payload.data.age=5;payload.data.stars=20;payload.data.password='do-not-copy';payload.data.policy={locked:false};payload.data.best['fish-0']=3;
+ for(const key of ['race','frog']){await p.locator(`[data-game="${key}"]`).click();if(key==='frog'){for(let i=0;i<4;i++){await p.locator('#choices button').nth(i).click();if(await p.locator('#feedback').evaluate(e=>e.classList.contains('good')))break;}}
+ await upload(p,payload);assert(await p.locator('#home').isVisible());assert.equal(await p.locator('#board').textContent(),'');await p.waitForTimeout(key==='frog'?3500:1300);assert(await p.locator('#home').isVisible());assert.equal(await p.locator('#board').textContent(),'');const restored=await p.evaluate(()=>JSON.parse(localStorage.getItem('math-island-v1')));assert.equal(restored.age,5);assert.equal(restored.stars,20);assert.deepEqual(Object.keys(restored).sort(),['age','best','sound','stars','voice']);}
+ const exported=await download(p);assert.equal(exported.data.password,undefined);assert.equal(exported.data.policy,undefined);assert.equal(await p.evaluate(()=>localStorage.getItem('unrelated-auth-test')),'keep');
+});
+module.exports={open,upload,download,seed};
